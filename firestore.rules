@@ -2,12 +2,14 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // 1. Verifica que exista una sesión autenticada válida en Firebase Auth
+    // 1. Sesión Firebase Auth válida (nunca anónima sin perfil de worker)
     function isAuthenticated() {
-      return request.auth != null && request.auth.uid != null;
+      return request.auth != null
+        && request.auth.uid != null
+        && request.auth.token.firebase.sign_in_provider != 'anonymous';
     }
 
-    // 2. Verifica el documento de perfil del colaborador en /workers/{uid}
+    // 2. Perfil del colaborador en /workers/{uid}
     function hasWorkerProfile() {
       return isAuthenticated() && exists(/databases/$(database)/documents/workers/$(request.auth.uid));
     }
@@ -16,52 +18,59 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/workers/$(request.auth.uid)).data;
     }
 
-    // 3. Verifica si el usuario autenticado cuenta con privilegios de Administración Global (RBAC)
+    // 3. Admin global: solo vía perfil worker o custom claims verificados por Admin SDK
+    //    (eliminados emails hardcodeados y token.rol sin claims reales — Semana 2 / S18)
     function isAdmin() {
       return isAuthenticated() && (
-        (request.auth.token.email_verified == true && (request.auth.token.email == 'superadmin@aldea-abogados.pe' || request.auth.token.email == 'admin@aldea-abogados.pe')) ||
-        (request.auth.token.rol in ['super_admin', 'admin', 'socio']) ||
+        (request.auth.token.rol is string && request.auth.token.rol in ['super_admin', 'admin', 'socio']) ||
         (hasWorkerProfile() && getWorkerProfile().rol in ['super_admin', 'admin', 'socio'])
       );
     }
 
-    // 4. Verifica aislamiento perimetral por sede (Multi-Sede Isolation)
+    // 4. Aislamiento por sede — documentos SIN sede se deniegan (S4)
     function canAccessSedeData(docData) {
       return isAdmin() || (
-        hasWorkerProfile() && (
+        hasWorkerProfile() &&
+        ('sede' in docData) &&
+        (
           getWorkerProfile().sede in ['todas', 'global'] ||
-          !('sede' in docData) ||
           docData.sede == getWorkerProfile().sede
         )
       );
     }
 
-    // 5. Validación estructural mínima de integridad de documentos
     function isValidPayload() {
       return request.resource.data.keys().size() <= 120;
     }
 
-    // Metadatos de Sincronización Multi-Sede y Tombstones
+    // Prohibir secretos de autenticación en la nube (S5)
+    function hasNoAuthSecrets() {
+      return !('password' in request.resource.data)
+        && !('pin' in request.resource.data)
+        && !('clave' in request.resource.data)
+        && !('passwordHash' in request.resource.data)
+        && !('pinHash' in request.resource.data)
+        && !('passwordPlain' in request.resource.data)
+        && !('pinPlain' in request.resource.data);
+    }
+
     match /_meta/{metaId} {
-      allow read: if isAuthenticated();
+      allow read: if isAuthenticated() && hasWorkerProfile();
       allow write: if isAdmin() && isValidPayload();
     }
 
-    // Reglas para Casos Jurídicos y Expedientes (Aislamiento por Sede + RBAC)
     match /casos/{casoId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
       allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
       allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
     }
 
-    // Reglas para Caja Chica y Centros de Costo
     match /caja_chica/{movId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
       allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
       allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
     }
 
-    // Reglas para Control de Asistencia Biométrica / GPS
     match /attendance/{asistenciaId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
       allow create: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data)
@@ -70,19 +79,18 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
-    // Reglas para Padrón de Colaboradores (Workers)
     match /workers/{workerId} {
-      // Lectura: administradores o el propio colaborador (los hashes de otros no deben ser legibles)
       allow read: if isAdmin() || (isAuthenticated() && workerId == request.auth.uid);
-      allow create, delete: if isAdmin();
-      // Un colaborador puede editar su perfil pero NO su rol, sede ni permisos
-      allow update: if isAdmin() || (isAuthenticated() && workerId == request.auth.uid
-        && request.resource.data.get('rol', null) == resource.data.get('rol', null)
-        && request.resource.data.get('sede', null) == resource.data.get('sede', null)
-        && request.resource.data.get('permisos', null) == resource.data.get('permisos', null));
+      allow create: if isAdmin() && isValidPayload() && hasNoAuthSecrets();
+      allow delete: if isAdmin();
+      allow update: if hasNoAuthSecrets() && (
+        isAdmin() || (isAuthenticated() && workerId == request.auth.uid
+          && request.resource.data.get('rol', null) == resource.data.get('rol', null)
+          && request.resource.data.get('sede', null) == resource.data.get('sede', null)
+          && request.resource.data.get('permisos', null) == resource.data.get('permisos', null))
+      );
     }
 
-    // Reglas para Citas, Documentos, Inventario y Presupuestos
     match /citas/{citaId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
       allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
@@ -107,16 +115,15 @@ service cloud.firestore {
       allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
     }
 
-    // Registro Forense de Auditoría (Inmutable: prohibido editar o borrar trazas)
     match /auditoria/{audId} {
       allow read: if isAdmin();
       allow create: if isAuthenticated() && isValidPayload();
       allow update, delete: if false;
     }
 
-    // Denegar por defecto cualquier colección desconocida no declarada explícitamente
+    // Deny-by-default: colecciones no declaradas quedan bloqueadas (S4 catch-all)
     match /{document=**} {
-      allow read, write: if isAdmin();
+      allow read, write: if false;
     }
   }
 }

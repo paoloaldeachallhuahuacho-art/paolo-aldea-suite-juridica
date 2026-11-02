@@ -174,44 +174,23 @@ class AlertEngine {
       }
     }
 
-    // 3. Envío seguro por Proxy Serverless (Netlify Function) con fallback directo para entorno local
-    if (s && s.telegramChatId) {
+    // 3. Telegram SOLO vía proxy Netlify (Semana 2: sin fallback con bot token en el cliente)
+    if (s && (s.telegramEnabled !== false)) {
       try {
-        const text = `⚖️ *${title}*\n\n${message}`;
-        const proxyPayload = {
-          chatId: s.telegramChatId,
-          token: s.telegramToken || undefined,
-          text: text
+        const text = `⚖️ ${title}\n\n${message}`;
+        const headers = { "Content-Type": "application/json" };
+        const sendViaProxy = async () => {
+          if (window.firebaseService && typeof window.firebaseService.getIdToken === "function") {
+            const idTok = await window.firebaseService.getIdToken();
+            if (idTok) headers.Authorization = "Bearer " + idTok;
+          }
+          return fetch("/.netlify/functions/telegram-proxy", {
+            method: "POST",
+            headers,
+            body: JSON.stringify({ text })
+          });
         };
-        fetch("/.netlify/functions/telegram-proxy", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(proxyPayload)
-        }).then((res) => {
-          if (!res.ok && s.telegramToken) {
-            return fetch(`https://api.telegram.org/bot${s.telegramToken}/sendMessage`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: s.telegramChatId,
-                text: text,
-                parse_mode: "Markdown"
-              })
-            });
-          }
-        }).catch(() => {
-          if (s.telegramToken) {
-            fetch(`https://api.telegram.org/bot${s.telegramToken}/sendMessage`, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                chat_id: s.telegramChatId,
-                text: text,
-                parse_mode: "Markdown"
-              })
-            }).catch(e => console.warn("Telegram silent error:", e));
-          }
-        });
+        sendViaProxy().catch(e => console.warn("Telegram proxy:", e));
       } catch (te) {
         console.warn("Telegram fail:", te);
       }
@@ -941,29 +920,47 @@ class AlertEngine {
       if (item.source === 'caja') targetModuleName = 'Caja Chica';
       if (item.source === 'inventario') targetModuleName = 'Inventario & Archivo';
 
+      const esc = (typeof window.escapeHtml === "function") ? window.escapeHtml : (v) => String(v == null ? "" : v);
+      const safeId = esc(item.id);
+      const safeSource = esc(item.source);
       return `
-        <div class="p-3.5 rounded-xl border ${border} flex items-start gap-3 transition hover:shadow-sm">
+        <div class="p-3.5 rounded-xl border ${border} flex items-start gap-3 transition hover:shadow-sm" data-alert-id="${safeId}" data-alert-source="${safeSource}">
           <i class="fa-solid ${icon} text-lg mt-0.5 shrink-0"></i>
           <div class="flex-1 min-w-0">
-            <h4 class="text-xs font-bold text-slate-900 leading-tight">${item.title}</h4>
-            <p class="text-xs text-slate-700 mt-0.5 line-clamp-2">${item.subtitle}</p>
+            <h4 class="text-xs font-bold text-slate-900 leading-tight">${esc(item.title)}</h4>
+            <p class="text-xs text-slate-700 mt-0.5 line-clamp-2">${esc(item.subtitle)}</p>
             <div class="flex items-center gap-2 mt-2">
               <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-slate-600">
-                <i class="fa-regular fa-clock text-[10px]"></i> ${item.meta}
+                <i class="fa-regular fa-clock text-[10px]"></i> ${esc(item.meta)}
               </span>
               ${item.source === 'cita' ? `
-                <button onclick="window.app.openWhatsAppModal('${item.id}'); event.stopPropagation();" class="ml-auto text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded flex items-center gap-1 shadow-sm transition" title="Enviar mensaje o recordatorio por WhatsApp">
+                <button type="button" data-action="whatsapp" class="ml-auto text-[11px] font-bold text-emerald-800 bg-emerald-100 hover:bg-emerald-200 border border-emerald-300 px-2 py-0.5 rounded flex items-center gap-1 shadow-sm transition" title="Enviar mensaje o recordatorio por WhatsApp">
                   <i class="fa-brands fa-whatsapp text-emerald-600"></i> WhatsApp
                 </button>
               ` : ''}
-              <button onclick="window.alerts.goToItem('${item.source}', '${item.id}')" class="${item.source === 'cita' ? '' : 'ml-auto'} text-[11px] font-bold text-slate-900 hover:text-amber-700 underline flex items-center gap-1">
-                Ver en ${targetModuleName} <i class="fa-solid fa-arrow-right text-[9px]"></i>
+              <button type="button" data-action="goto" class="${item.source === 'cita' ? '' : 'ml-auto'} text-[11px] font-bold text-slate-900 hover:text-amber-700 underline flex items-center gap-1">
+                Ver en ${esc(targetModuleName)} <i class="fa-solid fa-arrow-right text-[9px]"></i>
               </button>
             </div>
           </div>
         </div>
       `;
     }).join("");
+
+    listEl.querySelectorAll("[data-action]").forEach((btn) => {
+      btn.addEventListener("click", (ev) => {
+        ev.stopPropagation();
+        const row = btn.closest("[data-alert-id]");
+        if (!row) return;
+        const id = row.getAttribute("data-alert-id");
+        const source = row.getAttribute("data-alert-source");
+        if (btn.getAttribute("data-action") === "whatsapp" && window.app && typeof window.app.openWhatsAppModal === "function") {
+          window.app.openWhatsAppModal(id);
+        } else if (btn.getAttribute("data-action") === "goto") {
+          this.goToItem(source, id);
+        }
+      });
+    });
   }
 
   goToItem(source, id) {

@@ -38,6 +38,17 @@ const AttendanceModule = (function () {
     window.showToast = showToast;
   }
 
+  function esc(str) {
+    if (typeof window.escapeHtml === "function") return window.escapeHtml(str);
+    if (str === null || str === undefined) return "";
+    return String(str)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#039;");
+  }
+
   // Lugares predefinidos para simulación / pruebas de oficina y diligencias en Cotabambas
   const PRESET_LOCATIONS = {
     sim_oficina: {
@@ -880,7 +891,11 @@ const AttendanceModule = (function () {
       if (cargoEl) cargoEl.textContent = worker.cargo;
       if (dniEl) dniEl.textContent = `DNI: ${worker.dni}`;
       if (roleBadgeEl) {
-        roleBadgeEl.innerHTML = window.db ? window.db.getRoleBadge(worker.rol) : (worker.rol || "Colaborador");
+        if (window.db && typeof window.db.getRoleBadge === "function") {
+          roleBadgeEl.innerHTML = window.db.getRoleBadge(worker.rol);
+        } else {
+          roleBadgeEl.textContent = worker.rol || "Colaborador";
+        }
       }
     } else {
       selectedWorker = null;
@@ -1286,7 +1301,7 @@ const AttendanceModule = (function () {
               <span><i class="fas fa-sign-out-alt text-amber-400 mr-1"></i>Salida: <strong>${horaSalida}</strong></span>
               <span><i class="fas fa-map-marker-alt text-cyan-400 mr-1"></i>Distancia: <strong>${r.distanciaMetros} m</strong></span>
             </div>
-            ${r.motivoExterno ? `<div class="text-xs text-amber-300/90 bg-amber-950/30 p-1.5 rounded border border-amber-500/20 mt-1"><strong>Diligencia:</strong> ${r.motivoExterno} <br><span class="text-slate-400 text-[11px]">${r.justificacion || ""}</span></div>` : ""}
+            ${r.motivoExterno ? `<div class="text-xs text-amber-300/90 bg-amber-950/30 p-1.5 rounded border border-amber-500/20 mt-1"><strong>Diligencia:</strong> ${esc(r.motivoExterno)} <br><span class="text-slate-400 text-[11px]">${esc(r.justificacion || "")}</span></div>` : ""}
           </div>
         </div>
       `;
@@ -1755,17 +1770,18 @@ const AttendanceModule = (function () {
         statusBadge = `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-rose-400 bg-rose-950/60 border border-rose-500/30 px-2 py-0.5 rounded">Rechazado</span>`;
       }
 
+      const safeId = esc(r.id);
       html += `
-        <tr class="hover:bg-slate-800/40 border-b border-slate-800/60 transition-colors">
+        <tr class="hover:bg-slate-800/40 border-b border-slate-800/60 transition-colors" data-att-id="${safeId}">
           <td class="py-3 px-3">
             <div class="flex items-center gap-1.5 flex-wrap">
-              <span class="font-bold text-slate-200 text-xs">${r.nombre}</span>
+              <span class="font-bold text-slate-200 text-xs">${esc(r.nombre)}</span>
               ${window.renderSedeBadge ? window.renderSedeBadge(r.sede) : ''}
             </div>
-            <div class="text-[11px] text-slate-400">${r.cargo} | DNI: ${r.dni}</div>
+            <div class="text-[11px] text-slate-400">${esc(r.cargo)} | DNI: ${esc(r.dni)}</div>
           </td>
           <td class="py-3 px-3 text-xs text-slate-300 whitespace-nowrap">
-            <i class="far fa-calendar text-slate-500 mr-1"></i>${r.fecha}
+            <i class="far fa-calendar text-slate-500 mr-1"></i>${esc(r.fecha)}
           </td>
           <td class="py-3 px-3 text-xs whitespace-nowrap">
             <div class="text-emerald-400 font-semibold"><i class="fas fa-arrow-right text-[10px] mr-1"></i>${horaIngreso}</div>
@@ -1775,24 +1791,24 @@ const AttendanceModule = (function () {
             ${geoBadge}
           </td>
           <td class="py-3 px-3 text-xs">
-            ${r.motivoExterno ? `<div class="font-semibold text-amber-300 text-[11px]">${r.motivoExterno}</div><div class="text-slate-400 text-[11px] truncate max-w-xs" title="${r.justificacion}">${r.justificacion}</div>` : '<span class="text-slate-500 text-[11px]">Jornada Presencial Sede Central</span>'}
+            ${r.motivoExterno ? `<div class="font-semibold text-amber-300 text-[11px]">${esc(r.motivoExterno)}</div><div class="text-slate-400 text-[11px] truncate max-w-xs" title="${esc(r.justificacion)}">${esc(r.justificacion)}</div>` : '<span class="text-slate-500 text-[11px]">Jornada Presencial Sede Central</span>'}
           </td>
           <td class="py-3 px-3">
             ${statusBadge}
           </td>
           <td class="py-3 px-3 text-right whitespace-nowrap space-x-1">
             ${r.estadoAprobacion === "pendiente" ? `
-              <button onclick="AttendanceModule.approveRecord('${r.id}')" title="Aprobar diligencia" class="p-1.5 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded text-xs transition-colors">
+              <button type="button" data-att-action="approve" title="Aprobar diligencia" class="p-1.5 bg-emerald-600/80 hover:bg-emerald-600 text-white rounded text-xs transition-colors">
                 <i class="fas fa-check"></i>
               </button>
-              <button onclick="AttendanceModule.openRejectModal('${r.id}')" title="Rechazar diligencia" class="p-1.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded text-xs transition-colors">
+              <button type="button" data-att-action="reject" title="Rechazar diligencia" class="p-1.5 bg-rose-600/80 hover:bg-rose-600 text-white rounded text-xs transition-colors">
                 <i class="fas fa-times"></i>
               </button>
             ` : ""}
-            <button onclick="AttendanceModule.showDetailModal('${r.id}')" title="Ver detalle de auditoría" class="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded text-xs transition-colors">
+            <button type="button" data-att-action="detail" title="Ver detalle de auditoría" class="p-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 rounded text-xs transition-colors">
               <i class="fas fa-eye"></i>
             </button>
-            <button onclick="AttendanceModule.deleteRecord('${r.id}')" title="Eliminar registro" class="p-1.5 bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-400 rounded text-xs transition-colors">
+            <button type="button" data-att-action="delete" title="Eliminar registro" class="p-1.5 bg-slate-800 hover:bg-rose-900/60 text-slate-400 hover:text-rose-400 rounded text-xs transition-colors">
               <i class="fas fa-trash-alt"></i>
             </button>
           </td>
@@ -1801,6 +1817,17 @@ const AttendanceModule = (function () {
     });
 
     tbody.innerHTML = html;
+    tbody.querySelectorAll("[data-att-action]").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const id = btn.closest("[data-att-id]")?.getAttribute("data-att-id");
+        if (!id) return;
+        const action = btn.getAttribute("data-att-action");
+        if (action === "approve") AttendanceModule.approveRecord(id);
+        else if (action === "reject") AttendanceModule.openRejectModal(id);
+        else if (action === "detail") AttendanceModule.showDetailModal(id);
+        else if (action === "delete") AttendanceModule.deleteRecord(id);
+      });
+    });
   }
 
   /**
@@ -1817,22 +1844,22 @@ const AttendanceModule = (function () {
     content.innerHTML = `
       <div class="space-y-3 text-xs">
         <div class="grid grid-cols-2 gap-2 bg-slate-950/60 p-3 rounded-lg border border-slate-800">
-          <div><span class="text-slate-400">Colaborador:</span> <strong class="text-slate-200 block">${rec.nombre}</strong></div>
-          <div><span class="text-slate-400">DNI:</span> <strong class="text-slate-200 block">${rec.dni}</strong></div>
-          <div><span class="text-slate-400">Cargo:</span> <strong class="text-slate-200 block">${rec.cargo}</strong></div>
-          <div><span class="text-slate-400">Fecha:</span> <strong class="text-slate-200 block">${rec.fecha}</strong></div>
+          <div><span class="text-slate-400">Colaborador:</span> <strong class="text-slate-200 block">${esc(rec.nombre)}</strong></div>
+          <div><span class="text-slate-400">DNI:</span> <strong class="text-slate-200 block">${esc(rec.dni)}</strong></div>
+          <div><span class="text-slate-400">Cargo:</span> <strong class="text-slate-200 block">${esc(rec.cargo)}</strong></div>
+          <div><span class="text-slate-400">Fecha:</span> <strong class="text-slate-200 block">${esc(rec.fecha)}</strong></div>
         </div>
         <div class="grid grid-cols-2 gap-2 bg-slate-950/60 p-3 rounded-lg border border-slate-800">
-          <div><span class="text-slate-400">Hora Ingreso:</span> <strong class="text-emerald-400 block">${rec.ingreso ? new Date(rec.ingreso).toLocaleString("es-PE") : "No registrado"}</strong></div>
-          <div><span class="text-slate-400">Hora Salida:</span> <strong class="text-amber-400 block">${rec.salida ? new Date(rec.salida).toLocaleString("es-PE") : "No registrado"}</strong></div>
-          <div><span class="text-slate-400">Coordenadas:</span> <strong class="text-cyan-400 block">${rec.latitud}, ${rec.longitud}</strong></div>
-          <div><span class="text-slate-400">Distancia a Sede Central:</span> <strong class="text-slate-200 block">${rec.distanciaMetros} metros</strong></div>
+          <div><span class="text-slate-400">Hora Ingreso:</span> <strong class="text-emerald-400 block">${rec.ingreso ? esc(new Date(rec.ingreso).toLocaleString("es-PE")) : "No registrado"}</strong></div>
+          <div><span class="text-slate-400">Hora Salida:</span> <strong class="text-amber-400 block">${rec.salida ? esc(new Date(rec.salida).toLocaleString("es-PE")) : "No registrado"}</strong></div>
+          <div><span class="text-slate-400">Coordenadas:</span> <strong class="text-cyan-400 block">${esc(rec.latitud)}, ${esc(rec.longitud)}</strong></div>
+          <div><span class="text-slate-400">Distancia a Sede Central:</span> <strong class="text-slate-200 block">${esc(rec.distanciaMetros)} metros</strong></div>
         </div>
         ${rec.motivoExterno ? `
           <div class="bg-amber-950/40 p-3 rounded-lg border border-amber-500/30">
             <span class="text-amber-400 font-bold block mb-1">Diligencia Externa Declarada:</span>
-            <p class="text-slate-200 font-semibold mb-1">${rec.motivoExterno}</p>
-            <p class="text-slate-300 italic">${rec.justificacion || "Sin justificación adicional"}</p>
+            <p class="text-slate-200 font-semibold mb-1">${esc(rec.motivoExterno)}</p>
+            <p class="text-slate-300 italic">${esc(rec.justificacion || "Sin justificación adicional")}</p>
           </div>
         ` : ""}
         <div class="bg-slate-950/60 p-3 rounded-lg border border-slate-800">

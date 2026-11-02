@@ -2111,11 +2111,23 @@ class DataManager {
               const existingTime = new Date(existing.updatedAt || existing.fechaModificacion || existing.fecha || existing.timestamp || 0).getTime();
 
               if (incomingTime >= existingTime) {
-                currentList[idx] = Object.assign({}, existing, incomingItem);
+                const merged = Object.assign({}, existing, incomingItem);
+                // Credenciales locales nunca se pisan con el hub (hashes no viajan a la nube)
+                if (col === "workers") {
+                  if (existing.passwordHash) merged.passwordHash = existing.passwordHash;
+                  if (existing.pinHash) merged.pinHash = existing.pinHash;
+                  delete merged.password;
+                  delete merged.pin;
+                  delete merged.clave;
+                }
+                currentList[idx] = merged;
                 updated++;
               }
             } else {
-              currentList.push(incomingItem);
+              const toAdd = (col === "workers")
+                ? (() => { const w = { ...incomingItem }; delete w.password; delete w.pin; delete w.clave; delete w.passwordHash; delete w.pinHash; return w; })()
+                : incomingItem;
+              currentList.push(toAdd);
               currentMap.set(key, currentList.length - 1);
               added++;
             }

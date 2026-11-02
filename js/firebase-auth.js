@@ -395,24 +395,31 @@ class FirebaseLegalService {
   }
 
   /**
-   * Garantiza sesión activa en Firebase Auth (Email o Anónima de respaldo para reglas Firestore)
+   * Garantiza sesión Firebase Auth real (email/password u OAuth).
+   * Semana 2: se eliminó signInAnonymously — sin sesión nominal no hay sync a Firestore.
    */
   async ensureAuthSession() {
     if (!this.auth) return false;
     if (this.auth.currentUser) {
+      if (this.auth.currentUser.isAnonymous) {
+        try { await this.auth.signOut(); } catch (_) {}
+        this.currentUser = null;
+        return false;
+      }
       this.currentUser = this.auth.currentUser;
       return true;
     }
-    try {
-      const cred = await this.auth.signInAnonymously();
-      if (cred && cred.user) {
-        this.currentUser = cred.user;
-        return true;
-      }
-    } catch (_) {
-      // Si Anonymous Auth no está habilitado en consola Firebase, continuar
-    }
     return false;
+  }
+
+  /** Devuelve ID token actual para proxies Netlify (Telegram, etc.). */
+  async getIdToken(forceRefresh = false) {
+    if (!(await this.ensureAuthSession())) return null;
+    try {
+      return await this.auth.currentUser.getIdToken(!!forceRefresh);
+    } catch (_) {
+      return null;
+    }
   }
 
   /**
@@ -433,7 +440,11 @@ class FirebaseLegalService {
       }
     }
 
-    await this.ensureAuthSession();
+    const authed = await this.ensureAuthSession();
+    if (!authed) {
+      if (!silent) throw new Error("Firebase Auth requerido: inicie sesión con correo institucional (Anonymous Auth deshabilitado).");
+      return null;
+    }
 
     this.isSyncing = true;
     try {

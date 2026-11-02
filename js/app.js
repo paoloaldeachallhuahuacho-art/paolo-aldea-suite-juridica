@@ -5761,10 +5761,13 @@ ${callToAction}
     };
 
     toast.className = "toast-enter bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border border-slate-700 text-sm max-w-sm pointer-events-auto";
-    toast.innerHTML = `
-      <i class="fa-solid ${icons[type] || icons.success} text-lg"></i>
-      <div class="flex-1 font-medium">${message}</div>
-    `;
+    const iconEl = document.createElement("i");
+    iconEl.className = `fa-solid ${icons[type] || icons.success} text-lg`;
+    const textEl = document.createElement("div");
+    textEl.className = "flex-1 font-medium";
+    textEl.textContent = String(message == null ? "" : message);
+    toast.appendChild(iconEl);
+    toast.appendChild(textEl);
 
     container.appendChild(toast);
 
