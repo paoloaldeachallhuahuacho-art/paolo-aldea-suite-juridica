@@ -1,0 +1,188 @@
+      <section id="view-presupuestos" class="tab-view hidden space-y-4">
+        <!-- Frase Jurídica Oficial de Sección y Exportaciones -->
+        <div class="bg-gradient-to-r from-amber-950 via-slate-900 to-slate-950 text-white p-3.5 rounded-xl shadow-sm border border-amber-900/50 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400 font-bold shrink-0">
+              <i class="fa-solid fa-file-invoice-dollar text-sm"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold text-amber-300 font-serif-legal tracking-wide">«Ratio pecuniae in iustitia • Provisio et prosperitas»</div>
+              <div class="text-[11px] text-slate-300 italic">“La prudente asignación de recursos y provisión económica sostienen la firmeza y éxito del ejercicio legal”</div>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="window.pdfExporter.exportModulePdf('presupuestos')" class="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Exportar presupuesto en PDF con membrete oficial">
+              <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+            </button>
+            <button onclick="window.excelExporter.exportModule('presupuestos')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Exportar presupuesto en Excel con formato contable">
+              <i class="fa-solid fa-file-excel"></i> Exportar Excel
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Tarjetas de Resumen Financiero Superior -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <!-- 1. CAPEX: Inversión Inicial -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Inversión Inicial (CAPEX)</span>
+              <span class="w-7 h-7 rounded-lg bg-blue-50 text-blue-700 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-building-circle-check"></i>
+              </span>
+            </div>
+            <div id="presSummaryCapex" class="text-2xl font-bold text-blue-950 font-mono mt-1">S/ 0.00</div>
+            <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+              <i class="fa-solid fa-info-circle text-blue-500"></i> Infraestructura, letreros y licencias
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-600 to-indigo-600"></div>
+          </div>
+
+          <!-- 2. OPEX: Gasto Operativo Mensual -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Gasto Operativo Mensual (OPEX)</span>
+              <span class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-arrows-spin"></i>
+              </span>
+            </div>
+            <div id="presSummaryOpex" class="text-2xl font-bold text-emerald-950 font-mono mt-1">S/ 0.00</div>
+            <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+              <i class="fa-solid fa-bolt text-emerald-500"></i> Alquiler, Claro, luz, agua y marketing
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-emerald-600 to-teal-500"></div>
+          </div>
+
+          <!-- 3. Fondo de Contingencia -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Fondo de Contingencia</span>
+              <span class="w-7 h-7 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-shield-halved"></i>
+              </span>
+            </div>
+            <div id="presSummaryContingencia" class="text-2xl font-bold text-amber-950 font-mono mt-1">S/ 0.00</div>
+            <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+              <i class="fa-solid fa-triangle-exclamation text-amber-500"></i> Bloqueos, clima y emergencias procesales
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-yellow-500"></div>
+          </div>
+
+          <!-- 4. Asignación de Caja Chica -->
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm relative overflow-hidden">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-bold text-slate-500 uppercase tracking-wider">Asignación de Caja Chica</span>
+              <span class="w-7 h-7 rounded-lg bg-purple-50 text-purple-700 flex items-center justify-center text-xs">
+                <i class="fa-solid fa-vault"></i>
+              </span>
+            </div>
+            <div id="presSummaryCajaChica" class="text-2xl font-bold text-purple-950 font-mono mt-1">S/ 0.00</div>
+            <div class="text-[10px] text-slate-400 mt-1 flex items-center gap-1">
+              <i class="fa-solid fa-receipt text-purple-500"></i> Fondo rotatorio para aranceles y copias
+            </div>
+            <div class="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-purple-600 to-pink-500"></div>
+          </div>
+        </div>
+
+        <!-- Barra de Total General Consolidado y Eficiencia de Ejecución -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-950 text-white p-3.5 px-5 rounded-xl border border-slate-700 shadow-sm flex flex-wrap items-center justify-between gap-4">
+          <div class="flex flex-wrap items-center gap-4 sm:gap-6">
+            <div>
+              <span class="text-[10px] text-slate-400 uppercase tracking-wider font-bold block">Presupuesto Inicial:</span>
+              <span id="presSummaryTotal" class="text-xl font-bold text-amber-400 font-mono">S/ 0.00</span>
+            </div>
+            <div class="border-l border-slate-700 pl-4 sm:pl-6">
+              <span class="text-[10px] text-emerald-300 uppercase tracking-wider font-bold block">Total Ejecutado (Gasto Real):</span>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span id="presSummaryEjecutado" class="text-xl font-bold text-emerald-400 font-mono">S/ 0.00</span>
+                <span id="presSummaryPctUsado" class="text-[11px] font-bold px-2 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-800">0.0% usado</span>
+              </div>
+            </div>
+            <div class="border-l border-slate-700 pl-4 sm:pl-6">
+              <span class="text-[10px] text-amber-300 uppercase tracking-wider font-bold block">Saldo No Usado (Disponible):</span>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span id="presSummarySaldo" class="text-xl font-bold text-white font-mono">S/ 0.00</span>
+                <span id="presSummaryPctNoUsado" class="text-[11px] font-bold px-2 py-0.5 rounded bg-amber-950 text-amber-300 border border-amber-800">100.0% disponible</span>
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-300">
+            <span id="presSummaryCount" class="font-bold text-white bg-slate-800 px-3 py-1 rounded-full border border-slate-700">0 partidas</span>
+            <span class="text-slate-400 text-[11px] hidden sm:inline">• Sede Challhuahuacho</span>
+          </div>
+        </div>
+
+        <!-- Filtros y Herramientas -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2 flex-1 max-w-3xl">
+            <div class="relative flex-1 min-w-[200px]">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="searchPresupuesto" oninput="window.app.renderPresupuestos()" placeholder="Buscar por concepto, categoría, notas o responsable..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-600">
+            </div>
+
+            <select id="filterTipoPresupuesto" onchange="window.app.renderPresupuestos()" class="text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todos los Tipos</option>
+              <option value="CAPEX">Inversión Inicial (CAPEX)</option>
+              <option value="OPEX">Gasto Operativo (OPEX)</option>
+              <option value="Contingencia">Fondo de Contingencia</option>
+              <option value="Caja Chica">Asignación Caja Chica</option>
+            </select>
+
+            <select id="filterCentroCostoPresupuesto" onchange="window.app.renderPresupuestos()" class="text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-semibold text-slate-800">
+              <option value="ALL">🏢 Todos los Centros de Costo</option>
+              <option value="ADM">ADM • Administración y Finanzas</option>
+              <option value="LOG">LOG • Logística y Transportes</option>
+              <option value="SRI">SRI • Relaciones Comunitarias</option>
+              <option value="SEG">SEG • Seguridad Ocupacional (SST)</option>
+            </select>
+
+            <select id="filterCategoriaPresupuesto" onchange="window.app.renderPresupuestos()" class="text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todas las Categorías</option>
+              <option value="Gastos Legales y Constitución">Gastos Legales y Constitución</option>
+              <option value="Infraestructura y Mobiliario">Infraestructura y Mobiliario</option>
+              <option value="Marketing y Publicidad">Marketing y Publicidad (Personal Eventual)</option>
+              <option value="Gastos Fijos (Alquiler, Luz, Agua, Internet Claro)">Gastos Fijos (Alquiler, Luz, Claro)</option>
+              <option value="Viáticos, Pasajes, Alimentación">Viáticos, Pasajes, Alimentación</option>
+              <option value="Fondo de Contingencia">Fondo de Contingencia</option>
+              <option value="Asignación de Caja Chica">Asignación de Caja Chica</option>
+            </select>
+
+            <select id="filterFrecuenciaPresupuesto" onchange="window.app.renderPresupuestos()" class="text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todas las Frecuencias</option>
+              <option value="Por Días">Por Días</option>
+              <option value="Por Semanas">Por Semanas</option>
+              <option value="Mensual">Mensual</option>
+              <option value="Inversión Única">Inversión Única</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="window.app.openPresupuestoModal()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-plus"></i> Nueva Partida Presupuestaria
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabla Detallada y Responsive -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left legal-table">
+              <thead>
+                <tr>
+                  <th class="w-16">Código</th>
+                  <th>Categoría & Subcategoría</th>
+                  <th>Concepto / Partida Presupuestaria</th>
+                  <th class="text-center">Tipo</th>
+                  <th class="text-center">Frecuencia</th>
+                  <th class="text-center">Cant.</th>
+                  <th class="text-right">Pto. Inicial</th>
+                  <th class="text-center min-w-[190px]">Ejecución Real & % Usado</th>
+                  <th class="text-center">Estado</th>
+                  <th class="text-center">Acciones & Ejecución</th>
+                </tr>
+              </thead>
+              <tbody id="presupuestoTableBody"></tbody>
+            </table>
+          </div>
+        </div>
+      </section>

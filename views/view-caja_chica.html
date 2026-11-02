@@ -1,0 +1,172 @@
+      <section id="view-caja_chica" class="tab-view hidden space-y-4">
+        <!-- Frase Jurídica Oficial de Sección -->
+        <div class="bg-gradient-to-r from-emerald-950 via-slate-900 to-slate-950 text-white p-3.5 rounded-xl shadow-sm border border-emerald-900/50 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-emerald-500/20 border border-emerald-400/40 flex items-center justify-center text-emerald-400 font-bold shrink-0">
+              <i class="fa-solid fa-coins text-sm"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold text-emerald-300 font-serif-legal tracking-wide">«Fides et integritas in omnibus rebus»</div>
+
+  
+              <div class="text-[11px] text-slate-300 italic">“La transparencia y pulcritud en la administración de los fondos es la piedra angular del patrocinio legal”</div>
+
+  
+            </div>
+
+  
+
+</div>
+
+  
+
+<div class="flex items-center gap-2">
+            <button onclick="window.pdfExporter.exportModulePdf('caja_chica')" class="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+            </button>
+            <button onclick="window.excelExporter.exportModule('caja_chica')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-excel"></i> Exportar Excel
+            </button>
+          </div>
+
+  
+
+</div>
+
+  
+
+<!-- Resumen -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 bg-white p-4 rounded-xl border border-slate-200 shadow-sm">
+          <div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase">Saldo Sede Challhuahuacho</div>
+
+  
+            <div id="cajaSummarySaldo" class="text-xl font-bold text-emerald-700 font-mono">S/ 0.00</div>
+
+  
+          </div>
+
+  
+
+<div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase">Total Ingresos / Provisiones</div>
+
+  
+            <div id="cajaSummaryIngresos" class="text-xl font-bold text-slate-800 font-mono">+S/ 0.00</div>
+
+  
+          </div>
+
+  
+
+<div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase">Total Egresos Operativos</div>
+
+  
+            <div id="cajaSummaryEgresos" class="text-xl font-bold text-rose-700 font-mono">-S/ 0.00</div>
+
+  
+          </div>
+
+  
+
+<div>
+            <div class="text-[11px] font-bold text-slate-400 uppercase">Movimientos Registrados</div>
+
+  
+            <div id="cajaSummaryCount" class="text-xl font-bold text-slate-700 font-mono">0</div>
+
+  
+          </div>
+
+  
+
+</div>
+
+  
+
+<!-- Filtros y Acciones -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2 flex-1 max-w-2xl">
+            <div class="relative flex-1 min-w-[200px]">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="searchCajaChica" oninput="window.app.renderCajaChica()" placeholder="Buscar por concepto, expediente, comprobante..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-600">
+            </div>
+
+  
+
+<select id="filterTipoCaja" onchange="window.app.renderCajaChica()" class="text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todos los Tipos</option>
+              <option value="Ingreso">Solo Ingresos</option>
+              <option value="Egreso">Solo Egresos</option>
+            </select>
+            <select id="filterCategoriaCaja" onchange="window.app.renderCajaChica()" class="text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todas las Categorías</option>
+              <option value="Útiles de oficina">Útiles de oficina</option>
+              <option value="Aranceles y Tasas Judiciales">Aranceles y Tasas</option>
+              <option value="Viáticos y Transporte Procesal">Viáticos y Transporte</option>
+              <option value="Notificaciones y Notaría">Notificaciones y Notaría</option>
+              <option value="Fotocopias y Legalizaciones">Fotocopias y Legalizaciones</option>
+              <option value="Honorarios / Adelanto de Gastos">Honorarios / Adelanto</option>
+              <option value="Servicios y Telecomunicaciones">Servicios y Telecom</option>
+              <option value="Suministros y Logística Oficina">Suministros y Logística</option>
+              <option value="Aporte de Capital / Apertura">Aporte de Capital</option>
+              <option value="Otros Gastos">Otros Gastos</option>
+            </select>
+            <select id="filterEstadoAprobacionCaja" onchange="window.app.renderCajaChica()" class="text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todos los Estados de Flujo</option>
+              <option value="pendiente_asistente">⏳ 1. Pendiente Revisión Asistente</option>
+              <option value="elevado_admin">📤 2. Elevado a Socio / Admin</option>
+              <option value="observado">Observado (Por Corregir)</option>
+              <option value="aprobado">Aprobado &amp; Desembolsado</option>
+              <option value="rechazado">❌ Rechazado</option>
+            </select>
+          </div>
+
+  
+
+<div class="flex items-center gap-2">
+            <button onclick="window.app.openCajaModal()" class="bg-blue-900 hover:bg-blue-950 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-plus"></i> Nuevo Movimiento de Caja
+            </button>
+          </div>
+
+  
+
+</div>
+
+  
+
+<!-- Tabla -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left legal-table">
+              <thead>
+                <tr>
+                  <th>Fecha</th>
+                  <th>Tipo</th>
+                  <th>Centro de Costo</th>
+                  <th>Categoría</th>
+                  <th>Concepto / Detalle del Gasto</th>
+                  <th>Expediente</th>
+                  <th>N° Comprobante</th>
+                  <th class="text-right">Monto</th>
+                  <th class="text-center">Estado Flujo & Trazabilidad</th>
+                  <th class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="cajaChicaTableBody"></tbody>
+            </table>
+          </div>
+
+  
+
+</div>
+
+  
+
+</section>
+
+      <!-- =====================================================================
+           VISTA 3: CASOS & LITIGIOS (Con Selector Tabla vs Kanban)
+           ===================================================================== -->
