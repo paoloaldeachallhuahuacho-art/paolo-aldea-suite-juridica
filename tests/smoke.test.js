@@ -64,7 +64,14 @@ JSDOM.fromURL("http://localhost:8765/index.html", {
       w.localStorage.setItem("PAOLO ALDEA_MASTER_UNLOCKED", "true");
     })();    w.scrollTo = () => {};
     w.HTMLCanvasElement.prototype.getContext = () => ({});
-    w.fetch = () => Promise.reject(new Error("offline"));
+    w.fetch = (input) => {
+      const s = String(typeof input === "string" ? input : (input && input.url) || "");
+      if (/views\//.test(s) || /lib\//.test(s)) {
+        const abs = s.startsWith("http") ? s : `http://localhost:8765/${s.replace(/^\//, "")}`;
+        return globalThis.fetch(abs);
+      }
+      return Promise.reject(new Error("offline"));
+    };
     w.alert = () => {}; w.confirm = () => true; w.prompt = () => "";
     w.Notification = undefined;
     w.addEventListener("error", ev => errors.push("window.onerror: " + ev.message + " @" + (ev.filename || "").split("/").pop() + ":" + ev.lineno));
@@ -72,7 +79,7 @@ JSDOM.fromURL("http://localhost:8765/index.html", {
   }
 }).then(dom => {
   const w = dom.window;
-  setTimeout(() => {
+  setTimeout(async () => {
     const app = w.app; console.log("USER:", JSON.stringify(w.db.getCurrentUser()), "| ss keys:", Object.keys(w.sessionStorage).join(",")); console.log("TOASTS:", [...w.document.querySelectorAll("[id*=toast],.toast")].map(e=>e.textContent.trim().slice(0,120)).join(" || "));
     console.log("window.app:", !!app, "| currentTab:", app && app.currentTab);
     const checks = ["switchTab", "toggleMobileSidebar", "setupEventListeners", "compressImageDataUrl", "updateProfilePhotoUI", "handleProfilePhotoUpload", "removeProfilePhoto"];
@@ -81,18 +88,18 @@ JSDOM.fromURL("http://localhost:8765/index.html", {
     const tabs = [...w.document.querySelectorAll(".nav-tab-btn")].map(b => b.dataset.tab);
     console.log("nav tabs:", tabs.join(","));
     const failedTabs = [];
-    tabs.forEach(t => {
+    for (const t of tabs) {
       try {
-        app.switchTab(t);
+        await app.switchTab(t);
         if (t !== "master_admin" && app.currentTab !== t) failedTabs.push(t);
         const v = w.document.getElementById("view-" + t);
         console.log(` tab ${t}: current=${app.currentTab} viewVisible=${v ? !v.classList.contains("hidden") : "NO-VIEW"}`);
       } catch (e) { failedTabs.push(t); console.log(` tab ${t}: EXCEPTION ${e.message}`); }
-    });
+    }
     try { app.toggleMobileSidebar(true); app.toggleMobileSidebar(false); console.log("sidebar toggle ok"); } catch (e) { console.log("sidebar EXC", e.message); }
     console.log("\nERRORES CAPTURADOS (" + errors.length + "):");
     [...new Set(errors)].slice(0, 40).forEach(e => console.log(" - " + e));
-    const real = [...new Set(errors)].filter(e => !/gstatic\.com|cdn\.jsdelivr|supabase-js/.test(e));
+    const real = [...new Set(errors)].filter(e => !/gstatic\.com|cdn\.jsdelivr|supabase-js|can't acquire context|Failed to create chart/.test(e));
     const badTabs = failedTabs;
     const missing = checks.filter(m => !app || typeof app[m] !== "function");
     const ok = !!app && real.length === 0 && badTabs.length === 0 && missing.length === 0;

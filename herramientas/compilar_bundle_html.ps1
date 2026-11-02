@@ -1,6 +1,7 @@
 # ==============================================================================
-# PAOLO ALDEA & ABOGADOS - Compilador de Bundle HTML (Desarrollo a Distribución)
-# Reensambla index.html integrando las vistas actualizadas desde views/*.html
+# PAOLO ALDEA & ABOGADOS - Compilador de Bundle HTML (Semana 3 — shell liviano)
+# Solo inyecta vistas de arranque (asistencia + kpis). El resto y los modales
+# se cargan bajo demanda vía ComponentLoader (views/*.html).
 # ==============================================================================
 
 $baseDir = Split-Path -Parent $PSScriptRoot
@@ -13,18 +14,10 @@ if (-not (Test-Path $viewsDir)) {
     exit 1
 }
 
+# P1: cold-start mínimo — el resto lo trae ComponentLoader al cambiar de pestaña
 $mainViews = @(
     "view-kpis.html",
-    "view-caja_chica.html",
-    "view-casos.html",
-    "view-citas.html",
-    "view-presupuestos.html",
-    "view-inventario.html",
-    "view-documentos.html",
-    "view-asistencia.html",
-    "view-personal.html",
-    "view-roles_permisos.html",
-    "view-master_admin.html"
+    "view-asistencia.html"
 )
 
 $original = [System.IO.File]::ReadAllLines($htmlFile, [System.Text.Encoding]::UTF8)
@@ -69,20 +62,25 @@ foreach ($vf in $mainViews) {
 }
 
 $middleBridge = @()
-if ($mainCloseIdx -gt 0 -and $modalsStartIdx -gt $mainCloseIdx) {
-    $middleBridge = $original[$mainCloseIdx..($modalsStartIdx - 1)]
+if ($mainCloseIdx -gt 0) {
+    if ($modalsStartIdx -gt $mainCloseIdx) {
+        $middleBridge = $original[$mainCloseIdx..($modalsStartIdx - 1)]
+    } else {
+        # Ya no hay bloque de modales inlined: tomar desde </main> hasta scripts
+        $middleBridge = $original[$mainCloseIdx..($endIdx - 1)]
+    }
 }
 
-$modalsContent = @()
-$modalsPath = Join-Path $viewsDir "view-modals.html"
-if (Test-Path $modalsPath) {
-    $modalsContent = [System.IO.File]::ReadAllLines($modalsPath, [System.Text.Encoding]::UTF8)
-}
+# Modales NO se inlined (P1) — se cargan con ensureModalsLoaded()
+$modalsPlaceholder = @(
+    "  <!-- Modales diferidos: views/view-modals.html vía ComponentLoader (Semana 3) -->"
+)
 
-$newHtml = [string[]]($header + $combinedMain + $middleBridge + $modalsContent + $footer)
+$newHtml = [string[]]($header + $combinedMain + $middleBridge + $modalsPlaceholder + $footer)
 [System.IO.File]::WriteAllLines($htmlFile, $newHtml, $utf8NoBom)
 
 Write-Host "==========================================================" -ForegroundColor Cyan
-Write-Host "  Bundle HTML reensamblado satisfactoriamente!" -ForegroundColor Green
+Write-Host "  Bundle HTML liviano reensamblado (kpis + asistencia)!" -ForegroundColor Green
 Write-Host "  Total de líneas resultantes: $($newHtml.Count)" -ForegroundColor Yellow
+Write-Host "  Modales y resto de vistas: carga bajo demanda" -ForegroundColor Gray
 Write-Host "==========================================================" -ForegroundColor Cyan
