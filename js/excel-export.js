@@ -327,12 +327,20 @@ class LegalExcelExporter {
   // =========================================================================
   // EXPORTACIÓN MAESTRA COMPLETA (6 PESTAÑAS)
   // =========================================================================
+  async _ensureExcelReady() {
+    if (typeof ExcelJS !== "undefined" && typeof saveAs === "function") return true;
+    if (window.PaoloLibLoader) {
+      await window.PaoloLibLoader.loadExcel();
+    }
+    if (typeof ExcelJS === "undefined") {
+      throw new Error("ExcelJS no disponible. Verifique lib/exceljs.min.js o conexión.");
+    }
+    return true;
+  }
+
   async exportMasterWorkbook() {
     try {
-      if (typeof ExcelJS === "undefined") {
-        alert("Librería ExcelJS cargando. Por favor, reintente en unos segundos.");
-        return;
-      }
+      await this._ensureExcelReady();
 
       const branchInfo = this.getBranchInfo();
       const workbook = new ExcelJS.Workbook();
@@ -1563,10 +1571,7 @@ class LegalExcelExporter {
   // =========================================================================
   async exportModule(moduleName) {
     try {
-      if (typeof ExcelJS === "undefined") {
-        alert("Cargando componentes de exportación. Intente de nuevo en unos segundos.");
-        return;
-      }
+      await this._ensureExcelReady();
 
       const branchInfo = this.getBranchInfo();
       const slug = branchInfo.branchSlug;
@@ -1625,10 +1630,7 @@ class LegalExcelExporter {
   // EXPORTACION INDIVIDUAL DE PARTIDA PRESUPUESTARIA EN EXCEL
   async exportSinglePresupuesto(presupuestoId) {
     try {
-      if (typeof ExcelJS === "undefined") {
-        alert("Cargando motor de Excel. Por favor, reintente en un momento.");
-        return;
-      }
+      await this._ensureExcelReady();
 
       const item = window.db.get("presupuestos").find(i => i.id === presupuestoId);
       if (!item) {

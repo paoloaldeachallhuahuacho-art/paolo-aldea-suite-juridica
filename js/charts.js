@@ -11,9 +11,9 @@ class KpiDashboard {
     this.activeCenterFilter = "challhuahuacho"; // 'all' | 'challhuahuacho' | 'cotabambas'
   }
 
-  init() {
+  async init() {
     this.renderMetrics();
-    this.renderCharts();
+    await this.renderCharts();
   }
 
   // Segmentador 1: Período de Tiempo (Acumulado Total, Este Mes, Últimos 30 Días)
@@ -52,9 +52,9 @@ class KpiDashboard {
     }
   }
 
-  refresh() {
+  async refresh() {
     this.renderMetrics();
-    this.updateCharts();
+    await this.updateCharts();
   }
 
   // Lógica de filtrado por fecha
@@ -206,16 +206,27 @@ class KpiDashboard {
     if (elValorInv) elValorInv.textContent = `${curr} ${valorTotalInv.toLocaleString('es-PE', { minimumFractionDigits: 2 })} (${itemsClaseA} Clase A)`;
   }
 
-  renderCharts() {
-    this.createCashflowChart();
-    this.createCasesByMatterChart();
-    this.createCostCentersChart();
-    this.createAppointmentsChart();
+  async renderCharts() {
+    try {
+      if (window.PaoloLibLoader) await window.PaoloLibLoader.loadChart();
+    } catch (err) {
+      console.warn("[KpiDashboard] Chart.js no disponible:", err);
+      return;
+    }
+    if (typeof Chart === "undefined") return;
+    try {
+      this.createCashflowChart();
+      this.createCasesByMatterChart();
+      this.createCostCentersChart();
+      this.createAppointmentsChart();
+    } catch (err) {
+      console.warn("[KpiDashboard] No se pudieron renderizar gráficos:", err && err.message ? err.message : err);
+    }
   }
 
-  updateCharts() {
+  async updateCharts() {
     this.destroyCharts();
-    this.renderCharts();
+    await this.renderCharts();
   }
 
   destroyCharts() {
@@ -230,7 +241,8 @@ class KpiDashboard {
   // Gráfico 1: Flujo Financiero Sede Challhuahuacho
   createCashflowChart() {
     const ctx = document.getElementById("chartCashflow");
-    if (!ctx) return;
+    if (!ctx || typeof ctx.getContext !== "function") return;
+    try { if (!ctx.getContext("2d")) return; } catch (_) { return; }
 
     const caja = this.getFilteredCaja();
     const monthsMap = {};

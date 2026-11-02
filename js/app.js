@@ -650,7 +650,7 @@ class LegalApp {
   }
 
   /** Cambia de modulo aplicando control de acceso (RBAC) y refresca la vista. */
-  switchTab(tabId) {
+  async switchTab(tabId) {
     const currentUser = window.db ? window.db.getCurrentUser() : null;
 
     if (tabId === "master_admin") {
@@ -672,6 +672,10 @@ class LegalApp {
       const roleLabel = window.db.getRoleLabel(window.db.getUserRole(currentUser));
       this.showToast(`Acceso denegado: El rol de ${roleLabel} no cuenta con permisos para acceder al módulo de ${tabId}.`, "error");
       return;
+    }
+
+    if (window.componentLoader && typeof window.componentLoader.ensureViewLoaded === "function") {
+      await window.componentLoader.ensureViewLoaded(tabId, "main");
     }
 
     this.currentTab = tabId;
@@ -704,6 +708,54 @@ class LegalApp {
     } else {
       this.refreshCurrentModuleView();
     }
+  }
+
+  /** Paginación de tablas principales (casos / caja / asistencia). */
+  getTablePageState(key, total, pageSize = 50) {
+    if (!this._tablePages) this._tablePages = {};
+    const pages = Math.max(1, Math.ceil((total || 0) / pageSize));
+    let page = Number(this._tablePages[key]) || 1;
+    if (page > pages) page = pages;
+    if (page < 1) page = 1;
+    this._tablePages[key] = page;
+    const start = (page - 1) * pageSize;
+    return { page, pages, pageSize, total, start, end: Math.min(start + pageSize, total) };
+  }
+
+  setTablePage(key, page) {
+    if (!this._tablePages) this._tablePages = {};
+    this._tablePages[key] = Math.max(1, Number(page) || 1);
+    if (key === "casos") this.renderCasos();
+    else if (key === "caja") this.renderCajaChica();
+    else if (key === "asistencia" && window.AttendanceModule && typeof window.AttendanceModule.renderAdminAttendanceTable === "function") {
+      window.AttendanceModule.renderAdminAttendanceTable();
+    }
+  }
+
+  renderTablePagerHtml(key, state) {
+    if (!state || state.total <= state.pageSize) {
+      return state && state.total
+        ? `<div class="flex items-center justify-between gap-2 px-1 py-2 text-[11px] text-slate-500"><span>${state.total} registro(s)</span></div>`
+        : "";
+    }
+    const { page, pages, total, start, end } = state;
+    const prevDisabled = page <= 1 ? "opacity-40 pointer-events-none" : "";
+    const nextDisabled = page >= pages ? "opacity-40 pointer-events-none" : "";
+    return `
+      <div class="flex flex-wrap items-center justify-between gap-2 px-1 py-2 text-[11px] text-slate-600 border-t border-slate-200 mt-1">
+        <span>Mostrando ${start + 1}–${end} de ${total}</span>
+        <div class="flex items-center gap-1.5">
+          <button type="button" class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 ${prevDisabled}" onclick="window.app.setTablePage('${key}', ${page - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+          <span class="font-semibold text-slate-800">Pág. ${page} / ${pages}</span>
+          <button type="button" class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 ${nextDisabled}" onclick="window.app.setTablePage('${key}', ${page + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+        </div>
+      </div>`;
+  }
+
+  _syncTablePager(pagerId, key, state) {
+    const el = document.getElementById(pagerId);
+    if (!el) return;
+    el.innerHTML = this.renderTablePagerHtml(key, state);
   }
 
   /** Abre/cierra la barra lateral en movil. Sin argumento alterna el estado. */
@@ -833,10 +885,14 @@ class LegalApp {
           </td>
         </tr>
       `;
+      this._syncTablePager("cajaChicaTablePager", "caja", { page: 1, pages: 1, pageSize: 50, total: 0, start: 0, end: 0 });
       return;
     }
 
-    container.innerHTML = filtered.map(item => {
+    const pageState = this.getTablePageState("caja", filtered.length, 50);
+    const pageItems = filtered.slice(pageState.start, pageState.end);
+
+    container.innerHTML = pageItems.map(item => {
       const isIngreso = item.tipo === "Ingreso";
       const tipoBadge = isIngreso
         ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300"><i class="fa-solid fa-arrow-down-left mr-1"></i>Ingreso</span>`
@@ -906,6 +962,7 @@ class LegalApp {
         </tr>
       `;
     }).join("");
+    this._syncTablePager("cajaChicaTablePager", "caja", pageState);
   }
 
   toggleCajaRecurrente() {
@@ -1591,10 +1648,14 @@ class LegalApp {
           </td>
         </tr>
       `;
+      this._syncTablePager("casosTablePager", "casos", { page: 1, pages: 1, pageSize: 50, total: 0, start: 0, end: 0 });
       return;
     }
 
-    container.innerHTML = filtered.map(c => {
+    const pageState = this.getTablePageState("casos", filtered.length, 50);
+    const pageItems = filtered.slice(pageState.start, pageState.end);
+
+    container.innerHTML = pageItems.map(c => {
       let deadlineBadge = `<span class="text-slate-400 text-xs">Sin plazo fijado</span>`;
       if (c.vencimiento) {
         const vDate = new Date(c.vencimiento + "T00:00:00");
@@ -1702,6 +1763,7 @@ class LegalApp {
         </tr>
       `;
     }).join("");
+    this._syncTablePager("casosTablePager", "casos", pageState);
   }
 
   renderCasosKanban() {
@@ -5639,7 +5701,10 @@ ${callToAction}
   // =========================================================================
   // MODALES & TOASTS
   // =========================================================================
-  showModal(modalId) {
+  async showModal(modalId) {
+    if (window.componentLoader && typeof window.componentLoader.ensureModalsLoaded === "function") {
+      await window.componentLoader.ensureModalsLoaded();
+    }
     const modal = document.getElementById(modalId);
     if (!modal) return;
     this._lastFocusedElementBeforeModal = document.activeElement;
@@ -5678,8 +5743,8 @@ ${callToAction}
     }
   }
 
-  openModal(modalId) {
-    this.showModal(modalId);
+  async openModal(modalId) {
+    await this.showModal(modalId);
   }
 
   closeModal(modalId) {

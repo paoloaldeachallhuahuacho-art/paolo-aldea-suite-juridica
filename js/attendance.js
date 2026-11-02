@@ -1749,11 +1749,18 @@ const AttendanceModule = (function () {
           </td>
         </tr>
       `;
+      const emptyPager = document.getElementById("asistenciaAdminTablePager");
+      if (emptyPager) emptyPager.innerHTML = "";
       return;
     }
 
+    const pageState = (window.app && typeof window.app.getTablePageState === "function")
+      ? window.app.getTablePageState("asistencia", records.length, 50)
+      : { page: 1, pages: 1, pageSize: 50, total: records.length, start: 0, end: records.length };
+    const pageRecords = records.slice(pageState.start, pageState.end);
+
     let html = "";
-    records.forEach(r => {
+    pageRecords.forEach(r => {
       const horaIngreso = r.ingreso ? new Date(r.ingreso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "--:--";
       const horaSalida = r.salida ? new Date(r.salida).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : '<span class="text-slate-500 italic">En labores</span>';
 
@@ -1828,6 +1835,25 @@ const AttendanceModule = (function () {
         else if (action === "delete") AttendanceModule.deleteRecord(id);
       });
     });
+
+    const pager = document.getElementById("asistenciaAdminTablePager");
+    if (pager) {
+      if (pageState.total <= pageState.pageSize) {
+        pager.innerHTML = `<div class="px-1 py-2 text-[11px] text-slate-500">${pageState.total} registro(s)</div>`;
+      } else {
+        const prevDisabled = pageState.page <= 1 ? "opacity-40 pointer-events-none" : "";
+        const nextDisabled = pageState.page >= pageState.pages ? "opacity-40 pointer-events-none" : "";
+        pager.innerHTML = `
+          <div class="flex flex-wrap items-center justify-between gap-2 px-1 py-2 text-[11px] text-slate-400 border-t border-slate-800 mt-1">
+            <span>Mostrando ${pageState.start + 1}–${pageState.end} de ${pageState.total}</span>
+            <div class="flex items-center gap-1.5">
+              <button type="button" class="px-2 py-1 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 ${prevDisabled}" onclick="window.app.setTablePage('asistencia', ${pageState.page - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+              <span class="font-semibold text-slate-200">Pág. ${pageState.page} / ${pageState.pages}</span>
+              <button type="button" class="px-2 py-1 rounded border border-slate-700 bg-slate-900 hover:bg-slate-800 ${nextDisabled}" onclick="window.app.setTablePage('asistencia', ${pageState.page + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+            </div>
+          </div>`;
+      }
+    }
   }
 
   /**

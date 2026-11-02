@@ -201,9 +201,12 @@ class LegalPdfExporter {
   async exportModulePdf(moduleName) {
     const bInfo = this.getBranchInfo();
     const sedeDisplay = (bInfo.activeSede === "todas") ? "Consolidado Nacional" : (bInfo.branchHeaderLabel || bInfo.branchName);
-    if (typeof html2pdf === "undefined") {
-      alert("Cargando motor de generación PDF. Por favor, reintente en un momento.");
-      return;
+    try {
+      if (typeof html2pdf === "undefined" && window.PaoloLibLoader) {
+        await window.PaoloLibLoader.loadPdf();
+      }
+    } catch (err) {
+      console.warn("[PDF] html2pdf no cargó; se usará impresión aislada:", err);
     }
 
     let reportTitle = "";
