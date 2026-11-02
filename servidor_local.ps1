@@ -62,7 +62,7 @@ Write-Host "  PAOLO ALDEA & ABOGADOS - Servidor Web Local Iniciado" -ForegroundC
 Write-Host "  Estudio: PAOLO ALDEA & ABOGADOS (Sede Challhuahuacho)" -ForegroundColor Yellow
 Write-Host "  URL: $prefix" -ForegroundColor White
 Write-Host "  Arquitectura: Streaming I/O + Transacciones Atómicas (Fase 2)" -ForegroundColor Green
-Write-Host "  APIs: /api/cloud_sync, /api/alertas_sync, /api/health, /api/backup" -ForegroundColor Gray
+Write-Host "  APIs: /api/cloud_sync, /api/cloud_snapshot, /api/alertas_sync, /api/health, /api/backup" -ForegroundColor Gray
 Write-Host "  Presione Ctrl+C para detener el servidor" -ForegroundColor Gray
 Write-Host "==========================================================" -ForegroundColor Cyan
 
@@ -653,6 +653,7 @@ while ($listener.IsListening) {
                 $toSaveDisk["_deletedIds"] = $existingTombstones
 
                 # Persistencia Atómica ACID: Escribir a .tmp, respaldar a .bak y mover a destino final
+                # Una sola serialización pesada (Semana 4 / P4) — la respuesta POST es ACK liviano
                 $cloudDbJson = ConvertTo-Json -InputObject $toSaveDisk -Depth 10 -Compress
                 [System.IO.File]::WriteAllText($cloudDbTmp, $cloudDbJson, $utf8NoBom)
                 
@@ -663,15 +664,42 @@ while ($listener.IsListening) {
                     Move-Item -Path $cloudDbTmp -Destination $cloudDbPath -Force
                 }
 
-                $outPkg = @{
-                    protocol = "LEX_MULTI_SEDE_SYNC_V2"
-                    status = "ok"
-                    message = "Sincronización multi-sede completada exitosamente con transacción atómica"
-                    timestamp = (Get-Date).ToString("o")
-                    data = $existingCloud
-                    deletedIds = $existingTombstones
+                $counts = @{}
+                foreach ($col in $collectionNames) {
+                    $counts[$col] = @($existingCloud[$col]).Count
                 }
-                $resJson = ConvertTo-Json -InputObject $outPkg -Depth 10 -Compress
+
+                # ACK liviano: evita un segundo ConvertTo-Json del dataset completo.
+                # El cliente hidrata con GET /api/cloud_snapshot (stream del archivo).
+                $wantFull = $false
+                try {
+                    $qs = $request.Url.Query
+                    if ($qs -and ($qs -match "[?&]full=1")) { $wantFull = $true }
+                } catch {}
+
+                if ($wantFull) {
+                    $outPkg = @{
+                        protocol = "LEX_MULTI_SEDE_SYNC_V2"
+                        status = "ok"
+                        message = "Sincronización multi-sede completada (respuesta completa)"
+                        timestamp = (Get-Date).ToString("o")
+                        data = $existingCloud
+                        deletedIds = $existingTombstones
+                        counts = $counts
+                    }
+                    $resJson = ConvertTo-Json -InputObject $outPkg -Depth 10 -Compress
+                } else {
+                    $outPkg = @{
+                        protocol = "LEX_MULTI_SEDE_SYNC_V2"
+                        status = "ok"
+                        ackOnly = $true
+                        message = "Sincronización multi-sede completada; usar /api/cloud_snapshot para hidratar"
+                        timestamp = (Get-Date).ToString("o")
+                        deletedIds = $existingTombstones
+                        counts = $counts
+                    }
+                    $resJson = ConvertTo-Json -InputObject $outPkg -Depth 6 -Compress
+                }
                 $resBytes = $utf8NoBom.GetBytes($resJson)
                 $response.ContentType = "application/json; charset=utf-8"
                 $response.ContentLength64 = $resBytes.Length
@@ -679,6 +707,41 @@ while ($listener.IsListening) {
                 $response.Close()
                 continue
             }
+        }
+
+        # ----------------------------------------------------------------------
+        # ENDPOINT: Snapshot cloud (GET /api/cloud_snapshot) — stream sin re-serializar
+        # Semana 4 / P4: sirve central_cloud_data.json tal cual desde disco
+        # ----------------------------------------------------------------------
+        if ($urlPath -eq "/api/cloud_snapshot" -and ($request.HttpMethod -eq "GET" -or $request.HttpMethod -eq "HEAD")) {
+            if (-not (Test-ApiAuthorized $request)) { Send-Unauthorized $response $utf8NoBom; continue }
+            $cloudDbPath = Join-Path $baseDir "central_cloud_data.json"
+            if (-not (Test-Path $cloudDbPath -PathType Leaf)) {
+                $empty = '{"caja_chica":[],"casos":[],"citas":[],"inventario":[],"documentos":[],"presupuestos":[],"attendance":[],"workers":[],"_deletedIds":{}}'
+                $resBytes = $utf8NoBom.GetBytes($empty)
+                $response.StatusCode = 200
+                $response.ContentType = "application/json; charset=utf-8"
+                $response.ContentLength64 = $resBytes.Length
+                if ($request.HttpMethod -eq "GET") {
+                    $response.OutputStream.Write($resBytes, 0, $resBytes.Length)
+                }
+                $response.Close()
+                continue
+            }
+            $fileInfo = Get-Item -LiteralPath $cloudDbPath
+            $response.StatusCode = 200
+            $response.ContentType = "application/json; charset=utf-8"
+            $response.ContentLength64 = $fileInfo.Length
+            if ($request.HttpMethod -eq "GET") {
+                $fs = [System.IO.File]::OpenRead($cloudDbPath)
+                try {
+                    $fs.CopyTo($response.OutputStream)
+                } finally {
+                    $fs.Close()
+                }
+            }
+            $response.Close()
+            continue
         }
 
         # ----------------------------------------------------------------------

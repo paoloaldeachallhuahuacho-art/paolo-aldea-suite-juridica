@@ -516,8 +516,8 @@ const INITIAL_ATTENDANCE = [];
 
 /**
  * Capa de Abstracción de Almacenamiento Seguro (SafeStorageAdapter)
- * Implementa persistencia tolerante a fallos con respaldo dual (LocalStorage + IndexedDB),
- * detección y auto-reparación de corrupción JSON, y copias de contingencia (_BACKUP).
+ * Semana 4: IndexedDB es la fuente de verdad; localStorage es espejo/cache con debounce.
+ * Detección y auto-reparación de corrupción JSON; stubs cuando supera cuota.
  */
 class SafeStorageAdapter {
   constructor(prefix = "PAOLO ALDEA_PAOLO_ALDEA_") {
@@ -528,15 +528,34 @@ class SafeStorageAdapter {
     this.idb = null;
     this.memoryCache = new Map();
     this.pendingQueue = [];
+    /** @type {"indexeddb"|"localStorage"} */
+    this.primaryStore = "indexeddb";
+    this._lsMirrorTimers = new Map();
+    this._lsMirrorDelayMs = 180;
+    this._crossTabRefreshTimer = null;
+    this._legacyDbNames = ["PaoloAldeaJuridicoDB", "PaoloAldeaJuridicoDB_v1"];
     this.readyPromise = new Promise((resolve) => {
       this._resolveReady = resolve;
     });
     this.initIndexedDB();
     this.setupCrossTabCacheSync();
+    this.purgeLegacyIndexedDB();
   }
 
   /**
-   * Sincroniza la caché en memoria RAM entre múltiples pestañas abiertas cuando otra pestaña actualiza LocalStorage
+   * Elimina bases IndexedDB antiguas (auditoría: purge no borraba v2 / nombres viejos).
+   */
+  purgeLegacyIndexedDB() {
+    if (typeof window === "undefined" || !window.indexedDB || !window.indexedDB.deleteDatabase) return;
+    this._legacyDbNames.forEach((name) => {
+      try {
+        window.indexedDB.deleteDatabase(name);
+      } catch (_) {}
+    });
+  }
+
+  /**
+   * Sincroniza la caché en memoria entre pestañas (evento storage) con debounce.
    */
   setupCrossTabCacheSync() {
     if (typeof window === "undefined") return;
@@ -551,12 +570,32 @@ class SafeStorageAdapter {
         const parsed = JSON.parse(e.newValue);
         if (parsed && !parsed._storedInIndexedDB) {
           this.memoryCache.set(collectionKey, parsed);
+        } else if (parsed && parsed._storedInIndexedDB) {
+          // Stub: otra pestaña escribió en IDB; rehidratar esa clave
+          this._rehydrateKeyFromIdb(collectionKey);
+        }
+        clearTimeout(this._crossTabRefreshTimer);
+        this._crossTabRefreshTimer = setTimeout(() => {
           if (window.app && typeof window.app.refreshCurrentModuleView === "function") {
             window.app.refreshCurrentModuleView();
           }
-        }
+        }, 250);
       } catch (_) {}
     });
+  }
+
+  _rehydrateKeyFromIdb(key) {
+    if (!this.idb) return;
+    try {
+      const tx = this.idb.transaction(this.storeName, "readonly");
+      const req = tx.objectStore(this.storeName).get(key);
+      req.onsuccess = () => {
+        const rec = req.result;
+        if (rec && rec.data !== undefined) {
+          this.memoryCache.set(key, rec.data);
+        }
+      };
+    } catch (_) {}
   }
 
   clearAll() {
@@ -635,34 +674,32 @@ class SafeStorageAdapter {
         req.onsuccess = () => {
           const results = req.result || [];
           if (results.length > 0) {
+            // IndexedDB es primario: siempre gana sobre el espejo localStorage
             results.forEach(rec => {
               if (rec && rec.key && rec.data !== undefined) {
                 this.memoryCache.set(rec.key, rec.data);
-                const fullKey = this.prefix + rec.key;
-                try {
-                  const localVal = localStorage.getItem(fullKey);
-                  if (!localVal) {
-                    localStorage.setItem(fullKey, JSON.stringify(rec.data));
-                  }
-                } catch (quotaErr) {
-                  // Cuota excedida en localStorage, los datos completos viven seguros en IndexedDB
-                }
+                this._scheduleLocalStorageMirror(rec.key, rec.data, true);
               }
             });
           } else {
-            // Migración inicial: pasar datos históricos de LocalStorage hacia IndexedDB
+            // Migración inicial: LocalStorage → IndexedDB
             const defaultCollections = ["caja_chica", "casos", "citas", "inventario", "documentos", "presupuestos", "workers", "attendance", "settings"];
             defaultCollections.forEach(col => {
               try {
                 const raw = localStorage.getItem(this.prefix + col);
                 if (raw) {
                   const parsed = JSON.parse(raw);
-                  this.mirrorToIndexedDB(col, parsed);
-                  this.memoryCache.set(col, parsed);
+                  if (parsed && !parsed._storedInIndexedDB) {
+                    this.mirrorToIndexedDB(col, parsed);
+                    this.memoryCache.set(col, parsed);
+                  }
                 }
               } catch (e) {}
             });
           }
+          try {
+            localStorage.setItem(this.prefix + "_STORAGE_PRIMARY", "indexeddb");
+          } catch (_) {}
           resolve();
         };
         req.onerror = () => resolve();
@@ -673,41 +710,76 @@ class SafeStorageAdapter {
     });
   }
 
-  save(key, items) {
+  /**
+   * Espejo localStorage con debounce. Colecciones grandes → stub cuando IDB está activo.
+   */
+  _scheduleLocalStorageMirror(key, items, forceStub = false) {
+    if (typeof localStorage === "undefined") return;
+    const prev = this._lsMirrorTimers.get(key);
+    if (prev) clearTimeout(prev);
+    const timer = setTimeout(() => {
+      this._lsMirrorTimers.delete(key);
+      this._writeLocalStorageMirror(key, items, forceStub);
+    }, this._lsMirrorDelayMs);
+    this._lsMirrorTimers.set(key, timer);
+  }
+
+  _writeLocalStorageMirror(key, items, forceStub = false) {
     const fullKey = this.prefix + key;
     const backupKey = fullKey + "_BACKUP";
-
-    // 1. Persistencia inmediata en memoria RAM (0ms)
-    this.memoryCache.set(key, items);
-
-    // 2. Persistencia ilimitada en IndexedDB (supera la barrera de 5MB)
-    this.mirrorToIndexedDB(key, items);
-
-    // 3. Persistencia en LocalStorage como espejo rápido (optimizando cuota para no duplicar payloads grandes si IndexedDB está activo)
+    const SMALL_KEYS = new Set(["settings"]);
     try {
       const jsonStr = JSON.stringify(items);
+      const preferStub = forceStub || (this.idb && !SMALL_KEYS.has(key) && jsonStr.length >= 48000);
+      if (preferStub) {
+        localStorage.setItem(fullKey, JSON.stringify({
+          _storedInIndexedDB: true,
+          primary: "indexeddb",
+          count: Array.isArray(items) ? items.length : 1,
+          updatedAt: Date.now()
+        }));
+        try { localStorage.removeItem(backupKey); } catch (_) {}
+        return true;
+      }
       localStorage.setItem(fullKey, jsonStr);
       if (!this.idb || jsonStr.length < 120000) {
         localStorage.setItem(backupKey, jsonStr);
       } else {
-        localStorage.removeItem(backupKey);
+        try { localStorage.removeItem(backupKey); } catch (_) {}
       }
       return true;
     } catch (e) {
       if (e.name === "QuotaExceededError" || e.code === 22) {
-        console.warn(`SafeStorageAdapter: Cuota LocalStorage superada para '${key}'. Datos asegurados en IndexedDB.`);
+        console.warn(`SafeStorageAdapter: Cuota LocalStorage superada para '${key}'. Datos en IndexedDB.`);
         try {
           localStorage.removeItem(backupKey);
-          localStorage.setItem(fullKey, JSON.stringify({ _storedInIndexedDB: true, count: Array.isArray(items) ? items.length : 1, updatedAt: Date.now() }));
-        } catch (innerErr) {}
+          localStorage.setItem(fullKey, JSON.stringify({
+            _storedInIndexedDB: true,
+            primary: "indexeddb",
+            count: Array.isArray(items) ? items.length : 1,
+            updatedAt: Date.now()
+          }));
+        } catch (_) {}
         return true;
       }
       return false;
     }
   }
 
+  save(key, items) {
+    // 1. RAM inmediata
+    this.memoryCache.set(key, items);
+
+    // 2. IndexedDB = fuente de verdad (inmediato)
+    this.mirrorToIndexedDB(key, items);
+
+    // 3. localStorage espejo diferido (reduce thrash cross-tab y cuota)
+    this._scheduleLocalStorageMirror(key, items, false);
+    return true;
+  }
+
   load(key, fallback = []) {
-    // 1. Memoria RAM instantánea
+    // 1. Memoria (hidratada desde IndexedDB al arrancar)
     if (this.memoryCache.has(key)) {
       return this.memoryCache.get(key);
     }
@@ -715,21 +787,25 @@ class SafeStorageAdapter {
     const fullKey = this.prefix + key;
     const backupKey = fullKey + "_BACKUP";
 
-    // 2. LocalStorage principal
+    // 2. LocalStorage (solo si no es stub de IDB)
     try {
       const raw = localStorage.getItem(fullKey);
       if (raw) {
         const parsed = JSON.parse(raw);
         if (parsed && !parsed._storedInIndexedDB) {
           this.memoryCache.set(key, parsed);
+          if (this.idb) this.mirrorToIndexedDB(key, parsed);
           return parsed;
+        }
+        if (parsed && parsed._storedInIndexedDB) {
+          this._rehydrateKeyFromIdb(key);
         }
       }
     } catch (e) {
       console.warn(`SafeStorageAdapter: Error de lectura LocalStorage (${key}):`, e);
     }
 
-    // 3. Respaldo secundario LocalStorage
+    // 3. Backup localStorage
     try {
       const rawBackup = localStorage.getItem(backupKey);
       if (rawBackup) {
@@ -741,7 +817,6 @@ class SafeStorageAdapter {
       }
     } catch (e) {}
 
-    // 4. Retornar fallback y cachear
     this.memoryCache.set(key, fallback);
     return fallback;
   }
@@ -749,6 +824,7 @@ class SafeStorageAdapter {
   async checkHealth() {
     return {
       indexedDBActive: !!this.idb,
+      primaryStore: this.idb ? "indexeddb" : "localStorage",
       dbName: this.dbName,
       dbVersion: this.dbVersion,
       cachedKeysCount: this.memoryCache.size,

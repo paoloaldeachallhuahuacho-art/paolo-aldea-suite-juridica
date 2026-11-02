@@ -22,7 +22,7 @@ JSDOM.fromURL("http://localhost:" + server.address().port + "/index.html", {
     const port = server.address().port;
     w.fetch = (input) => {
       const s = String(typeof input === "string" ? input : (input && input.url) || "");
-      if (/views\//.test(s) || /lib\//.test(s)) {
+      if (/views\//.test(s) || /lib\//.test(s) || /js\/controllers\//.test(s)) {
         const abs = s.startsWith("http") ? s : `http://localhost:${port}/${s.replace(/^\//, "")}`;
         return globalThis.fetch(abs);
       }
