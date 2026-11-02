@@ -473,13 +473,14 @@ const DEFAULT_SETTINGS = {
   horaSalidaDefecto: "20:00",
   masterPasswordHash: "",
   masterPinHash: "",
-  cloudSyncEndpoint: "https://cznxzrwhogyobpqmfxnk.supabase.co",
+  // Vacío por defecto: configurar en Master Admin o vía public-config (Modo B).
+  cloudSyncEndpoint: "",
   cloudSyncApiKey: "",
   cloudSyncAuto: true,
   firebaseConfig: {
-    projectId: "paolo-aldea-juridico-3c5cb",
-    authDomain: "paolo-aldea-juridico-3c5cb.firebaseapp.com",
-    storageBucket: "paolo-aldea-juridico-3c5cb.appspot.com",
+    projectId: "",
+    authDomain: "",
+    storageBucket: "",
     apiKey: ""
   }
 };

@@ -764,7 +764,7 @@ while ($listener.IsListening) {
         # Bloqueo estricto de acceso estático a archivos internos de sistema
         $reqFileName = [System.IO.Path]::GetFileName($filePath).ToLowerInvariant()
         $blockedExts = @(".ps1", ".bat", ".vbs", ".sql", ".bak", ".tmp")
-        $blockedFiles = @(".server_token", ".server_port", ".server_pairing", "central_cloud_data.json", "alertas_locales.json", "database_cloud_schema.sql")
+        $blockedFiles = @(".server_token", ".server_port", ".server_pairing", "central_cloud_data.json", "alertas_locales.json", ".env", ".env.local")
         if ($reqFileName.StartsWith(".") -or $blockedFiles -contains $reqFileName -or $blockedExts -contains [System.IO.Path]::GetExtension($filePath).ToLowerInvariant()) {
             $response.StatusCode = 403
             $forbiddenBytes = [System.Text.Encoding]::UTF8.GetBytes("Acceso denegado a recurso interno del despacho.")

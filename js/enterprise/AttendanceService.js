@@ -17,6 +17,7 @@
     const pos = await getPosition();
     const coords = pos.coords;
     const spoof = !!(coords && (coords.mocked === true || coords.isMocked === true));
+    const accessToken = global.PaoloAuthService ? global.PaoloAuthService.getAccessToken() : null;
     const payload = {
       id: "ATT-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
       branch_id: branchId,
@@ -26,19 +27,21 @@
       lon: coords.longitude,
       accuracy_m: coords.accuracy,
       spoof_suspected: spoof,
-      worker_code: workerCode || null,
-      user_jwt: global.PaoloAuthService ? global.PaoloAuthService.getAccessToken() : null,
-      auth_uid: (global.PaoloAuthService && global.PaoloAuthService.getClaims())
-        ? global.PaoloAuthService.getClaims().uid
-        : null
+      worker_code: workerCode || null
     };
 
     if (!global.PaoloEnterpriseConfig || !global.PaoloEnterpriseConfig.isEnterprise()) {
       return { ok: true, offline: true, localOnly: true, payload };
     }
 
-    const headers = { "Content-Type": "application/json" };
-    if (payload.user_jwt) headers.Authorization = "Bearer " + payload.user_jwt;
+    if (!accessToken) {
+      throw new Error("Sesión Supabase requerida para marcar asistencia en la nube.");
+    }
+
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + accessToken
+    };
 
     const res = await fetch("/.netlify/functions/attendance-validate", {
       method: "POST",

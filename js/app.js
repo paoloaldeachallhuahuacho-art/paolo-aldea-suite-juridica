@@ -7908,7 +7908,7 @@ _________________________________                _______________________________
     const inApiKey = document.getElementById("masterCloudApiKey");
     const chkAuto = document.getElementById("masterCloudAutoSync");
 
-    if (inEndpoint) inEndpoint.value = s.cloudSyncEndpoint || "https://cznxzrwhogyobpqmfxnk.supabase.co";
+    if (inEndpoint) inEndpoint.value = s.cloudSyncEndpoint || "";
     if (inApiKey) inApiKey.value = s.cloudSyncApiKey || "";
     if (chkAuto) chkAuto.checked = !!s.cloudSyncAuto;
   }
@@ -8604,6 +8604,27 @@ _________________________________                _______________________________
   }
 
   async sincronizarConNube(silent = false) {
+    // Modo B Zero-Trust: outbox/Realtime — no usar tabla legada sync_multi_sede_hub
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloSyncManager && typeof window.PaoloSyncManager.flush === "function") {
+      this.cargarAjustesFirebaseUI();
+      this.actualizarIndicadorNube("syncing", "Sincronizando...");
+      try {
+        await window.PaoloSyncManager.flush();
+        this.actualizarIndicadorNube("online", "Enterprise Sync");
+        if (!silent) this.showToast("Sincronización enterprise (outbox) completada.", "success");
+        if (window.kpiDashboard && typeof window.kpiDashboard.refresh === "function") {
+          window.kpiDashboard.refresh();
+        }
+        this.refreshCurrentModuleView();
+      } catch (e) {
+        this.actualizarIndicadorNube("offline", "Sync pendiente");
+        if (!silent) {
+          this.showToast("Sync enterprise no disponible: " + (e.message || "error"), "warning");
+        }
+      }
+      return;
+    }
+
     const sSettings = window.db ? window.db.getSettings() : {};
     let endpoint = (document.getElementById("masterCloudEndpoint")?.value || sSettings.cloudSyncEndpoint || "").trim();
     const apiKey = (document.getElementById("masterCloudApiKey")?.value || sSettings.cloudSyncApiKey || "").trim();
@@ -8624,6 +8645,19 @@ _________________________________                _______________________________
       return;
     }
 
+    // Supabase directo vía sync_multi_sede_hub fue retirado (schema inseguro eliminado).
+    if (/supabase\.co/i.test(endpoint)) {
+      this.cargarAjustesFirebaseUI();
+      this.actualizarIndicadorNube("offline", "Hub legado retirado");
+      if (!silent) {
+        this.showToast(
+          "El sync por sync_multi_sede_hub fue retirado. Use Modo B (Netlify + migración Zero-Trust) o el hub local /api/cloud_sync.",
+          "warning"
+        );
+      }
+      return;
+    }
+
     this.cargarAjustesFirebaseUI();
     this.actualizarIndicadorNube("syncing", "Sincronizando...");
     if (!silent) this.showToast("Iniciando sincronización bidireccional Multi-Sede...", "info");
@@ -8639,126 +8673,7 @@ _________________________________                _______________________________
         headers["apikey"] = apiKey;
       }
 
-      if (endpoint.includes("supabase.co")) {
-        const baseUrl = endpoint.replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
-        const restUrl = baseUrl + "/rest/v1";
-
-        let totalNewRecords = 0;
-        let totalUpdatedRecords = 0;
-
-        // 1. DESCARGAR Y FUSIONAR PRIMERO (GET -> Merge) todas las sedes (incluida la propia sede)
-        // Esto garantiza que dos usuarios en la misma sede jamás sobrescriban los cambios del otro
-        const fetchRes = await fetch(restUrl + "/sync_multi_sede_hub?select=*", {
-          method: "GET",
-          headers: headers
-        });
-
-        if (fetchRes.status === 401 || fetchRes.status === 403) {
-          throw new Error("HTTP " + fetchRes.status + " - API Key de Supabase no autorizada o RLS restringido.");
-        }
-
-        if (fetchRes.ok) {
-          const allSedes = await fetchRes.json();
-          if (Array.isArray(allSedes)) {
-            allSedes.forEach(sedeRow => {
-              if (sedeRow && sedeRow.data_bundle) {
-                const bundleData = (sedeRow.data_bundle && sedeRow.data_bundle.data)
-                  ? sedeRow.data_bundle
-                  : { data: sedeRow.data_bundle };
-                const mergeStats = window.db.mergeSyncPackage(bundleData);
-                totalNewRecords += mergeStats.totalAdded;
-                totalUpdatedRecords += mergeStats.totalUpdated;
-              }
-            });
-          }
-        }
-
-        // 2. EXPORTAR PAQUETE CONSOLIDADO Y SUBIR (POST UPSERT) a sync_multi_sede_hub
-        const mergedPayload = window.db.exportSyncPackage();
-        let totalRecordsInBundle = 0;
-        if (mergedPayload.data) {
-          Object.values(mergedPayload.data).forEach(arr => {
-            if (Array.isArray(arr)) totalRecordsInBundle += arr.length;
-          });
-        }
-
-        const rawSede = mergedPayload.sedeOrigen || "challhuahuacho";
-        const sedeCodigo = (rawSede === "todas") ? "nacional" : rawSede;
-        const nombreSede = (rawSede === "todas")
-          ? "Consolidado Nacional"
-          : ("Sede " + rawSede.charAt(0).toUpperCase() + rawSede.slice(1));
-
-        const hubPayload = {
-          sede_codigo: sedeCodigo,
-          nombre_sede: nombreSede,
-          emisor: mergedPayload.emisor || "Usuario",
-          data_bundle: {
-            data: mergedPayload.data,
-            deletedIds: mergedPayload.deletedIds || {}
-          },
-          records_count: totalRecordsInBundle,
-          updated_at: new Date().toISOString()
-        };
-
-        const hubRes = await fetch(restUrl + "/sync_multi_sede_hub", {
-          method: "POST",
-          headers: {
-            ...headers,
-            "Prefer": "resolution=merge-duplicates"
-          },
-          body: JSON.stringify(hubPayload)
-        });
-
-        if (!hubRes.ok) {
-          throw new Error("HTTP " + hubRes.status + " al sincronizar con sync_multi_sede_hub en Supabase.");
-        }
-
-        // 3. Registrar trazabilidad en auditoria_trazabilidad
-        try {
-          const auditRecord = [{
-            accion: "SYNC_SUPABASE_BIDIRECCIONAL",
-            tabla_afectada: "sync_multi_sede_hub",
-            detalles: {
-              sedeOrigen: mergedPayload.sedeOrigen,
-              emisor: mergedPayload.emisor,
-              timestamp: mergedPayload.timestamp,
-              totalEnviados: totalRecordsInBundle,
-              recibidosNuevos: totalNewRecords,
-              recibidosActualizados: totalUpdatedRecords
-            }
-          }];
-
-          await fetch(restUrl + "/auditoria_trazabilidad", {
-            method: "POST",
-            headers: {
-              ...headers,
-              "Prefer": "return=minimal"
-            },
-            body: JSON.stringify(auditRecord)
-          });
-        } catch (auditErr) {}
-
-        // 4. Si Firebase también tiene credenciales configuradas, sincronizar en paralelo
-        if (window.firebaseService && window.firebaseService.hasCredentials() && !window.firebaseService.isSyncing) {
-          window.firebaseService.fullSync(null, true).catch(() => {});
-        }
-
-        this.cargarAjustesFirebaseUI();
-        this.actualizarIndicadorNube("online", "Supabase Conectado");
-        if (!silent) {
-          const statsMsg = (totalNewRecords > 0 || totalUpdatedRecords > 0)
-            ? ` (+${totalNewRecords} nuevos, ${totalUpdatedRecords} actualizados)`
-            : " (Todas las sedes sincronizadas)";
-          this.showToast(`¡Sincronización en la nube (Supabase) completada!${statsMsg}`, "success");
-        }
-        if (window.kpiDashboard && typeof window.kpiDashboard.refresh === "function") {
-          window.kpiDashboard.refresh();
-        }
-        this.refreshCurrentModuleView();
-        return;
-      }
-
-      // Si es el hub local de despacho o servidor intermedio
+      // Hub local de despacho (/api/cloud_sync) o servidor intermedio LAN
       const localTok = window.__LOCAL_SERVER_API_KEY__ || sessionStorage.getItem("PA_LOCAL_API_TOKEN") || "";
       if (localTok && !headers.Authorization) {
         headers.Authorization = "Bearer " + localTok;

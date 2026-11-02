@@ -33,9 +33,14 @@
     if (!global.PaoloEnterpriseConfig || !global.PaoloEnterpriseConfig.isEnterprise()) {
       return { ok: true, offline: true, state: newState };
     }
-    const headers = { "Content-Type": "application/json" };
     const tok = global.PaoloAuthService && global.PaoloAuthService.getAccessToken();
-    if (tok) headers.Authorization = "Bearer " + tok;
+    if (!tok) {
+      throw new Error("Sesión Supabase requerida para transiciones de caja en la nube.");
+    }
+    const headers = {
+      "Content-Type": "application/json",
+      Authorization: "Bearer " + tok
+    };
     const res = await fetch("/.netlify/functions/petty-cash-transition", {
       method: "POST",
       headers,

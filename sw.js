@@ -5,7 +5,7 @@
 // Compatible con Android (Chrome) e iOS (Safari PWA 16.4+)
 // =========================================================================
 
-const CACHE_NAME = 'paolo-aldea-pwa-v2026.11-zero-trust';
+const CACHE_NAME = 'paolo-aldea-pwa-v2026.11-csp-handlers';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -22,6 +22,9 @@ const ASSETS_TO_CACHE = [
   './lib/fa/webfonts/fa-regular-400.woff2',
   './lib/fa/webfonts/fa-brands-400.woff2',
   './js/data.js',
+  './js/boot-early.js',
+  './js/tailwind-config.js',
+  './js/auth-bridge.js',
   './js/lib-loader.js',
   './js/controller-loader.js',
   './js/enterprise/sanitize.js',

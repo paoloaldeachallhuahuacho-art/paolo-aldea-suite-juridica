@@ -107,10 +107,10 @@ Genera un libro `.xlsx` maestro con membrete institucional de **PAOLO ALDEA & AB
       - **[🌐] Comisión Oficial (En Otras Sedes)**: Opción oficial para colaboradores asignados a diligencias inter-sede o juzgados en otras provincias, con selección de sede de destino y motivo justificado.
 
 5. **Despliegue Híbrido en Nube & Sincronización Multi-Sede (Fase 3 - Implementada)**:
-   - **Motor de Sincronización Bidireccional Real (Supabase & Hub Local)**: Transmisión y recepción bidireccional de las 8 colecciones operativas mediante `sync_multi_sede_hub` y endpoints REST, consolidando automáticamente cambios de las 5 sedes (Challhuahuacho, Miraflores, Abancay, Cusco, Huaraz).
+   - **Sincronización dual**: Modo A hub LAN (`/api/cloud_sync` + snapshot) y Modo B Zero-Trust (`PaoloSyncManager` outbox/Realtime + RLS). El hub legado `sync_multi_sede_hub` fue retirado.
    - **Detección Automática de Red (Offline-First)**: Event listeners nativos (`online` / `offline`) que activan sincronizaciones automáticas al recuperar conectividad y actualizan el semáforo visual de la Topbar sin interrumpir al usuario.
    - **Resolución Determinista de Conflictos**: Algoritmo *Last-Write-Wins* basado en marcas de tiempo ISO para fusionar registros simultáneos entre sedes.
-   - **Guía de Despliegue en 1 Clic**: Documento paso a paso en [**`herramientas/guia_despliegue_supabase.md`**](file:///c:/Users/Yiim0/OneDrive/Desktop/TRABAJO%202026/Paolo%20Aldea/herramientas/guia_despliegue_supabase.md) para activar una base de datos PostgreSQL gratuita en minutos con `database_cloud_schema.sql`.
+   - **Despliegue Zero-Trust (Modo B)**: Guía en [`docs/DEPLOY.md`](docs/DEPLOY.md) + migración [`supabase/migrations/20261102_enterprise_zero_trust.sql`](supabase/migrations/20261102_enterprise_zero_trust.sql). Resumen corto: [`herramientas/guia_despliegue_supabase.md`](herramientas/guia_despliegue_supabase.md).
 
 6. **Arquitectura y Refactorización Modular del Frontend (Fase 4 - Implementada)**:
    - **Ecosistema de 7 Controladores Especializados**: Desacoplamiento de la lógica de negocio del monolito en controladores de dominio independientes:
@@ -124,17 +124,17 @@ Genera un libro `.xlsx` maestro con membrete institucional de **PAOLO ALDEA & AB
 
 
 7. **Roadmap de Excelencia y Optimización Enterprise (Fase 5 - Implementada)**:
-   - **Desacoplamiento de Plantillas HTML en Componentes**: Extracción de todas las vistas y modales a componentes modulares dentro de `views/`, soportados por el cargador dinámico `ComponentLoader` y las herramientas de desarrollo `modularizar_vistas.ps1` y `compilar_bundle_html.ps1`.
-   - **Cifrado Local Militar con Web Crypto API (AES-256-GCM + PBKDF2)**: Módulo criptográfico `LegalCryptoEngine` con 100,000 iteraciones SHA-256 para blindaje total del secreto profesional y confidencialidad procesal.
-   - **Compresión Automática de Snapshots (.zip)**: Generación de respaldos comprimidos de alta eficiencia (reducción del 68% en peso) con política de retención automática de los 5 snapshots más recientes en `_backups/`.
-   - **Servidor Binario Standalone Nativo (`servidor_local.exe`)**: Micro-servidor compilado en C# .NET nativo de solo 15 KB, eliminando cualquier restricción de políticas de ejecución PowerShell en computadoras corporativas.
+   - **Desacoplamiento de Plantillas HTML en Componentes**: Extracción de vistas/modales a `views/`, con `ComponentLoader` y `herramientas/compilar_bundle_html.ps1`.
+   - **Cifrado Local (Web Crypto API AES-256-GCM + PBKDF2)**: Módulo `LegalCryptoEngine` para secreto profesional en almacenamiento local.
+   - **Compresión Automática de Snapshots (.zip)**: Respaldos con retención de los 5 snapshots más recientes en `_backups/` (`herramientas/respaldo_automatico.ps1`).
+   - **Servidor local**: `servidor_local.ps1` + `abrir_app.bat` (hub LAN; no exponer a Internet).
    - **Widget Visual de Cuota de Almacenamiento en Topbar**: Medidor interactivo en tiempo real que audita el uso de LocalStorage / IndexedDB con alerta preventiva y descarga de copias de seguridad en 1 clic.
 
 8. **Blindaje de Ciberseguridad, Respaldo Binario de PDFs y Estabilización Final (v2026.11 — Despliegue de Producción)**:
    - **Preservación Binaria de PDFs en Backups**: Motor de serialización bidireccional asíncrona Blob ↔ Base64 en `data.js` e IndexedDB (`PdfDatabase`), garantizando que las copias maestras en JSON salvaguarden íntegramente los archivos de expedientes y resoluciones judiciales.
    - **Blindaje de Servidor Local contra Fuga de Datos**: Bloqueo absoluto de acceso web estático a archivos internos sensibles (`.server_token`, `.server_port`, scripts `.ps1`/`.bat`/`.vbs`, esquemas SQL y volcados de datos JSON). Generación dinámica criptográfica del token Bearer sin contraseñas cableadas.
    - **Protección Criptográfica contra Escalada de Privilegios**: Validación estricta de firma de sesión `AUTH_SIG` en `getCurrentUser()`, impidiendo la inyección no autorizada de roles de Super Administrador desde DevTools.
-   - **Saneamiento de Reglas en Nube (Firestore & Supabase RLS)**: Eliminación de patrones de correo genéricos en `firestore.rules`, protección de perfiles en `/workers` con acceso de escritura exclusivo para administradores, y restricción de lectura/escritura anónima en la tabla `sync_multi_sede_hub` de PostgreSQL.
+   - **Saneamiento de Reglas en Nube (Firestore & Supabase RLS)**: `firestore.rules` endurecidas y migración Zero-Trust en `supabase/migrations/` (sin acceso `anon` a tablas operativas).
    - **Estabilización de Reportes y Prevención XSS**: Implementación de `sanitizeHtmlString` y saneamiento estricto de campos de usuario en `pdf-export.js`.
    - **Asistencia Blindada y Geocercas Reales**: Validación de sensor GPS físico haversine en modo "En Oficina", marcas de tiempo sincronizadas con el servidor inmutable (anti-manipulación de reloj local) y sello digital SHA-256 con hash canónico.
    - **Inventario ABC Industrial Basado en Pareto**: Recálculo dinámico de clasificación por valor acumulado de consumo (Ley 80/15/5) para la optimización logística de la Sede Challhuahuacho.

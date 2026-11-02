@@ -47,6 +47,10 @@ Validar que las 5 sedes (Miraflores, Abancay, Cusco, Huaraz, Challhuahuacho) sin
 
 ## 7. Netlify / CSP
 - [ ] `GET /.netlify/functions/public-config` no expone service role
+- [ ] `POST attendance-validate` sin Bearer → 401 (no escribe filas)
+- [ ] `POST petty-cash-transition` sin Bearer → 401
+- [ ] Origin distinto de `ALLOWED_ORIGIN` → 401
+- [ ] RPC se ejecuta con JWT de usuario (`auth.uid()`), no service_role
 - [ ] `*.sql`, `/supabase/*`, `/docs/*` → 404
 - [ ] Telegram proxy exige Bearer Firebase (503 sin `FIREBASE_API_KEY`)
 

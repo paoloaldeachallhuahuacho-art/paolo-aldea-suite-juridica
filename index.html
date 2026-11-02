@@ -21,113 +21,24 @@
   <link rel="apple-touch-icon" sizes="167x167" href="assets/logo_paolo_aldea.jpg">
   <link rel="icon" type="image/jpeg" href="assets/logo_paolo_aldea.jpg">
 
-    <!-- Purga Definitiva Cero Kilómetros (Elimina datos de prueba residuales de versiones anteriores) -->
-  <script>
-    (function() {
-      var CLEAN_TOKEN = "PAOLO_ALDEA_ZERO_KM_CLEAN_2026_EMPTY_PRODUCTION_V3";
-      if (!localStorage.getItem(CLEAN_TOKEN)) {
-        // Salvaguarda: si ya existen expedientes o datos activos reales, no purgar
-        var existingCases = localStorage.getItem("PAOLO ALDEA_PAOLO_ALDEA_casos");
-        if (existingCases && existingCases.length > 20) {
-          localStorage.setItem(CLEAN_TOKEN, "true");
-          return;
-        }
-        try {
-          var prefix = "PAOLO ALDEA_PAOLO_ALDEA_";
-          var keys = ["caja_chica", "casos", "citas", "inventario", "documentos", "presupuestos", "workers", "attendance", "auditoria"];
-          keys.forEach(function(k) {
-            localStorage.removeItem(prefix + k);
-            localStorage.removeItem(prefix + k + "_BACKUP");
-            localStorage.removeItem("PAOLO ALDEA_" + k);
-          });
-          if (window.indexedDB) {
-            window.indexedDB.deleteDatabase("PaoloAldeaJuridicoDB");
-          }
-          if ('caches' in window) {
-            caches.keys().then(function(names) {
-              names.forEach(function(n) { caches.delete(n); });
-            });
-          }
-        } catch(e) {}
-        localStorage.setItem(CLEAN_TOKEN, "true");
-        console.info("[Sistema] Despacho Cero Kilómetros inicializado en blanco.");
-      }
-    })();
-  </script>
-
-  <!-- Script Zero-FOUC para prevenir parpadeo de modo oscuro/claro -->
-  <script>
-    (function() {
-      try {
-        var savedTheme = localStorage.getItem('PAOLO_ALDEA_THEME');
-        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      } catch (e) {}
-    })();
-
-    // Visibilidad universal de contraseñas (disponible inmediatamente)
-    window.togglePasswordVisibility = function(inputId, iconId) {
-      try {
-        var input = document.getElementById(inputId);
-        if (!input) return;
-        var icon = document.getElementById(iconId || ('toggleIcon-' + inputId));
-        if (input.type === 'password') {
-          input.type = 'text';
-          if (icon) {
-            icon.classList.remove('fa-eye');
-            icon.classList.add('fa-eye-slash');
-          }
-        } else {
-          input.type = 'password';
-          if (icon) {
-            icon.classList.remove('fa-eye-slash');
-            icon.classList.add('fa-eye');
-          }
-        }
-      } catch (err) {
-        console.error('Error al alternar visibilidad de contraseña:', err);
-      }
-    };
-  </script>
+    <!-- Purga, tema y ojo de contraseña (externo: CSP bloquea <script> embebidos) -->
+  <script src="js/boot-early.js?v=20261102_csp_handlers"></script>
 
   <!-- Google Fonts con carga asíncrona segura (no bloqueante en modo offline) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
+  <link id="paoloFonts" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" media="print">
   <noscript><link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 
   <!-- Librerías 100% Locales (Funcionan sin internet en Challhuahuacho) -->
   <link rel="stylesheet" href="lib/fa/css/all.min.css">
   <script src="lib/tailwind.js"></script>
+  <script src="js/tailwind-config.js?v=20261102_csp_handlers"></script>
   <!-- Chart / ExcelJS / FileSaver / html2pdf: carga diferida vía js/lib-loader.js (Semana 3) -->
   <script src="js/lib-loader.js?v=20261101_week3_perf"></script>
 
   <!-- Estilos Personalizados del Estudio Jurídico -->
   <link rel="stylesheet" href="css/styles.css?v=20261101_week2_firebase_xss">
-
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            legal: {
-              navy: '#0B132B',
-              slate: '#1C2541',
-              card: '#132247',
-              gold: '#C5A059',
-              goldMuted: '#997B28',
-              accent: '#3A506B'
-            }
-          }
-        }
-      }
-    }
-  </script>
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased flex h-screen overflow-hidden">
 
@@ -1568,10 +1479,9 @@
     </nav>
   </div>
 
-    <!-- =========================================================================
-         MODAL: AUTENTICACIÓN MAESTRA DEL SOCIO FUNDADOR (MODALMASTERAUTH)
-         ========================================================================= -->
-  <!-- Modales diferidos: views/view-modals.html vía ComponentLoader (Semana 3) -->
+  <!-- Modales diferidos: views/view-modals.html vía ComponentLoader -->
+  <!-- Modales diferidos: views/view-modals.html vÃ­a ComponentLoader (Semana 3) -->
+  <!-- Modales diferidos: views/view-modals.html vÃ­a ComponentLoader (Semana 3) -->
   <!-- Scripts del Sistema -->
   <script src="js/data.js?v=20261101_week4_qa"></script>
   <script src="js/alerts.js?v=20261101_week2_firebase_xss"></script>
@@ -1601,60 +1511,7 @@
   <script src="js/enterprise/CaseService.js?v=20261102_zt"></script>
   <script src="js/enterprise/BudgetAnalytics.js?v=20261102_zt"></script>
   <script src="js/enterprise/bootstrap.js?v=20261102_zt"></script>
-  <script src="js/app.js?v=20261102_zt"></script>
-
-  <script>
-    // Puente oficial de envío del formulario de inicio de sesión / bootstrap
-    window._ensureLegalApp = async function() {
-      if (!window.app && typeof LegalApp === "function") {
-        try {
-          window.app = new LegalApp();
-          await window.app.init();
-        } catch (e) {
-          console.error("Error al arrancar LegalApp bajo demanda:", e);
-        }
-      } else if (window.db && typeof window.db.ready === "function") {
-        try { await window.db.ready(); } catch (_) {}
-      }
-      return window.app;
-    };
-    window.ejecutarAccesoDespacho = async function(event) {
-      if (event) event.preventDefault();
-      const app = await window._ensureLegalApp();
-      if (app && typeof app.handleLogin === "function") {
-        app.handleLogin(event);
-      } else {
-        const errMsg = document.getElementById("loginErrorMessage");
-        const errAlert = document.getElementById("loginErrorAlert");
-        if (errMsg && errAlert) {
-          errMsg.textContent = "Iniciando módulos del despacho. Por favor intente en un instante...";
-          errAlert.classList.remove("hidden");
-        }
-      }
-    };
-    window.ejecutarBootstrapDespacho = async function(event) {
-      if (event) event.preventDefault();
-      const app = await window._ensureLegalApp();
-      if (app && typeof app.completeAuthBootstrap === "function") {
-        app.completeAuthBootstrap(event);
-      }
-    };
-  </script>
-
-  <script>
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const dateEl = document.getElementById("currentDateStr");
-    if (dateEl) {
-      dateEl.textContent = now.toLocaleDateString('es-ES', options);
-    }
-
-    // Registro de Service Worker para soporte PWA y notificaciones
-    if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
-      navigator.serviceWorker.register('sw.js').then(reg => {
-        reg.update();
-      }).catch(err => console.warn('SW registration skipped:', err));
-    }
-  </script>
+  <script src="js/app.js?v=20261102_csp_handlers"></script>
+  <script src="js/auth-bridge.js?v=20261102_csp_handlers"></script>
 </body>
 </html>

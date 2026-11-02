@@ -2,12 +2,18 @@
  * Expone solo configuración pública (anon). Nunca service_role.
  */
 exports.handler = async (event) => {
+  const allowed = process.env.ALLOWED_ORIGIN || "";
+  const origin = event.headers.origin || event.headers.Origin || "";
   const headers = {
     "Content-Type": "application/json",
     "Cache-Control": "no-store",
-    "Access-Control-Allow-Origin": process.env.ALLOWED_ORIGIN || "*",
     Vary: "Origin"
   };
+  if (allowed && origin === allowed) {
+    headers["Access-Control-Allow-Origin"] = allowed;
+  } else if (!allowed) {
+    // Desarrollo sin ALLOWED_ORIGIN: same-origin únicamente (sin ACAO abierto).
+  }
 
   if (event.httpMethod === "OPTIONS") {
     return {
