@@ -2196,22 +2196,45 @@ const AttendanceModule = (function () {
   }
 
   /**
-   * Inicia el reloj digital continuo
+   * Inicia el reloj digital continuo (formato institucional)
    */
   function startClock() {
     if (clockInterval) clearInterval(clockInterval);
 
+    const DAYS_ES = ["domingo", "lunes", "martes", "miércoles", "jueves", "viernes", "sábado"];
+    const MONTHS_ES = ["enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre"];
+    const pad2 = (n) => String(n).padStart(2, "0");
+
+    const formatLegalDate = (now) => {
+      const dayName = DAYS_ES[now.getDay()];
+      const monthName = MONTHS_ES[now.getMonth()];
+      const titled = dayName.charAt(0).toUpperCase() + dayName.slice(1);
+      return `${titled}, ${now.getDate()} de ${monthName} de ${now.getFullYear()}`;
+    };
+
     const updateTime = () => {
       const clockEl = document.getElementById("asistencia-live-clock");
+      const meridiemEl = document.getElementById("asistencia-live-meridiem");
       const dateEl = document.getElementById("asistencia-live-date");
       const now = new Date();
 
+      let h = now.getHours();
+      const m = now.getMinutes();
+      const s = now.getSeconds();
+      const isAm = h < 12;
+      const h12 = h % 12 || 12;
+
       if (clockEl) {
-        clockEl.textContent = now.toLocaleTimeString("es-PE", { hour12: true });
+        clockEl.textContent = `${pad2(h12)}:${pad2(m)}:${pad2(s)}`;
+      }
+      if (meridiemEl) {
+        meridiemEl.textContent = isAm ? "a. m." : "p. m.";
       }
       if (dateEl) {
-        const options = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
-        dateEl.textContent = now.toLocaleDateString("es-PE", options);
+        const label = formatLegalDate(now);
+        const span = dateEl.querySelector("span");
+        if (span) span.textContent = label;
+        else dateEl.textContent = label;
       }
     };
 

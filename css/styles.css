@@ -609,3 +609,135 @@ html.dark .mobile-nav-btn {
 html.dark .mobile-nav-btn.active {
   color: #fbbf24 !important;
 }
+
+/* Reloj legal de marcaje (kiosco de asistencia) */
+.asistencia-legal-clock {
+  position: relative;
+  overflow: hidden;
+  border-radius: 1rem;
+  border: 1px solid rgba(197, 160, 89, 0.38);
+  background:
+    radial-gradient(ellipse 80% 60% at 100% 0%, rgba(197, 160, 89, 0.12), transparent 55%),
+    linear-gradient(160deg, #0B132B 0%, #132247 48%, #0B132B 100%);
+  box-shadow:
+    0 12px 28px -12px rgba(11, 19, 43, 0.65),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
+  padding: 1.15rem 1.1rem 1.05rem;
+  text-align: center;
+}
+
+.asistencia-legal-clock::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 12%;
+  right: 12%;
+  height: 2px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, transparent, #C5A059, #E5C158, #C5A059, transparent);
+  opacity: 0.9;
+}
+
+.asistencia-legal-clock__watermark {
+  position: absolute;
+  right: -0.35rem;
+  bottom: -0.55rem;
+  font-size: 5.5rem;
+  line-height: 1;
+  color: rgba(197, 160, 89, 0.06);
+  pointer-events: none;
+  user-select: none;
+}
+
+.asistencia-legal-clock__label {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  margin: 0 auto 0.65rem;
+  padding: 0.28rem 0.7rem;
+  border-radius: 999px;
+  border: 1px solid rgba(197, 160, 89, 0.28);
+  background: rgba(11, 19, 43, 0.45);
+  font-family: 'Cinzel', Georgia, serif;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: #E5C158;
+}
+
+.asistencia-legal-clock__pulse {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 999px;
+  background: #34d399;
+  box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55);
+  animation: asistenciaClockPulse 1.8s ease-out infinite;
+  flex-shrink: 0;
+}
+
+@keyframes asistenciaClockPulse {
+  0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0.55); }
+  70% { box-shadow: 0 0 0 8px rgba(52, 211, 153, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(52, 211, 153, 0); }
+}
+
+.asistencia-legal-clock__time-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+  margin-bottom: 0.35rem;
+}
+
+.asistencia-legal-clock__time {
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, monospace;
+  font-size: clamp(1.85rem, 5.2vw, 2.85rem);
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  font-variant-numeric: tabular-nums;
+  color: #F8FAFC;
+  line-height: 1.05;
+  text-shadow: 0 2px 18px rgba(197, 160, 89, 0.18);
+}
+
+.asistencia-legal-clock__meridiem {
+  font-family: 'Plus Jakarta Sans', sans-serif;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #0B132B;
+  background: linear-gradient(135deg, #E5C158, #C5A059);
+  border-radius: 0.4rem;
+  padding: 0.22rem 0.45rem;
+  line-height: 1;
+  transform: translateY(-0.15rem);
+}
+
+.asistencia-legal-clock__date {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+  font-size: 0.78rem;
+  font-weight: 500;
+  color: #94A3B8;
+}
+
+.asistencia-legal-clock__date i {
+  color: rgba(197, 160, 89, 0.75);
+  font-size: 0.7rem;
+}
+
+.asistencia-legal-clock__tz {
+  margin-top: 0.55rem;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: rgba(148, 163, 184, 0.85);
+}

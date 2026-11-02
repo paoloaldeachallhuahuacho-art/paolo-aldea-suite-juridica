@@ -43,24 +43,21 @@
             <!-- Columna Izquierda: Reloj Digital, Identificación y Sensor GPS -->
             <div class="lg:col-span-5 space-y-4 min-w-0">
               <!-- Tarjeta de Reloj Digital Oficial -->
-              <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-xl text-center relative overflow-hidden">
-                <div class="absolute -right-6 -bottom-6 text-amber-500/5 text-8xl font-black select-none pointer-events-none">
-                  <i class="fa-regular fa-clock"></i>
+              <div class="asistencia-legal-clock">
+                <div class="asistencia-legal-clock__watermark" aria-hidden="true"><i class="fa-regular fa-clock"></i></div>
+                <div class="asistencia-legal-clock__label">
+                  <span class="asistencia-legal-clock__pulse" aria-hidden="true"></span>
+                  Hora legal oficial de marcaje
                 </div>
-
-                <div class="text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-400/90 mb-1 flex items-center justify-center gap-2">
-                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
-                  Hora Legal Oficial de Marcaje
+                <div class="asistencia-legal-clock__time-row">
+                  <div id="asistencia-live-clock" class="asistencia-legal-clock__time">--:--:--</div>
+                  <span id="asistencia-live-meridiem" class="asistencia-legal-clock__meridiem">--</span>
                 </div>
-
-                <div id="asistencia-live-clock" class="text-2xl sm:text-4xl md:text-5xl font-black font-mono tracking-tight text-white py-1 whitespace-nowrap">
-                  --:--:--
+                <div id="asistencia-live-date" class="asistencia-legal-clock__date">
+                  <i class="fa-regular fa-calendar"></i>
+                  <span>Cargando fecha…</span>
                 </div>
-
-                <div id="asistencia-live-date" class="text-xs font-medium text-slate-400 capitalize">
-                  Cargando fecha...
-                </div>
-
+                <div class="asistencia-legal-clock__tz">Zona horaria · Perú (UTC−5)</div>
               </div>
 
               <!-- Tarjeta de Identificación del Colaborador -->
