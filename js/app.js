@@ -422,6 +422,11 @@ class LegalApp {
       try { await window.db.ready(); } catch (_) {}
     }
 
+    // Modo B enterprise (no-op si no hay SUPABASE_* en Netlify)
+    if (window.PaoloEnterprise && typeof window.PaoloEnterprise.boot === "function") {
+      try { await window.PaoloEnterprise.boot(); } catch (_) {}
+    }
+
     // Gestión de Sesiones Senior:
     // 1. Bloquea únicamente si el usuario recarga la página (F5 / Recargar) o si expiró por inactividad (2-3 min).
     // 2. Permite navegación fluida entre múltiples pestañas/ventanas sin bloquear al cambiar de pestaña.
@@ -1221,6 +1226,9 @@ class LegalApp {
           }
         ];
         window.db.add("caja_chica", data);
+        if (window.PaoloCashManager && typeof window.PaoloCashManager.enqueueLocalEntry === "function") {
+          window.PaoloCashManager.enqueueLocalEntry(data).catch(() => {});
+        }
         this.showToast("Nuevo movimiento registrado en caja chica", "success");
 
         // Notificar automáticamente al Asistente Administrativo
@@ -1514,6 +1522,20 @@ class LegalApp {
     });
 
     window.db.update("caja_chica", item.id, item);
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloCashManager && typeof window.PaoloCashManager.transition === "function") {
+      // Cloud: requested/branch_approved → disbursed (mapa LWW)
+      const cloudState = (window.PaoloSyncManager && window.PaoloSyncManager.mapLegacyWorkflow)
+        ? window.PaoloSyncManager.mapLegacyWorkflow("aprobado")
+        : "disbursed";
+      window.PaoloCashManager.transition(item.id, cloudState === "disbursed" ? "disbursed" : cloudState).catch((err) => {
+        console.warn("[CashManager] transición cloud diferida:", err && err.message);
+        if (window.PaoloCashManager.enqueueLocalEntry) {
+          window.PaoloCashManager.enqueueLocalEntry(item).catch(() => {});
+        }
+      });
+    } else if (window.PaoloCashManager && window.PaoloCashManager.enqueueLocalEntry) {
+      window.PaoloCashManager.enqueueLocalEntry(item).catch(() => {});
+    }
     this.showToast("Gasto aprobado y autorizado para desembolso", "success");
 
     // Notificar al colaborador solicitante
@@ -2170,6 +2192,9 @@ class LegalApp {
         data.fechaInicio = getRelativeDateOnlyStr(0);
         window.db.add("casos", data);
         this.showToast("Nuevo expediente judicial registrado en el despacho", "success");
+      }
+      if (window.PaoloCaseService && typeof window.PaoloCaseService.upsertCase === "function") {
+        window.PaoloCaseService.upsertCase(data).catch(() => {});
       }
 
       if (window.draftAutosave) window.draftAutosave.clearDraft("modalCaso");

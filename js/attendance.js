@@ -711,7 +711,35 @@ const AttendanceModule = (function () {
     }
     const res = window.db.save("attendance", rawList);
     updatePendingBadge();
-    // Push instantáneo a Supabase Cloud (Multi-Sede Real-Time)
+
+    // Modo B: validación server-side (Edge) — no sustituye el guardado local offline
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloAttendanceService && record && record.ingreso && !record._cloudValidated) {
+      const eventType = record.tipoMarcacion === "comision_oficial" || record.motivoExterno
+        ? "DILIGENCIA"
+        : (record.salida ? "SALIDA" : "ENTRADA");
+      window.PaoloAttendanceService.punch({
+        branchId: record.sede || "challhuahuacho",
+        eventType,
+        workerCode: record.workerId || record.dni
+      }).then((cloudRes) => {
+        record._cloudValidated = true;
+        record.validation_status = cloudRes.validation_status || "accepted";
+        if (cloudRes.distance_m != null) record.distanciaMetros = Math.round(cloudRes.distance_m);
+        const list2 = window.db.getRaw ? window.db.getRaw("attendance") : [];
+        const i2 = list2.findIndex((r) => r.id === record.id);
+        if (i2 >= 0) {
+          list2[i2] = { ...list2[i2], ...record };
+          window.db.save("attendance", list2);
+        }
+      }).catch((err) => {
+        console.warn("[AttendanceService] validación cloud:", err && err.message);
+        if (window.showToast) {
+          window.showToast("Marcaje local guardado; validación cloud pendiente o rechazada: " + (err.message || ""), "warning");
+        }
+      });
+    }
+
+    // Push instantáneo a hub / nube legacy
     if (window.app && typeof window.app.sincronizarConNube === "function") {
       setTimeout(() => { window.app.sincronizarConNube(true); }, 150);
     }

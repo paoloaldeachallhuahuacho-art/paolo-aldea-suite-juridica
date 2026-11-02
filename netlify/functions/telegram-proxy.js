@@ -66,17 +66,19 @@ exports.handler = async (event) => {
     return { statusCode: 401, headers: baseHeaders, body: JSON.stringify({ ok: false, error: "No autorizado." }) };
   }
 
+  // Zero-trust: Firebase ID token obligatorio en producción (no confiar solo en Origin)
   const firebaseApiKey = process.env.FIREBASE_API_KEY || "";
-  if (firebaseApiKey) {
-    const authHeader = event.headers.authorization || event.headers.Authorization || "";
-    const m = String(authHeader).match(/^Bearer\s+(.+)$/i);
-    if (!m) {
-      return { statusCode: 401, headers: baseHeaders, body: JSON.stringify({ ok: false, error: "Bearer Firebase ID token requerido." }) };
-    }
-    const user = await verifyFirebaseIdToken(m[1].trim(), firebaseApiKey);
-    if (!user) {
-      return { statusCode: 401, headers: baseHeaders, body: JSON.stringify({ ok: false, error: "Token Firebase inválido o anónimo." }) };
-    }
+  if (!firebaseApiKey) {
+    return { statusCode: 503, headers: baseHeaders, body: JSON.stringify({ ok: false, error: "FIREBASE_API_KEY requerido." }) };
+  }
+  const authHeader = event.headers.authorization || event.headers.Authorization || "";
+  const m = String(authHeader).match(/^Bearer\s+(.+)$/i);
+  if (!m) {
+    return { statusCode: 401, headers: baseHeaders, body: JSON.stringify({ ok: false, error: "Bearer Firebase ID token requerido." }) };
+  }
+  const user = await verifyFirebaseIdToken(m[1].trim(), firebaseApiKey);
+  if (!user) {
+    return { statusCode: 401, headers: baseHeaders, body: JSON.stringify({ ok: false, error: "Token Firebase inválido o anónimo." }) };
   }
 
   try {

@@ -1,63 +1,62 @@
 # Modo de despliegue — PAOLO ALDEA Suite Jurídica
 
-**Decisión Semana 4:** el modo soportado por defecto es **Local unipersonal (hub en sede)**.  
-Nube multi-sede e híbrido quedan documentados como opcionales y no se mezclan en el mismo arranque.
+**Arquitectura dual (Zero-Trust):** Modo A local siempre disponible; Modo B enterprise se activa solo con variables Netlify/Supabase.
 
 ---
 
-## Modo A — Local unipersonal (recomendado)
+## Modo A — Local unipersonal (siempre soportado)
 
 | | |
 |---|---|
-| **Cuándo** | Una PC de despacho (Challhuahuacho u otra sede), sin depender de internet |
-| **Arranque** | `abrir_app.bat` → `servidor_local.ps1` → navegador en `http://localhost:<puerto>/` |
-| **Datos** | IndexedDB primario (`PaoloAldeaJuridicoDB_v2`); localStorage solo espejo/stub |
-| **Auth** | Bootstrap de primer arranque + PBKDF2; sesión con `AUTH_SIG`; APIs con cookie/Bearer de pairing |
-| **Sync** | Opcional entre PCs de la misma LAN vía `/api/cloud_sync` + snapshot `/api/cloud_snapshot` |
-| **Prohibido** | Tokens Telegram en el cliente; Anonymous Firebase; hashes default en repo |
+| **Cuándo** | Una PC de despacho, sin depender de internet |
+| **Arranque** | `abrir_app.bat` → `servidor_local.ps1` → `http://localhost:<puerto>/` |
+| **Datos** | IndexedDB primario; localStorage espejo/stub |
+| **Auth** | Bootstrap + PBKDF2; sesión `AUTH_SIG`; APIs cookie/Bearer pairing |
+| **Flag** | `window.__ENTERPRISE_CLOUD__ === false` |
 
-### Checklist operativo
-1. No commitear `.server_token`, `.server_pairing`, `.env`, ni `central_cloud_data.json` con datos reales.
-2. Primer usuario: pantalla de bootstrap (crea `super_admin`).
-3. Backups: `_backups/` vía `/api/backup` o export JSON desde la UI.
-4. Librerías pesadas (Chart/Excel/PDF) se cargan solo al usarse.
+### Checklist
+1. No commitear `.server_token`, `.server_pairing`, `.env`, ni datos reales en `central_cloud_data.json`.
+2. Primer usuario vía bootstrap.
+3. Backups `_backups/` o export JSON.
 
 ---
 
-## Modo B — Multi-sede nube (opcional)
+## Modo B — Multi-sede nube Zero-Trust (enterprise)
 
 | | |
 |---|---|
-| **Cuándo** | Varias sedes necesitan consolidar expedientes/caja |
-| **Requisitos** | Firebase Auth **real** (sin Anonymous); `firestore.rules` por rol/sede; Telegram solo vía Netlify proxy con secretos en env |
-| **No usar** | Servidor PowerShell público a internet; secretos en `settings` sincronizados |
+| **Cuándo** | 5 sedes sincronizadas con RLS y Realtime |
+| **Activación** | Netlify env `SUPABASE_URL` + `SUPABASE_ANON_KEY` (+ service role solo en Functions) |
+| **Auth** | Supabase Auth JWT con `app_metadata.role` + `app_metadata.branch_id` |
+| **Datos** | PostgreSQL + outbox IndexedDB + LWW `server_ts` |
+| **Edge** | `attendance-validate`, `petty-cash-transition`, `public-config`, `telegram-proxy` |
+| **Schema** | [`supabase/migrations/20261102_enterprise_zero_trust.sql`](../supabase/migrations/20261102_enterprise_zero_trust.sql) |
+| **Auditoría** | [`docs/AUDIT_CHECKLIST_MULTI_SEDE.md`](AUDIT_CHECKLIST_MULTI_SEDE.md) |
 
-Activar solo cuando Modo A esté estable y haya responsable de cloud (App Check, rotación de claves).
+### Roles JWT
+`super_admin` | `admin` (BranchAdmin) | `abogado` | `asistente_*` | `accountant`
 
----
-
-## Modo C — Híbrido (evitar)
-
-Mezclar hub local + Firestore + Supabase en el mismo flujo sin política clara viola el secreto profesional y complica incidentes.  
-Si se necesita: documentar qué colecciones salen del despacho y base legal (Ley 29733) **antes** de encender sync.
-
----
-
-## Mapa rápido de endpoints locales
-
-| Método | Ruta | Uso |
-|--------|------|-----|
-| POST | `/api/session` | Emparejar cookie de sesión (pairing one-time) |
-| POST | `/api/cloud_sync` | Merge multi-sede → ACK liviano |
-| GET | `/api/cloud_snapshot` | Stream del JSON central (hidratación) |
-| GET | `/api/health` | Salud del hub |
-| POST | `/api/backup` | Snapshot zip allowlist |
+### Prohibido en Modo B
+- Anonymous Firebase / anon Supabase policies
+- Service role en el navegador
+- Telegram token en cliente
+- Confiar solo en Haversine client-side para aceptar marcajes
 
 ---
 
-## Relación con PRs de hardening
+## Modo C — Híbrido descontrolado (evitar)
 
-- Semana 1: APIs autenticadas + clean slate de credenciales  
-- Semana 2: Firebase/XSS/Telegram proxy  
-- Semana 3: shell liviano + lazy libs + paginación  
-- Semana 4: IndexedDB primario, controllers diferidos, sync ACK + este documento  
+Mezclar hub PowerShell público + Firestore + Supabase sin SyncManager/RLS.  
+Si se necesita offline+cloud: usar **Modo B** con outbox (no abrir el hub PS a Internet).
+
+---
+
+## Endpoints
+
+| Modo | Ruta | Uso |
+|------|------|-----|
+| A | `POST /api/session` | Pairing local |
+| A | `POST /api/cloud_sync` + `GET /api/cloud_snapshot` | Sync LAN |
+| B | `GET /.netlify/functions/public-config` | Anon config |
+| B | `POST /.netlify/functions/attendance-validate` | Geocerca server |
+| B | `POST /.netlify/functions/petty-cash-transition` | Flujo caja |

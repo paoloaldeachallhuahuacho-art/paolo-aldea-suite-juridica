@@ -5,7 +5,7 @@
 // Compatible con Android (Chrome) e iOS (Safari PWA 16.4+)
 // =========================================================================
 
-const CACHE_NAME = 'paolo-aldea-pwa-v2026.11-week4-hardening';
+const CACHE_NAME = 'paolo-aldea-pwa-v2026.11-zero-trust';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -24,6 +24,16 @@ const ASSETS_TO_CACHE = [
   './js/data.js',
   './js/lib-loader.js',
   './js/controller-loader.js',
+  './js/enterprise/sanitize.js',
+  './js/enterprise/ErrorBoundary.js',
+  './js/enterprise/config.js',
+  './js/enterprise/AuthService.js',
+  './js/enterprise/SyncManager.js',
+  './js/enterprise/AttendanceService.js',
+  './js/enterprise/CashManager.js',
+  './js/enterprise/CaseService.js',
+  './js/enterprise/BudgetAnalytics.js',
+  './js/enterprise/bootstrap.js',
   './js/attendance.js',
   './js/draft-autosave.js',
   './js/controllers/cases.controller.js',

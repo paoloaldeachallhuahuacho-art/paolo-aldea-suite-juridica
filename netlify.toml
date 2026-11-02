@@ -2,7 +2,7 @@
   publish = "."
   functions = "netlify/functions"
 
-# Bloqueo de archivos internos (no deben servirse publicamente)
+# ---------- Bloqueo de archivos internos ----------
 [[redirects]]
   from = "/*.ps1"
   to = "/index.html"
@@ -29,6 +29,18 @@
 
 [[redirects]]
   from = "/herramientas/*"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/supabase/*"
+  to = "/index.html"
+  status = 404
+  force = true
+
+[[redirects]]
+  from = "/docs/*"
   to = "/index.html"
   status = 404
   force = true
@@ -94,24 +106,30 @@
   force = true
 
 [[redirects]]
+  from = "/.server_pairing"
+  to = "/index.html"
+  status = 404
+  force = true
+
+# SPA fallback (después de bloqueos)
+[[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
 
-# Reglas de Seguridad Avanzada, CSP, SSL y Políticas de Navegador
+# ---------- Cabeceras zero-trust ----------
 [[headers]]
   for = "/*"
   [headers.values]
     X-Content-Type-Options = "nosniff"
-    X-Frame-Options = "SAMEORIGIN"
-    X-XSS-Protection = "1; mode=block"
+    X-Frame-Options = "DENY"
     Referrer-Policy = "strict-origin-when-cross-origin"
-    Cross-Origin-Opener-Policy = "same-origin-allow-popups"
+    Cross-Origin-Opener-Policy = "same-origin"
+    Cross-Origin-Resource-Policy = "same-origin"
     Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
-    Permissions-Policy = "geolocation=(self), camera=(), microphone=(), payment=(), usb=()"
-    Content-Security-Policy = "default-src 'self' https: data: blob: 'unsafe-inline' 'unsafe-eval'; script-src 'self' https: 'unsafe-inline' 'unsafe-eval' https://www.gstatic.com https://cdn.tailwindcss.com; connect-src 'self' https: wss: https://*.supabase.co wss://*.supabase.co https://*.googleapis.com https://*.firebaseio.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com; font-src 'self' https: data:; img-src 'self' https: data: blob:; style-src 'self' https: 'unsafe-inline'; base-uri 'self'; form-action 'self';"
+    Permissions-Policy = "geolocation=(self), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()"
+    Content-Security-Policy = "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.telegram.org; worker-src 'self' blob:; manifest-src 'self'"
 
-# Caché Inmutable de Larga Duración para Librerías Pesadas y Fuentes (Ahorro de Ancho de Banda Móvil)
 [[headers]]
   for = "/lib/*"
   [headers.values]
@@ -122,14 +140,17 @@
   [headers.values]
     Cache-Control = "public, max-age=604800, stale-while-revalidate=86400"
 
-# Service Worker PWA (Sin caché rígida para actualizaciones automáticas en celulares)
+[[headers]]
+  for = "/js/*"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
 [[headers]]
   for = "/sw.js"
   [headers.values]
     Cache-Control = "no-cache, no-store, must-revalidate"
     Content-Type = "application/javascript; charset=utf-8"
 
-# Manifiesto Oficial PWA
 [[headers]]
   for = "/manifest.json"
   [headers.values]
