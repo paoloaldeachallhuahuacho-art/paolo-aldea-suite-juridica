@@ -1,0 +1,237 @@
+      <section id="view-personal" class="tab-view hidden space-y-4">
+        <!-- Banner Institucional Oficial -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-3.5 rounded-xl shadow-sm border border-slate-700 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-400/40 flex items-center justify-center text-indigo-400 font-bold shrink-0">
+              <i class="fa-solid fa-id-card-clip text-sm"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold text-amber-300 font-serif-legal tracking-wide">«Optimum iuris patrocinium ab optimis hominibus oritur»</div>
+
+  
+              <div class="text-[11px] text-slate-300 italic">“La excelencia de la defensa jurídica nace de la probidad y talento de su equipo humano”</div>
+
+  
+            </div>
+
+  
+          </div>
+
+  
+          <div class="flex items-center gap-2">
+            <button onclick="window.excelExporter.exportModule('personal')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Exportar directorio de personal a Excel">
+              <i class="fa-solid fa-file-excel"></i> Exportar Excel
+            </button>
+            <button onclick="window.pdfExporter.exportModulePdf('personal')" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Exportar directorio oficial de personal a PDF">
+              <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+            </button>
+            <button id="btnNuevoPersonal" onclick="window.app.openPersonalModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-user-plus"></i> Registrar Colaborador
+            </button>
+          </div>
+
+  
+        </div>
+
+  
+
+        <!-- 5 Tarjetas Ejecutivas de KPIs de Personal -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-1">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span>TOTAL EQUIPO</span>
+              <i class="fa-solid fa-users text-slate-400"></i>
+            </div>
+
+  
+            <div id="kpiPersonalTotal" class="text-xl font-bold text-slate-900 font-mono">0</div>
+
+  
+            <div class="text-[10px] text-slate-500 flex items-center gap-1">
+              <span id="kpiPersonalActivosBadge" class="text-emerald-700 font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">0 activos</span>
+              <span id="kpiPersonalInactivosBadge" class="text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded">0 inactivos</span>
+            </div>
+
+  
+          </div>
+
+  
+
+          <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-1">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span>ABOGADOS ASOCIADOS</span>
+              <i class="fa-solid fa-scale-balanced text-blue-500"></i>
+            </div>
+
+  
+            <div id="kpiPersonalAbogados" class="text-xl font-bold text-blue-700 font-mono">0</div>
+
+  
+            <div class="text-[10px] text-blue-600 font-medium">Patrocinio & Litigación activa</div>
+
+  
+          </div>
+
+  
+
+          <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-1">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span>ASISTENTES LEGALES</span>
+              <i class="fa-solid fa-clipboard-user text-emerald-500"></i>
+            </div>
+
+  
+            <div id="kpiPersonalAsistentes" class="text-xl font-bold text-emerald-700 font-mono">0</div>
+
+  
+            <div class="text-[10px] text-emerald-600 font-medium">Gestión procesal y notificaciones</div>
+
+  
+          </div>
+
+  
+
+          <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-1">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span>ADMINISTRADORES</span>
+              <i class="fa-solid fa-crown text-amber-500"></i>
+            </div>
+
+  
+            <div id="kpiPersonalAdmins" class="text-xl font-bold text-amber-700 font-mono">0</div>
+
+  
+            <div class="text-[10px] text-amber-600 font-medium">Supervisión & Jefaturas de Sede</div>
+
+  
+          </div>
+
+  
+
+          <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs space-y-1">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span>COBERTURA SEDES</span>
+              <i class="fa-solid fa-city text-purple-500"></i>
+            </div>
+
+  
+            <div id="kpiPersonalSedes" class="text-xl font-bold text-purple-700 font-mono">5 Sedes</div>
+
+  
+            <div class="text-[10px] text-purple-600 font-medium">Lima, Apurímac, Cusco, Áncash</div>
+
+  
+          </div>
+
+  
+        </div>
+
+  
+
+        <!-- Barra de Búsqueda y Filtros Avanzados -->
+        <div class="bg-white p-3.5 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2.5 flex-1 w-full min-w-0">
+            <!-- Buscador -->
+            <div class="relative flex-1 min-w-[180px] w-full sm:w-auto">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-xs text-slate-400"></i>
+              <input type="text" id="searchPersonal" autocomplete="off" oninput="window.app.filterPersonal()" placeholder="Buscar por DNI, nombre, cargo o correo..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:border-blue-500">
+            </div>
+
+  
+
+            <!-- Filtro por Sede -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-bold text-slate-500 shrink-0"><i class="fa-solid fa-location-dot text-amber-500"></i> Sede:</span>
+              <select id="filterSedePersonal" onchange="window.app.filterPersonal()" class="text-xs py-1.5 px-2 rounded-lg border border-slate-300 bg-white font-medium focus:outline-none focus:border-blue-500">
+              <option value="ALL">Todas las Sedes</option>
+                <option value="todas">Consolidado Nacional</option>
+                <option value="miraflores">Sede Miraflores (Lima)</option>
+                <option value="abancay">Sede Abancay</option>
+                <option value="cusco">Sede Cusco</option>
+                <option value="huaraz">Sede Huaraz</option>
+                <option value="challhuahuacho">Sede Challhuahuacho</option>
+              </select>
+            </div>
+
+  
+
+            <!-- Filtro por Rol -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-bold text-slate-500 shrink-0"><i class="fa-solid fa-user-tag text-blue-500"></i> Rol:</span>
+              <select id="filterRolPersonal" onchange="window.app.filterPersonal()" class="text-xs py-1.5 px-2 rounded-lg border border-slate-300 bg-white font-medium focus:outline-none focus:border-blue-500">
+                <option value="ALL">Todos los Roles</option>
+                <option value="super_admin">Super Administrador</option>
+                <option value="socio">Socio Principal</option>
+                <option value="admin">Administrador</option>
+                <option value="abogado">Abogado Litigante Asociado</option>
+                <option value="asistente_legal">Asistente Legal</option>
+                <option value="asistente_admin">Asistente Administrativo</option>
+              </select>
+            </div>
+
+  
+
+            <!-- Filtro por Estado -->
+            <div class="flex items-center gap-1.5">
+              <span class="text-[11px] font-bold text-slate-500 shrink-0"><i class="fa-solid fa-toggle-on text-emerald-500"></i> Estado:</span>
+              <select id="filterEstadoPersonal" onchange="window.app.filterPersonal()" class="text-xs py-1.5 px-2 rounded-lg border border-slate-300 bg-white font-medium focus:outline-none focus:border-blue-500">
+                <option value="ALL">Todos los Estados</option>
+                <option value="ACTIVO">Activos</option>
+                <option value="INACTIVO">Inactivos / De Baja</option>
+              </select>
+            </div>
+
+  
+          </div>
+
+  
+
+          <div class="flex items-center gap-2">
+            <button onclick="window.app.resetPersonalFilters()" class="text-xs px-2.5 py-1.5 rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition" title="Restablecer filtros">
+              <i class="fa-solid fa-rotate-left mr-1"></i> Limpiar
+            </button>
+                        <span id="personalCountLabel" class="text-xs font-bold text-slate-700 bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200">0 colaboradores</span>
+            <button id="btnNuevoPersonalSecondary" onclick="window.app.openPersonalModal()" class="bg-blue-600 hover:bg-blue-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Registrar nuevo colaborador profesional">
+              <i class="fa-solid fa-user-plus"></i> Registrar Colaborador
+            </button>
+          </div>
+
+  
+        </div>
+
+  
+
+        <!-- Tabla de Personal -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-xs overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-900 text-white uppercase text-[10px] tracking-wider font-bold">
+                <tr>
+                  <th class="py-3 px-3">Colaborador / DNI</th>
+                  <th class="py-3 px-3">Cargo & Especialidad</th>
+                  <th class="py-3 px-3 text-center">Rol Sistema</th>
+                  <th class="py-3 px-3 text-center">Sede Asignada</th>
+                  <th class="py-3 px-3">Contacto Directo</th>
+                  <th class="py-3 px-3 text-center">Estado</th>
+                  <th class="py-3 px-3">Ingreso</th>
+                  <th class="py-3 px-3 text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="personalTableBody" class="divide-y divide-slate-200">
+                <!-- Filas renderizadas dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+
+  
+        </div>
+
+  
+      </section>
+
+        <!-- =========================================================================
+         PANEL DE CONTROL TOTAL & GOBIERNO DE LA FIRMA (EXCLUSIVO SOCIO FUNDADOR)
+         ========================================================================= -->
+      <!-- =========================================================================
+           MÓDULO OFICIAL DE ROLES Y GESTIÓN DE PERMISOS GRANULARES (RBAC)
+           ========================================================================= -->

@@ -1,0 +1,294 @@
+      <section id="view-kpis" class="tab-view hidden space-y-4">
+        <!-- Frase Jurídica Oficial de Sección -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-slate-900 text-white p-3.5 rounded-xl shadow-sm border border-slate-700 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3 min-w-0 flex-1">
+            <span class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400 font-bold shrink-0">
+              <i class="fa-solid fa-scale-balanced text-sm"></i>
+            </span>
+            <div class="min-w-0">
+              <div class="text-xs font-bold text-amber-300 font-serif-legal tracking-wide">«Iustitia est constans et perpetua voluntas ius suum cuique tribuendi»</div>
+              <div class="text-[11px] text-slate-300 italic">“La justicia es la constante y perpetua voluntad de dar a cada uno lo que por derecho le corresponde” — Ulpiano</div>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
+            <button onclick="window.excelExporter.exportMasterWorkbook()" class="flex-1 sm:flex-initial justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
+              <i class="fa-solid fa-file-excel"></i> Exportar Reporte Maestro a Excel
+            </button>
+            <button onclick="window.pdfExporter.exportModulePdf('kpis')" class="flex-1 sm:flex-initial justify-center bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
+              <i class="fa-solid fa-file-pdf"></i> Exportar Informe KPIs PDF
+            </button>
+            <button onclick="window.app && window.app.copiarUrlPowerBI ? window.app.copiarUrlPowerBI() : null" class="flex-1 sm:flex-initial justify-center bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer" title="Copiar enlace directo de datos para Microsoft Power BI"><i class="fa-solid fa-chart-pie"></i> Conector Power BI</button>
+          </div>
+        </div>
+
+        <!-- Power BI Slicers Dinámicos y Reactivos -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-filter text-amber-600"></i> Período de Análisis:
+            </span>
+            <div class="flex flex-wrap items-center gap-1">
+              <button type="button" onclick="window.kpiDashboard.setTimeFilter('all')" data-time="all" class="slicer-btn slicer-time-btn active">Acumulado Total</button>
+              <button type="button" onclick="window.kpiDashboard.setTimeFilter('month')" data-time="month" class="slicer-btn slicer-time-btn">Este Mes</button>
+              <button type="button" onclick="window.kpiDashboard.setTimeFilter('30days')" data-time="30days" class="slicer-btn slicer-time-btn">Últimos 30 Días</button>
+            </div>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <span class="text-xs font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5 shrink-0">
+              <i class="fa-solid fa-building-user text-blue-600"></i> Centro de Control:
+            </span>
+            <div class="flex flex-wrap items-center gap-1">
+              <button type="button" onclick="window.kpiDashboard.setCenterFilter('all')" data-center="all" class="slicer-btn slicer-center-btn">Todos</button>
+              <button type="button" onclick="window.kpiDashboard.setCenterFilter('challhuahuacho')" data-center="challhuahuacho" class="slicer-btn slicer-center-btn active">Sede Challhuahuacho</button>
+              <button type="button" onclick="window.kpiDashboard.setCenterFilter('cotabambas')" data-center="cotabambas" class="slicer-btn slicer-center-btn">Juzgados Cotabambas</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 6 Tarjetas Ejecutivas de KPIs (Interactivos: Clic para ir al módulo correspondiente) -->
+        <div class="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5 sm:gap-3.5">
+          <div onclick="window.app.switchTab('caja_chica')" class="kpi-card success p-3.5 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition duration-200 group" title="Haga clic para ir a Caja Chica & Centros de Costo">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span class="group-hover:text-emerald-700 transition">SALDO EN CAJA</span>
+              <i class="fa-solid fa-wallet text-emerald-600 text-sm group-hover:scale-110 transition"></i>
+            </div>
+
+  
+
+<div id="kpiSaldoCaja" class="text-xl font-bold text-slate-900 mt-1 font-mono">S/ 0.00</div>
+
+  
+            <div class="flex items-center justify-between text-[11px] mt-1.5 pt-1.5 border-t border-slate-100">
+              <span id="kpiTotalIngresos" class="text-emerald-700 font-bold">+S/ 0.00</span>
+              <span id="kpiTotalEgresos" class="text-rose-700 font-bold">-S/ 0.00</span>
+            </div>
+
+  
+
+</div>
+
+  
+
+<div onclick="window.app.switchTab('casos')" class="kpi-card p-3.5 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition duration-200 group" title="Haga clic para ir a Casos & Expedientes">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span class="group-hover:text-blue-700 transition">EXPEDIENTES ACTIVOS</span>
+              <i class="fa-solid fa-scale-balanced text-blue-600 text-sm group-hover:scale-110 transition"></i>
+            </div>
+
+  
+
+<div id="kpiCasosActivos" class="text-xl font-bold text-slate-900 mt-1 font-mono">0</div>
+
+  
+            <div class="flex items-center justify-between text-[11px] mt-1.5 pt-1.5 border-t border-slate-100">
+              <span id="kpiTasaExito" class="text-blue-700 font-bold">0% de éxito</span>
+              <span class="text-slate-400 group-hover:text-blue-600 font-semibold transition">Cotabambas &rarr;</span>
+            </div>
+
+  
+
+</div>
+
+  
+
+<div onclick="window.alerts.openDrawer()" class="kpi-card urgent p-3.5 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition duration-200 group" title="Haga clic para abrir el panel de Plazos Fatales y Alertas">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span class="group-hover:text-rose-700 transition">PLAZOS FATALES</span>
+              <i class="fa-solid fa-triangle-exclamation text-rose-600 text-sm group-hover:scale-110 transition animate-pulse"></i>
+            </div>
+
+  
+
+<div id="kpiAlertasFatales" class="text-xl font-bold text-rose-600 mt-1 font-mono">0</div>
+
+  
+            <div class="flex items-center justify-between text-[11px] mt-1.5 pt-1.5 border-t border-slate-100">
+              <span class="text-rose-600 font-semibold">≤ 48h / Hoy</span>
+              <span class="text-slate-700 group-hover:text-rose-700 font-bold underline flex items-center gap-1">Revisar <i class="fa-solid fa-arrow-right text-[9px]"></i></span>
+            </div>
+
+  
+
+</div>
+
+  
+
+<div onclick="window.app.switchTab('casos')" class="kpi-card p-3.5 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition duration-200 group" title="Haga clic para ver Tiempos de Ciclo y Lead Time en Casos">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span class="group-hover:text-indigo-700 transition">LEAD TIME MEDIO</span>
+              <i class="fa-solid fa-stopwatch text-indigo-600 text-sm group-hover:scale-110 transition"></i>
+            </div>
+
+  
+
+<div id="kpiAvgCiclo" class="text-sm font-bold text-slate-900 mt-2 font-mono">0 días promedio</div>
+
+  
+            <div class="flex items-center justify-between text-[10px] text-slate-400 mt-1.5 pt-1.5 border-t border-slate-100">
+              <span>Tiempo de ciclo</span>
+              <span class="group-hover:text-indigo-600 font-semibold transition">Ver casos &rarr;</span>
+            </div>
+
+  
+
+</div>
+
+  
+
+<div onclick="window.app.switchTab('inventario')" class="kpi-card warning p-3.5 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition duration-200 group" title="Haga clic para ir a Inventario Patrimonial (Método ABC)">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span class="group-hover:text-amber-800 transition">ACTIVOS EN SEDE</span>
+              <i class="fa-solid fa-boxes-stacked text-amber-600 text-sm group-hover:scale-110 transition"></i>
+            </div>
+
+  
+
+<div id="kpiValorInventario" class="text-xs font-bold text-slate-900 mt-2 font-mono truncate">S/ 0.00</div>
+
+  
+            <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1.5 pt-1.5 border-t border-slate-100">
+              <span>Método ABC</span>
+              <span class="group-hover:text-amber-800 font-semibold transition">Inventario &rarr;</span>
+            </div>
+
+  
+
+</div>
+
+  
+
+<div onclick="window.app.switchTab('casos')" class="kpi-card p-3.5 cursor-pointer hover:shadow-lg hover:-translate-y-1 transition duration-200 group" title="Haga clic para ver Cartera de Honorarios y Citas">
+            <div class="flex items-center justify-between text-slate-500 text-[11px] font-semibold">
+              <span class="group-hover:text-emerald-700 transition">HONORARIOS CARTERA</span>
+              <i class="fa-solid fa-briefcase text-emerald-600 text-sm group-hover:scale-110 transition"></i>
+            </div>
+
+  
+
+<div id="kpiCarteraHonorarios" class="text-xs font-bold text-slate-900 mt-2 font-mono truncate">S/ 0.00</div>
+
+  
+            <div class="flex items-center justify-between text-[10px] text-slate-500 mt-1.5 pt-1.5 border-t border-slate-100">
+              <span>Citas: <b id="kpiCitasMes">0</b> • Docs: <b id="kpiTotalDocs">0</b></span>
+              <span class="group-hover:text-emerald-700 font-semibold transition">Detalle &rarr;</span>
+            </div>
+
+  
+
+</div>
+
+  
+
+</div>
+
+  
+
+<!-- 4 Gráficos Interactivos de Power BI -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Flujo Financiero de Caja Chica (Sede Challhuahuacho)</h3>
+                <p class="text-xs text-slate-500">Ingresos/Provisiones de clientes vs Egresos operativos</p>
+              </div>
+
+  
+
+<span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase">Caja</span>
+            </div>
+
+  
+
+<div class="h-64">
+              <canvas id="chartCashflow"></canvas>
+            </div>
+
+  
+
+</div>
+
+  
+
+<div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Litigios por Materia Jurídica</h3>
+                <p class="text-xs text-slate-500">Civil/Comercial, Penal, Laboral Minero, Constitucional</p>
+              </div>
+
+  
+
+<span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase">Materias</span>
+            </div>
+
+  
+
+<div class="h-64">
+              <canvas id="chartMatters"></canvas>
+            </div>
+
+  
+
+</div>
+
+  
+
+<div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Egresos por Centro de Costo (Ingeniería Industrial)</h3>
+                <p class="text-xs text-slate-500">Gastos procesales recuperables vs Logística Tambobamba/Cusco</p>
+              </div>
+
+  
+
+<span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase">Costos</span>
+            </div>
+
+  
+
+<div class="h-64">
+              <canvas id="chartExpensesCategory"></canvas>
+            </div>
+
+  
+
+</div>
+
+  
+
+<div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex flex-col justify-between">
+            <div class="flex items-center justify-between mb-4">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Efectividad de Citas & Audiencias Judiciales</h3>
+                <p class="text-xs text-slate-500">Presenciales en Challhuahuacho y virtuales vía Meet</p>
+              </div>
+
+  
+
+<span class="text-[10px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-bold uppercase">Agenda</span>
+            </div>
+
+  
+
+<div class="h-64">
+              <canvas id="chartAppointments"></canvas>
+            </div>
+
+  
+
+</div>
+
+  
+
+</div>
+
+  
+
+</section>
+
+      <!-- =====================================================================
+           VISTA 2: CAJA CHICA & CENTROS DE COSTO
+           ===================================================================== -->

@@ -1,0 +1,95 @@
+      <section id="view-inventario" class="tab-view hidden space-y-4">
+        <!-- Frase Jurídica Oficial de Sección -->
+        <div class="bg-gradient-to-r from-amber-950 via-slate-900 to-slate-950 text-white p-3.5 rounded-xl shadow-sm border border-amber-900/50 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-amber-500/20 border border-amber-400/40 flex items-center justify-center text-amber-400 font-bold shrink-0">
+              <i class="fa-solid fa-shield text-sm"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold text-amber-300 font-serif-legal tracking-wide">«Scripta manent, verba volant»</div>
+
+  
+              <div class="text-[11px] text-slate-300 italic">“Las palabras vuelan, los escritos permanecen: Custodiar la prueba y el archivo es preservar la verdad jurídica”</div>
+
+  
+            </div>
+
+  
+
+</div>
+
+  
+
+<div class="flex items-center gap-2">
+            <button onclick="window.pdfExporter.exportModulePdf('inventario')" class="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+            </button>
+            <button onclick="window.excelExporter.exportModule('inventario')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-excel"></i> Exportar Excel
+            </button>
+          </div>
+
+  
+
+</div>
+
+  
+
+<!-- Filtros -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 w-full sm:max-w-md">
+            <div class="relative flex-1 min-w-[160px] w-full">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="searchInventario" oninput="window.app.renderInventario()" placeholder="Buscar activo, token, código o estante..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-600">
+            </div>
+
+            <select id="filterCatInventario" onchange="window.app.renderInventario()" class="w-full sm:w-auto text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todas las Categorías</option>
+              <option value="Equipos y Bienes">Equipos y Bienes (Tokens, Módem Claro, Laptops)</option>
+              <option value="Archivo de Expedientes">Archivo de Expedientes Físicos</option>
+              <option value="Biblioteca Jurídica">Biblioteca Jurídica</option>
+              <option value="Suministros Notariales">Suministros y Consumibles</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button onclick="window.app.openInventarioModal()" class="w-full sm:w-auto justify-center bg-blue-900 hover:bg-blue-950 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-plus"></i> Registrar Activo / Expediente
+            </button>
+          </div>
+
+        </div>
+
+  
+
+<!-- Tabla -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left legal-table">
+              <thead>
+                <tr>
+                  <th>Código</th>
+                  <th>Descripción del Activo o Expediente Físico</th>
+                  <th>Clasificación ABC</th>
+                  <th>Categoría</th>
+                  <th>Ubicación en Sede Challhuahuacho</th>
+                  <th class="text-center">Stock</th>
+                  <th class="text-right">Valor Total</th>
+                  <th class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="inventarioTableBody"></tbody>
+            </table>
+          </div>
+
+  
+
+</div>
+
+  
+
+</section>
+
+      <!-- =====================================================================
+           VISTA 6: GESTIÓN DOCUMENTAL
+           ===================================================================== -->

@@ -1,0 +1,79 @@
+      <section id="view-documentos" class="tab-view hidden space-y-4">
+        <!-- Frase Jurídica Oficial de Sección -->
+        <div class="bg-gradient-to-r from-cyan-950 via-slate-900 to-slate-950 text-white p-3.5 rounded-xl shadow-sm border border-cyan-900/50 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-400 font-bold shrink-0">
+              <i class="fa-solid fa-file-signature text-sm"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold text-amber-300 font-serif-legal tracking-wide">«Ex facto oritur ius»</div>
+
+  
+              <div class="text-[11px] text-slate-300 italic">“Del hecho rigurosamente redactado y probado nace el derecho invocado”</div>
+
+  
+            </div>
+
+  
+
+</div>
+
+  
+
+<div class="flex items-center gap-2">
+            <button onclick="window.pdfExporter.exportModulePdf('documentos')" class="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+            </button>
+            <button onclick="window.excelExporter.exportModule('documentos')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-excel"></i> Exportar Excel
+            </button>
+          </div>
+
+  
+
+</div>
+
+  
+
+<!-- Filtros -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-2 flex-1 max-w-md">
+            <div class="relative w-full">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="searchDocumentos" oninput="window.app.renderDocumentos()" placeholder="Buscar demanda, escrito, carta notarial o contrato..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-600">
+            </div>
+
+  
+
+</div>
+
+  
+
+<div class="flex items-center gap-2">
+            <button onclick="window.app.openDocumentModal()" class="bg-blue-900 hover:bg-blue-950 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-plus"></i> Nuevo Escrito / Modelo
+            </button>
+          </div>
+
+  
+
+</div>
+
+  
+
+<!-- Grid de Documentos -->
+        <div id="documentosCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+  
+      </section>
+
+      <!-- =====================================================================
+           VISTA 7: AJUSTES DE SEDE & ADMINISTRACIÓN
+           ===================================================================== -->
+      <!-- Vista Ajustes & Respaldo Local integrada en Control Total del Socio Fundador (master_admin) -->
+
+
+
+      <!-- =========================================================================
+           VISTA: CONTROL DE ASISTENCIA (RBAC + GEOFENCING)
+           ========================================================================= -->

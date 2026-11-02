@@ -1,0 +1,27 @@
+{
+  "name": "Paolo Aldea - Gestión Jurídica",
+  "short_name": "Paolo Aldea",
+  "description": "Suite Jurídica Multi-Sede y Control Operativo Profesional",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0B132B",
+  "theme_color": "#0B132B",
+  "lang": "es",
+  "categories": ["legal", "business", "productivity"],
+  "icons": [
+    {
+      "src": "assets/logo_paolo_aldea.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "assets/logo_paolo_aldea.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg",
+      "purpose": "any maskable"
+    }
+  ]
+}

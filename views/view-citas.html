@@ -1,0 +1,147 @@
+      <section id="view-citas" class="tab-view hidden space-y-4">
+        <!-- Frase Jurídica Oficial de Sección -->
+        <div class="bg-gradient-to-r from-purple-950 via-slate-900 to-slate-950 text-white p-3.5 rounded-xl shadow-sm border border-purple-900/50 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-purple-500/20 border border-purple-400/40 flex items-center justify-center text-purple-400 font-bold shrink-0">
+              <i class="fa-regular fa-handshake text-sm"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold text-amber-300 font-serif-legal tracking-wide">«Audiatur et altera pars • Pacta sunt servanda»</div>
+
+  
+              <div class="text-[11px] text-slate-300 italic">“Escúchese siempre a la contraparte y cúmplanse rigurosamente los compromisos pactados”</div>
+
+  
+            </div>
+
+  
+
+</div>
+
+  
+
+<div class="flex items-center gap-2">
+            <button onclick="window.pdfExporter.exportModulePdf('citas')" class="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+            </button>
+            <button onclick="window.excelExporter.exportModule('citas')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-excel"></i> Exportar Excel
+            </button>
+          </div>
+
+  
+
+</div>
+
+  
+
+        <!-- Evento Especial Fijo: Directorio Semanal los Viernes 3:00 PM vía Google Meet -->
+        <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-950 border-2 border-amber-400/50 rounded-xl p-4 sm:p-5 text-white shadow-md space-y-3">
+          <div class="flex flex-wrap items-center justify-between gap-4">
+            <div class="flex items-center gap-3.5">
+              <div class="w-12 h-12 rounded-xl bg-amber-500/20 border border-amber-400/50 flex items-center justify-center text-amber-400 text-xl shrink-0 shadow-inner">
+                <i class="fa-solid fa-people-roof"></i>
+              </div>
+
+  
+              <div>
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-xs font-bold text-amber-300 font-serif-legal uppercase tracking-wider">🏛️ Evento Especial Fijo de Estudio</span>
+                  <span class="text-[10px] bg-indigo-500/30 text-indigo-200 border border-indigo-400/40 px-2 py-0.5 rounded-full font-semibold">Semanal Recurrente</span>
+                  <span class="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 px-2 py-0.5 rounded-full font-medium flex items-center gap-1">
+                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span> Google Meet Oficial
+                  </span>
+                </div>
+
+  
+                <h3 class="text-sm sm:text-base font-bold text-white mt-0.5">Directorio de Socios & Equipo Legal — Todos los Viernes a las 3:00 PM</h3>
+                <p class="text-xs text-slate-300">Sesión obligatoria de evaluación de casos, estrategia procesal y balance financiero de la Sede Challhuahuacho vía Google Meet.</p>
+              </div>
+
+  
+            </div>
+
+  
+
+            <div class="flex flex-wrap items-center gap-2">
+              <a id="bannerDirectorioMeetBtn" href="https://meet.google.com/paolo-aldea-jur" target="_blank" rel="noopener noreferrer" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3.5 py-2 rounded-lg text-xs flex items-center gap-2 transition shadow-sm">
+                <i class="fa-solid fa-video"></i> Unirse a Google Meet
+              </a>
+              <button type="button" onclick="window.app.agendarDirectorioViernes()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3.5 py-2 rounded-lg text-xs flex items-center gap-2 transition shadow-sm">
+                <i class="fa-solid fa-calendar-plus"></i> Agendar Próximo Viernes (3:00 PM)
+              </button>
+            </div>
+
+  
+          </div>
+
+  
+
+          <!-- Barra de Gestión y Carga de Enlaces de Reunión Meet -->
+          <div class="pt-2 border-t border-slate-800/80 flex flex-wrap items-center justify-between gap-2.5 text-xs">
+            <div class="flex items-center gap-2 min-w-0 flex-1 max-w-xl bg-slate-950/70 border border-slate-800 rounded-lg px-3 py-1.5">
+              <i class="fa-solid fa-link text-amber-400 shrink-0"></i>
+              <span class="text-slate-400 text-[11px] font-semibold shrink-0">Enlace Meet:</span>
+              <a id="bannerDirectorioMeetUrlDisplay" href="https://meet.google.com/paolo-aldea-jur" target="_blank" rel="noopener noreferrer" class="font-mono text-emerald-300 hover:underline truncate text-[11px] font-medium" title="Clic para abrir enlace de Meet">
+                https://meet.google.com/paolo-aldea-jur
+              </a>
+            </div>
+
+  
+
+            <div class="flex items-center gap-1.5 shrink-0">
+              <button type="button" onclick="window.app.copiarDirectorioMeetUrl()" class="bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold px-2.5 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition cursor-pointer" title="Copiar enlace Meet al portapapeles">
+                <i class="fa-regular fa-copy text-amber-400"></i> Copiar
+              </button>
+              <button id="btnOpenEditMeet" type="button" onclick="window.app.openEditDirectorioMeetModal()" class="bg-amber-500/20 hover:bg-amber-500/30 border border-amber-400/50 text-amber-300 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-2xs cursor-pointer" title="Subir o cambiar el URL de Meet de la reunión (Solo Administrador / Socio)">
+                <i class="fa-solid fa-arrow-up-from-bracket"></i> Subir / Cambiar Enlace Meet
+              </button>
+              <span id="badgeMeetRoleInfo" class="hidden text-[10.5px] bg-slate-900 border border-slate-700 text-slate-300 px-2.5 py-1 rounded-lg font-semibold items-center gap-1.5">
+                <i class="fa-solid fa-shield-halved text-amber-400"></i> Centralizado por Administración
+              </span>
+            </div>
+
+  
+          </div>
+
+  
+        </div>
+
+  
+
+<!-- Filtros -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap sm:flex-nowrap items-center gap-2 flex-1 w-full sm:max-w-md">
+            <div class="relative flex-1 min-w-[160px] w-full">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="searchCitas" oninput="window.app.renderCitas()" placeholder="Buscar cliente, motivo o abogado..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-600">
+            </div>
+
+            <select id="filterEstadoCitas" onchange="window.app.renderCitas()" class="w-full sm:w-auto text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todos los Estados</option>
+              <option value="Confirmada">Confirmada</option>
+              <option value="Pendiente">Pendiente</option>
+              <option value="Atendida">Atendida</option>
+              <option value="Cancelada">Cancelada</option>
+            </select>
+          </div>
+
+          <div class="flex items-center gap-2 w-full sm:w-auto">
+            <button onclick="window.app.openCitaModal()" class="w-full sm:w-auto justify-center bg-blue-900 hover:bg-blue-950 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition">
+              <i class="fa-solid fa-plus"></i> Agendar Cita / Audiencia
+            </button>
+          </div>
+
+        </div>
+
+  
+
+<!-- Grid de Citas -->
+        <div id="citasCardsContainer" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+
+  
+      </section>
+
+      <!-- =====================================================================
+           VISTA: PRESUPUESTOS & PROYECCIONES FINANCIERAS
+           ===================================================================== -->

@@ -1,0 +1,122 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Verifica que exista una sesión autenticada válida en Firebase Auth
+    function isAuthenticated() {
+      return request.auth != null && request.auth.uid != null;
+    }
+
+    // 2. Verifica el documento de perfil del colaborador en /workers/{uid}
+    function hasWorkerProfile() {
+      return isAuthenticated() && exists(/databases/$(database)/documents/workers/$(request.auth.uid));
+    }
+
+    function getWorkerProfile() {
+      return get(/databases/$(database)/documents/workers/$(request.auth.uid)).data;
+    }
+
+    // 3. Verifica si el usuario autenticado cuenta con privilegios de Administración Global (RBAC)
+    function isAdmin() {
+      return isAuthenticated() && (
+        (request.auth.token.email_verified == true && (request.auth.token.email == 'superadmin@aldea-abogados.pe' || request.auth.token.email == 'admin@aldea-abogados.pe')) ||
+        (request.auth.token.rol in ['super_admin', 'admin', 'socio']) ||
+        (hasWorkerProfile() && getWorkerProfile().rol in ['super_admin', 'admin', 'socio'])
+      );
+    }
+
+    // 4. Verifica aislamiento perimetral por sede (Multi-Sede Isolation)
+    function canAccessSedeData(docData) {
+      return isAdmin() || (
+        hasWorkerProfile() && (
+          getWorkerProfile().sede in ['todas', 'global'] ||
+          !('sede' in docData) ||
+          docData.sede == getWorkerProfile().sede
+        )
+      );
+    }
+
+    // 5. Validación estructural mínima de integridad de documentos
+    function isValidPayload() {
+      return request.resource.data.keys().size() <= 120;
+    }
+
+    // Metadatos de Sincronización Multi-Sede y Tombstones
+    match /_meta/{metaId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() && isValidPayload();
+    }
+
+    // Reglas para Casos Jurídicos y Expedientes (Aislamiento por Sede + RBAC)
+    match /casos/{casoId} {
+      allow read: if isAuthenticated() && canAccessSedeData(resource.data);
+      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+    }
+
+    // Reglas para Caja Chica y Centros de Costo
+    match /caja_chica/{movId} {
+      allow read: if isAuthenticated() && canAccessSedeData(resource.data);
+      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+    }
+
+    // Reglas para Control de Asistencia Biométrica / GPS
+    match /attendance/{asistenciaId} {
+      allow read: if isAuthenticated() && canAccessSedeData(resource.data);
+      allow create: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data)
+        && (!('uid' in request.resource.data) || request.resource.data.uid == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // Reglas para Padrón de Colaboradores (Workers)
+    match /workers/{workerId} {
+      // Lectura: administradores o el propio colaborador (los hashes de otros no deben ser legibles)
+      allow read: if isAdmin() || (isAuthenticated() && workerId == request.auth.uid);
+      allow create, delete: if isAdmin();
+      // Un colaborador puede editar su perfil pero NO su rol, sede ni permisos
+      allow update: if isAdmin() || (isAuthenticated() && workerId == request.auth.uid
+        && request.resource.data.get('rol', null) == resource.data.get('rol', null)
+        && request.resource.data.get('sede', null) == resource.data.get('sede', null)
+        && request.resource.data.get('permisos', null) == resource.data.get('permisos', null));
+    }
+
+    // Reglas para Citas, Documentos, Inventario y Presupuestos
+    match /citas/{citaId} {
+      allow read: if isAuthenticated() && canAccessSedeData(resource.data);
+      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+    }
+
+    match /documentos/{docId} {
+      allow read: if isAuthenticated() && canAccessSedeData(resource.data);
+      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+    }
+
+    match /inventario/{invId} {
+      allow read: if isAuthenticated() && canAccessSedeData(resource.data);
+      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+    }
+
+    match /presupuestos/{presId} {
+      allow read: if isAuthenticated() && canAccessSedeData(resource.data);
+      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+    }
+
+    // Registro Forense de Auditoría (Inmutable: prohibido editar o borrar trazas)
+    match /auditoria/{audId} {
+      allow read: if isAdmin();
+      allow create: if isAuthenticated() && isValidPayload();
+      allow update, delete: if false;
+    }
+
+    // Denegar por defecto cualquier colección desconocida no declarada explícitamente
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
