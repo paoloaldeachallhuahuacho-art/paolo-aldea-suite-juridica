@@ -10,6 +10,7 @@ const {
   jsonError,
   verifyPbkdf2Secret
 } = require("./_supabaseAdmin");
+const { issueSyncToken } = require("./_syncToken");
 
 function parseBody(event) {
   try {
@@ -110,10 +111,18 @@ exports.handler = async (event) => {
       directory = [worker];
     }
 
+    const syncToken = issueSyncToken({
+      uid: worker.id,
+      id: worker.id,
+      role: worker.rol,
+      sede: worker.sede,
+      usuario: worker.usuario
+    });
+
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, worker, directory })
+      body: JSON.stringify({ ok: true, worker, directory, syncToken })
     };
   } catch (err) {
     return jsonError(headers, err, 500);

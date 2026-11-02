@@ -185,6 +185,28 @@ process.env.SUPABASE_ANON_KEY = "anon-test-key";
   const cors = admin.corsHeaders({ headers: { Origin: "https://evil.example" } });
   ok("cors no refleja origen ajeno", cors["Access-Control-Allow-Origin"] == null);
 
+  // Sync token HMAC + sync-pull sin token
+  process.env.SYNC_TOKEN_SECRET = "test-sync-secret-for-unit";
+  const syncTok = require(path.join(root, "netlify/functions/_syncToken.js"));
+  const syncPull = require(path.join(root, "netlify/functions/sync-pull.js"));
+  const issued = syncTok.issueSyncToken({ uid: "WRK-1", role: "super_admin", sede: "todas" });
+  const claims = syncTok.verifySyncToken(issued);
+  ok("syncToken roundtrip uid", claims.uid === "WRK-1");
+  ok("syncToken super_admin ve todas", syncTok.normalizeBranch(claims.sede, claims.role) === null);
+  let badTok = false;
+  try {
+    syncTok.verifySyncToken("bad.token");
+  } catch (_) {
+    badTok = true;
+  }
+  ok("syncToken inválido lanza", badTok);
+  res = await syncPull.handler({
+    httpMethod: "POST",
+    headers: { Origin: "https://app.example.test" },
+    body: "{}"
+  });
+  ok("sync-pull sin token → 401", res.statusCode === 401, res.body);
+
   global.fetch = realFetch;
   if (prevOrigin === undefined) delete process.env.ALLOWED_ORIGIN;
   else process.env.ALLOWED_ORIGIN = prevOrigin;

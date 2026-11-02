@@ -5,7 +5,7 @@
 // Compatible con Android (Chrome) e iOS (Safari PWA 16.4+)
 // =========================================================================
 
-const CACHE_NAME = 'paolo-aldea-pwa-v2026.11-csp-handlers';
+const CACHE_NAME = 'paolo-aldea-pwa-v2026.11-app-records-sync';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -32,6 +32,7 @@ const ASSETS_TO_CACHE = [
   './js/enterprise/config.js',
   './js/enterprise/AuthService.js',
   './js/enterprise/SyncManager.js',
+  './js/enterprise/CloudDataSync.js',
   './js/enterprise/AttendanceService.js',
   './js/enterprise/CashManager.js',
   './js/enterprise/CaseService.js',

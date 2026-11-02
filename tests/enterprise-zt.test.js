@@ -38,7 +38,8 @@ function loadEnterpriseHelpers() {
   sandbox.window = sandbox;
   const files = [
     "js/enterprise/BudgetAnalytics.js",
-    "js/enterprise/SyncManager.js"
+    "js/enterprise/SyncManager.js",
+    "js/enterprise/CloudDataSync.js"
   ];
   for (const f of files) {
     const code = fs.readFileSync(path.join(root, f), "utf8");
@@ -50,7 +51,9 @@ function loadEnterpriseHelpers() {
 const g = loadEnterpriseHelpers();
 const BA = g.PaoloBudgetAnalytics;
 const SM = g.PaoloSyncManager;
+const CDS = g.PaoloCloudDataSync;
 
+ok("CloudDataSync expuesto", !!(CDS && Array.isArray(CDS.COLLECTIONS) && CDS.COLLECTIONS.includes("casos")));
 ok("BudgetAnalytics.safeDiv /0 → 0", BA.safeDiv(100, 0) === 0);
 ok("utilization 50% → 5000 bps", BA.utilizationBps(50, 100) === 5000);
 ok("remaining no negativo", BA.remainingCentavos(10, 40) === 0);

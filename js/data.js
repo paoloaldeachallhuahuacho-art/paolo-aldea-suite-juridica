@@ -1676,6 +1676,9 @@ class DataManager {
 
       // Sincronizacion instantanea multi-sede al agregar, editar o eliminar (Supabase / Hub Local + Firebase Firestore Delta O(Δ))
       if (!this._isMergingSync && collectionName !== 'auditoria' && typeof window !== 'undefined') {
+        if (window.PaoloCloudDataSync && typeof window.PaoloCloudDataSync.schedulePush === 'function') {
+          window.PaoloCloudDataSync.schedulePush(collectionName);
+        }
         if (!this._dirtyCollections) this._dirtyCollections = new Set();
         this._dirtyCollections.add(collectionName);
         clearTimeout(this._cloudSyncDebounce);

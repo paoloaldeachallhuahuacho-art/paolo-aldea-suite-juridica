@@ -6518,6 +6518,7 @@ ${callToAction}
     }
 
     let isValid = !!(matchedWorker && isWorkerValid);
+    let cloudSyncToken = null;
 
     // Dispositivo vacío / sin nómina local: autenticar contra Supabase (staff_directory)
     if (!isValid && window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && navigator.onLine) {
@@ -6528,6 +6529,7 @@ ${callToAction}
           workers = window.db.getRaw("workers") || [];
           matchedWorker = workers.find(w => String(w.id) === String(cloud.worker.id)) || cloud.worker;
           isValid = true;
+          cloudSyncToken = cloud.syncToken || null;
           window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
         }
       } catch (cloudErr) {
@@ -6598,6 +6600,28 @@ ${callToAction}
       }
     }
 
+    // Sync multi-dispositivo: token + pull/push de colecciones (casos, citas, caja, etc.)
+    if (window.__ENTERPRISE_CLOUD__ && navigator.onLine && window.PaoloAuthService) {
+      try {
+        if (!cloudSyncToken) {
+          const cloudRefresh = await window.PaoloAuthService.cloudLogin(user, pass);
+          if (cloudRefresh && cloudRefresh.ok) {
+            cloudSyncToken = cloudRefresh.syncToken || null;
+            if (cloudRefresh.directory) {
+              window.PaoloAuthService.hydrateLocalWorkers(cloudRefresh.directory);
+            }
+          }
+        }
+        if (cloudSyncToken && window.PaoloCloudDataSync) {
+          window.PaoloCloudDataSync.afterLogin(cloudSyncToken).catch((e) =>
+            console.warn("[CloudDataSync]", e && e.message)
+          );
+        }
+      } catch (syncErr) {
+        console.warn("[Login] Sync token:", syncErr && syncErr.message);
+      }
+    }
+
     if (errAlert) errAlert.classList.add("hidden");
     await this._establishAuthenticatedSession(matchedWorker, pass);
   }
@@ -6605,6 +6629,9 @@ ${callToAction}
   lockScreen(silent = false, reason = "manual", fromRemote = false) {
     this.clearSessionStorageState();
     this._inactivityWarningShown = false;
+    if (window.PaoloCloudDataSync && typeof window.PaoloCloudDataSync.clearToken === "function") {
+      window.PaoloCloudDataSync.clearToken();
+    }
 
     if (!fromRemote) {
       this.broadcastSessionEvent("SESSION_LOCK", { reason });

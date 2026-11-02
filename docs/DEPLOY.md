@@ -30,7 +30,7 @@
 | **Auth** | Supabase Auth JWT con `app_metadata.role` + `app_metadata.branch_id` |
 | **Datos** | PostgreSQL + outbox IndexedDB + LWW `server_ts` |
 | **Edge** | `attendance-validate`, `petty-cash-transition`, `public-config`, `telegram-proxy` |
-| **Schema** | [`supabase/migrations/20261102_enterprise_zero_trust.sql`](../supabase/migrations/20261102_enterprise_zero_trust.sql) + [`20261102b_firm_auth_registry.sql`](../supabase/migrations/20261102b_firm_auth_registry.sql) (auth multi-dispositivo) |
+| **Schema** | [`20261102`](../supabase/migrations/20261102_enterprise_zero_trust.sql) + [`20261102b`](../supabase/migrations/20261102b_firm_auth_registry.sql) + [`20261102d_app_records_sync.sql`](../supabase/migrations/20261102d_app_records_sync.sql) |
 | **Auditoría** | [`docs/AUDIT_CHECKLIST_MULTI_SEDE.md`](AUDIT_CHECKLIST_MULTI_SEDE.md) |
 
 ### Auth multi-dispositivo (Super Admin compartido)
@@ -39,6 +39,11 @@
 3. Al crear el Super Admin en un PC/celular, se publica en `staff_directory`.
 4. Otro dispositivo vacío ya **no** pide “crear admin”: muestra login y valida contra la nube.
 5. Variables en Netlify (valores solo en el panel, no en el repo): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALLOWED_ORIGIN` (= URL exacta del sitio, sin barra final).
+
+### Sync de datos (casos, citas, caja, presupuestos, inventario, documentos, asistencia, personal)
+1. En Supabase SQL Editor ejecute `20261102d_app_records_sync.sql`.
+2. Edge: `sync-pull`, `sync-push` (token HMAC emitido por `auth-login`).
+3. Tras login online el cliente hace pull (LWW) y push de lo local; cada guardado encola push.
 
 ### Roles JWT
 `super_admin` | `admin` (BranchAdmin) | `abogado` | `asistente_*` | `accountant`
