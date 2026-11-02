@@ -6139,20 +6139,23 @@ ${callToAction}
       window.__CLOUD_AUTH_BOOTSTRAPPED__ = false;
       return false;
     }
-    let cloudBoot = null;
+    let status = null;
     try {
-      cloudBoot = await window.PaoloAuthService.fetchFirmBootstrapped();
+      const res = await fetch("/.netlify/functions/auth-firm-status", { credentials: "same-origin" });
+      status = await res.json();
     } catch (_) {
-      cloudBoot = null;
+      status = null;
     }
-    if (cloudBoot === true) {
+    const cloudBoot = status && status.bootstrapped === true;
+    window.__CLOUD_AUTH_STATUS__ = status || null;
+    if (cloudBoot) {
       window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
       return true;
     }
 
     // Si este navegador ya tiene admin local y la nube aún no, publicar registro (una vez)
     const localReady = window.db && typeof window.db.needsAuthBootstrap === "function" && !window.db.needsAuthBootstrap();
-    if (localReady && cloudBoot === false) {
+    if (localReady) {
       try {
         const workers = window.db.getRaw("workers") || [];
         const admin = workers.find((w) => w && w.activo !== false && (w.rol === "super_admin" || w.id === "WRK-000") && w.passwordHash);
@@ -6171,15 +6174,26 @@ ${callToAction}
             permisos: admin.permisos || null
           });
           window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+          this.showToast("Super Admin publicado en la nube. Ya puede ingresar desde otros dispositivos.", "success");
           return true;
         }
       } catch (e) {
         console.warn("[Auth] No se pudo publicar admin local a la nube:", e && e.message);
+        const detail = (status && status.detail) || "";
+        if (detail === "missing_tables") {
+          this.showToast("Falta ejecutar el SQL de autenticación en Supabase (firm_auth_registry).", "warning");
+        } else if (detail === "missing_service_role") {
+          this.showToast("Falta SUPABASE_SERVICE_ROLE_KEY en Netlify.", "warning");
+        } else {
+          this.showToast("No se pudo sincronizar el admin a la nube: " + (e.message || "error"), "warning");
+        }
       }
+    } else if (status && (status.detail === "missing_tables" || status.detail === "missing_service_role")) {
+      console.warn("[Auth] Nube no lista:", status.detail, status.hint || "");
     }
 
-    window.__CLOUD_AUTH_BOOTSTRAPPED__ = cloudBoot === true;
-    return !!window.__CLOUD_AUTH_BOOTSTRAPPED__;
+    window.__CLOUD_AUTH_BOOTSTRAPPED__ = false;
+    return false;
   }
 
   /** true si hay que mostrar el formulario de registro inicial. */
