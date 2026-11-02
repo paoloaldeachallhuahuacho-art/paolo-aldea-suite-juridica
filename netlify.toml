@@ -2,9 +2,12 @@
   publish = "."
   functions = "netlify/functions"
 
-# Evitar falsos positivos del escáner (placeholders / docs, no secretos reales)
+# Escáner de secretos: omitir docs/placeholders y claves que NO son secretos
+# (ALLOWED_ORIGIN es la URL pública; REVIEW_ID lo inyecta Netlify en previews).
+# Importante: la lista de paths usa COMAS (no punto y coma).
 [build.environment]
-  SECRETS_SCAN_OMIT_PATHS = ".env.example;docs/**;herramientas/**;tests/**"
+  SECRETS_SCAN_OMIT_PATHS = ".env.example,docs/**,herramientas/**,tests/**"
+  SECRETS_SCAN_OMIT_KEYS = "ALLOWED_ORIGIN,REVIEW_ID"
 
 # ---------- Bloqueo de archivos internos ----------
 [[redirects]]

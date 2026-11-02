@@ -38,7 +38,7 @@
 2. Netlify Functions: `auth-firm-status`, `auth-bootstrap`, `auth-login`, `auth-staff-upsert`.
 3. Al crear el Super Admin en un PC/celular, se publica en `staff_directory`.
 4. Otro dispositivo vacío ya **no** pide “crear admin”: muestra login y valida contra la nube.
-5. Variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALLOWED_ORIGIN=https://paoloaldea-abogados.netlify.app`.
+5. Variables en Netlify (valores solo en el panel, no en el repo): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALLOWED_ORIGIN` (= URL exacta del sitio, sin barra final).
 
 ### Roles JWT
 `super_admin` | `admin` (BranchAdmin) | `abogado` | `asistente_*` | `accountant`
