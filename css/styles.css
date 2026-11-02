@@ -1,0 +1,611 @@
+/* ==========================================================================
+   PAOLO ALDEA & ABOGADOS - SEDE CHALLHUAHUACHO
+   Diseño de Alta Gama: Legal Corporate Prestige + Industrial Process Analytics
+   Optimizado para funcionamiento autónomo 100% Offline
+   ========================================================================== */
+
+:root {
+  --primary-navy: #0B132B;
+  --secondary-navy: #1C2541;
+  --steel-slate: #3A506B;
+  --gold-primary: #C5A059;
+  --gold-accent: #E5C158;
+  --gold-dark: #8C6D23;
+  --gold-glow: rgba(197, 160, 89, 0.35);
+  --bg-app: #F4F6F9;
+  --card-white: #FFFFFF;
+}
+
+body {
+  font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  background-color: var(--bg-app);
+  color: #1E293B;
+  min-height: 100vh;
+}
+
+.font-serif-legal {
+  font-family: 'Cinzel', 'Playfair Display', Georgia, Cambria, 'Times New Roman', serif;
+}
+
+.font-mono-legal {
+  font-family: 'JetBrains Mono', 'Cascadia Code', Consolas, 'Courier New', monospace;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #E2E8F0;
+}
+::-webkit-scrollbar-thumb {
+  background: #94A3B8;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
+}
+
+/* Luxury Gold Gradients & Foils */
+.gold-foil-text {
+  background: linear-gradient(135deg, #FFF1B0 0%, #D4AF37 45%, #AA7C11 80%, #E5C158 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.gold-border-glow {
+  border: 1px solid rgba(197, 160, 89, 0.4);
+  box-shadow: 0 0 15px rgba(197, 160, 89, 0.15);
+}
+
+.navy-gradient-bg {
+  background: linear-gradient(145deg, #0B132B 0%, #152238 60%, #1C2541 100%);
+}
+
+/* Executive Power BI Metric Cards */
+.kpi-card {
+  background: #FFFFFF;
+  border-radius: 14px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 4px 14px -2px rgba(11, 19, 43, 0.05), 0 2px 6px -1px rgba(11, 19, 43, 0.03);
+  transition: all 0.28s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 14px 24px -4px rgba(11, 19, 43, 0.10), 0 4px 10px -2px rgba(11, 19, 43, 0.05);
+  border-color: #CBD5E1;
+}
+
+.kpi-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #1C2541, #C5A059);
+}
+
+.kpi-card.urgent::before {
+  background: linear-gradient(90deg, #DC2626, #EF4444);
+}
+
+.kpi-card.success::before {
+  background: linear-gradient(90deg, #059669, #10B981);
+}
+
+.kpi-card.warning::before {
+  background: linear-gradient(90deg, #D97706, #F59E0B);
+}
+
+/* Kanban Flow Board (Ingeniería Industrial de Procesos Judiciales) */
+.kanban-column {
+  background: #F8FAFC;
+  border: 1px solid #E2E8F0;
+  border-radius: 14px;
+  min-height: 480px;
+  display: flex;
+  flex-direction: column;
+}
+
+.kanban-card {
+  background: #FFFFFF;
+  border-radius: 10px;
+  border: 1px solid #E2E8F0;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s ease;
+  cursor: grab;
+}
+
+.kanban-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 14px rgba(0, 0, 0, 0.08);
+  border-color: #CBD5E1;
+}
+
+/* Table styling with legal prestige */
+.legal-table th {
+  background: #0B132B;
+  color: #F8FAFC;
+  font-weight: 700;
+  text-transform: uppercase;
+  font-size: 0.72rem;
+  letter-spacing: 0.06em;
+  padding: 13px 14px;
+}
+
+.legal-table td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #E2E8F0;
+  font-size: 0.84rem;
+  color: #334155;
+  vertical-align: middle;
+}
+
+.legal-table tr:hover td {
+  background-color: #F8FAFC;
+}
+
+/* Interactive Slicers */
+.slicer-btn {
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  padding: 6px 14px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  border-radius: 8px;
+  border: 1px solid #CBD5E1;
+  background-color: #FFFFFF;
+  color: #475569;
+  cursor: pointer;
+  user-select: none;
+}
+
+.slicer-btn:hover {
+  background-color: #F1F5F9;
+  color: #0F172A;
+  border-color: #94A3B8;
+  transform: translateY(-1px);
+}
+
+.slicer-btn:active {
+  transform: translateY(0);
+}
+
+.slicer-btn.active {
+  background-color: #0B132B !important;
+  color: #F8FAFC !important;
+  border-color: #0B132B !important;
+  box-shadow: 0 2px 8px rgba(11, 19, 43, 0.35) !important;
+}
+
+/* Modal styling */
+.modal-backdrop {
+  backdrop-filter: blur(5px);
+  background: rgba(11, 19, 43, 0.75);
+}
+
+.modal-container {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Scrollbar estilizada para modales y ventanas emergentes */
+.modal-container ::-webkit-scrollbar,
+.modal-container::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.modal-container ::-webkit-scrollbar-track,
+.modal-container::-webkit-scrollbar-track {
+  background: #F1F5F9;
+  border-radius: 8px;
+}
+.modal-container ::-webkit-scrollbar-thumb,
+.modal-container::-webkit-scrollbar-thumb {
+  background: #94A3B8;
+  border-radius: 8px;
+  border: 2px solid #F1F5F9;
+}
+.modal-container ::-webkit-scrollbar-thumb:hover,
+.modal-container::-webkit-scrollbar-thumb:hover {
+  background: #64748B;
+}
+
+/* Toast animations */
+@keyframes slideInRight {
+  from {
+    transform: translateX(110%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+.toast-enter {
+  animation: slideInRight 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* Badge animations */
+@keyframes pulseGlow {
+  0% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0.6); }
+  70% { box-shadow: 0 0 0 8px rgba(220, 38, 38, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(220, 38, 38, 0); }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s infinite;
+}
+
+/* Sidebar expandido para visibilidad completa de textos y membretes */
+aside {
+  width: 295px !important;
+  min-width: 295px !important;
+}
+
+.firm-name-display,
+.firm-branch-display,
+.admin-officer-display,
+.admin-title-display {
+  white-space: normal !important;
+  overflow: visible !important;
+  text-overflow: clip !important;
+  word-break: normal !important;
+}
+
+/* ==========================================================================
+   REGLAS DE IMPRESIÓN Y EXPORTACIÓN A PDF:
+   GARANTIZAR QUE LA BARRA LATERAL (SIDEBAR) NUNCA SALGA EN EL PDF / IMPRESIÓN
+   ========================================================================== */
+@media print {
+  /* 1. Ocultar absolutamente la barra lateral completa (Sidebar) y controles */
+  aside,
+  nav,
+  header,
+  #toastContainer,
+  .no-print,
+  button,
+  .slicer-btn,
+  input,
+  select,
+  #userProfilePhotoInput,
+  .nav-tab-btn,
+  .modal-backdrop,
+  #drawerAlerts {
+    display: none !important;
+    visibility: hidden !important;
+    width: 0 !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    position: absolute !important;
+    left: -99999px !important;
+    top: -99999px !important;
+  }
+
+  /* 2. Cuando se emite un reporte formal, ocultar el resto de la app */
+  body.printing-report aside,
+  body.printing-report header,
+  body.printing-report main,
+  body.printing-report > div:not(#printReportContainer) {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-report #printReportContainer {
+    display: block !important;
+    width: 100% !important;
+    position: static !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* 3. Formato limpio de página */
+  html, body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .flex-1, main {
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+}
+
+/* ==========================================================================
+   TEMA OSCURO Y CLARO DE ALTA DEFINICIÓN (DARK & LIGHT MODE)
+   Garantiza contraste óptimo y nitidez absoluta de textos en cualquier modo
+   ========================================================================== */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #070D1E !important;
+  color: #F8FAFC !important;
+}
+
+html.dark header {
+  background-color: #0B132B !important;
+  border-color: #1E293B !important;
+}
+
+html.dark main {
+  background-color: #070D1E !important;
+}
+
+html.dark .bg-white {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+}
+
+html.dark [class*="bg-slate-50"],
+html.dark [class*="bg-amber-50"],
+html.dark .bg-slate-50,
+html.dark .bg-slate-50\/40,
+html.dark .bg-slate-50\/60,
+html.dark .bg-slate-50\/70,
+html.dark .bg-slate-50\/80,
+html.dark .bg-amber-50\/40,
+html.dark .bg-amber-50\/70 {
+  background-color: #0F172A !important;
+  color: #F1F5F9 !important;
+}
+
+html.dark .bg-slate-100 {
+  background-color: #162444 !important;
+  color: #E2E8F0 !important;
+}
+
+html.dark .text-slate-900,
+html.dark .text-slate-800 {
+  color: #FFFFFF !important;
+}
+
+html.dark .text-slate-700 {
+  color: #E2E8F0 !important;
+}
+
+html.dark .text-slate-600 {
+  color: #CBD5E1 !important;
+}
+
+html.dark .text-slate-500 {
+  color: #94A3B8 !important;
+}
+
+html.dark .border-slate-200,
+html.dark .border-slate-300 {
+  border-color: #1E293B !important;
+}
+
+html.dark .border-slate-100 {
+  border-color: #142038 !important;
+}
+
+html.dark .border-amber-200,
+html.dark .border-amber-300 {
+  border-color: rgba(217, 119, 6, 0.4) !important;
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]),
+html.dark select,
+html.dark textarea {
+  background-color: #0B132B !important;
+  color: #F8FAFC !important;
+  border-color: #27354F !important;
+}
+
+html.dark input:not([type="checkbox"]):not([type="radio"]):focus,
+html.dark select:focus,
+html.dark textarea:focus {
+  border-color: #D4AF37 !important;
+  box-shadow: 0 0 0 1px #D4AF37 !important;
+}
+
+html.dark select option {
+  background-color: #0B132B !important;
+  color: #F8FAFC !important;
+}
+
+html.dark .kpi-card {
+  background-color: #0F172A !important;
+  border-color: #1E293B !important;
+  color: #F8FAFC !important;
+}
+
+html.dark .kanban-column {
+  background-color: #0B132B !important;
+  border-color: #1E293B !important;
+}
+
+html.dark .kanban-card {
+  background-color: #0F172A !important;
+  border-color: #1E293B !important;
+  color: #F8FAFC !important;
+}
+
+html.dark .kanban-card:hover {
+  border-color: #384C70 !important;
+}
+
+html.dark .legal-table th {
+  background-color: #070D1E !important;
+  color: #F8FAFC !important;
+}
+
+html.dark .legal-table td {
+  border-color: #1E293B !important;
+  color: #E2E8F0 !important;
+}
+
+html.dark .legal-table tr:hover td {
+  background-color: #142038 !important;
+}
+
+html.dark .modal-container > div {
+  background-color: #0F172A !important;
+  border-color: #27354F !important;
+  color: #F8FAFC !important;
+}
+
+html.dark .slicer-btn {
+  background-color: #111C35 !important;
+  color: #E2E8F0 !important;
+  border-color: #27354F !important;
+}
+
+html.dark .slicer-btn:hover {
+  background-color: #1A2744 !important;
+  color: #FFFFFF !important;
+  border-color: #384C70 !important;
+}
+
+html.dark .slicer-btn.active {
+  background-color: #C5A059 !important;
+  color: #0B132B !important;
+  border-color: #C5A059 !important;
+  font-weight: 800 !important;
+}
+
+html.dark #globalSedeSelectorContainer {
+  background-color: #111C35 !important;
+  border-color: #27354F !important;
+}
+
+html.dark #globalSedeSelect {
+  color: #F8FAFC !important;
+}
+
+html.dark #drawerAlerts > div {
+  background-color: #0F172A !important;
+  color: #F8FAFC !important;
+  border-color: #1E293B !important;
+}
+
+html.dark #mobileBottomNav {
+  background-color: rgba(11, 19, 43, 0.95) !important;
+  border-color: #1E293B !important;
+}
+
+/* ==========================================================================
+   OPTIMIZACIONES MÓVILES (Android & iPhone iOS PWA)
+   ========================================================================== */
+html,
+body {
+  max-width: 100vw;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
+}
+
+@supports (padding-top: env(safe-area-inset-top)) {
+  header {
+    padding-top: max(0.5rem, env(safe-area-inset-top)) !important;
+  }
+}
+
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  #mobileBottomNav {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom)) !important;
+  }
+}
+
+button, select, input, a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+@media (max-width: 768px) {
+  /* Scroll inercial suave para tablas en pantallas táctiles */
+  .overflow-x-auto,
+  .tab-view {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Evitar desborde horizontal en contenedores de vistas */
+  .tab-view {
+    max-width: 100%;
+    overflow-x: hidden;
+  }
+
+  /* Ajustar tamaño de modales en pantallas pequeñas */
+  .modal-container > div {
+    max-height: 92vh !important;
+    margin: auto 8px !important;
+  }
+}
+
+/* ==========================================================================
+   BARRA DE NAVEGACIÓN INFERIOR ESTILO APP NATIVA MÓVIL
+   ========================================================================== */
+.mobile-bottom-nav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100vw;
+  max-width: 100%;
+  min-height: 60px;
+  height: auto;
+  padding-top: 4px;
+  padding-bottom: 4px;
+  background-color: #ffffff;
+  border-top: 1px solid #e2e8f0;
+  z-index: 45;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+.mobile-nav-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  color: #64748b;
+  font-size: 10px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  padding: 4px 2px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.mobile-nav-btn i {
+  font-size: 17px;
+  margin-bottom: 2px;
+}
+
+.mobile-nav-btn.active {
+  color: #c5a059 !important;
+  font-weight: 700;
+}
+
+html.dark .mobile-bottom-nav {
+  background-color: #0b132b !important;
+  border-top-color: #1e293b !important;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, 0.4);
+}
+
+html.dark .mobile-nav-btn {
+  color: #94a3b8;
+}
+
+html.dark .mobile-nav-btn.active {
+  color: #fbbf24 !important;
+}

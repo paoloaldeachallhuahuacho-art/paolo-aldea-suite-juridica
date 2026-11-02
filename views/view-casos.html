@@ -1,0 +1,138 @@
+      <section id="view-casos" class="tab-view hidden space-y-4">
+        <!-- Frase Jurídica Oficial de Sección -->
+        <div class="bg-gradient-to-r from-blue-950 via-slate-900 to-slate-950 text-white p-3.5 rounded-xl shadow-sm border border-blue-900/50 flex flex-wrap items-center justify-between gap-3">
+          <div class="flex items-center gap-3">
+            <span class="w-8 h-8 rounded-lg bg-blue-500/20 border border-blue-400/40 flex items-center justify-center text-blue-400 font-bold shrink-0">
+              <i class="fa-solid fa-gavel text-sm"></i>
+            </span>
+            <div>
+              <div class="text-xs font-bold text-amber-300 font-serif-legal tracking-wide">«Iura novit curia • Vigilantibus iura scripta sunt»</div>
+
+  
+              <div class="text-[11px] text-slate-300 italic">“El juez conoce el derecho, pero las leyes protegen al que vigila sus plazos, no al que duerme”</div>
+
+  
+            </div>
+
+  
+
+</div>
+
+  
+
+<div class="flex items-center gap-2">
+            <button onclick="window.pdfExporter.exportModulePdf('casos')" class="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-pdf"></i> Exportar PDF
+            </button>
+            <button onclick="window.excelExporter.exportModule('casos')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-file-excel"></i> Exportar Excel
+            </button>
+          </div>
+
+  
+
+</div>
+
+  
+
+<!-- Barra de Control y Switcher de Vista -->
+        <div class="bg-white p-3 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div class="flex flex-wrap items-center gap-2 flex-1 w-full">
+            <!-- Switcher de Vistas: Tabular vs Kanban -->
+            <div class="inline-flex rounded-lg border border-slate-300 p-0.5 bg-slate-100 shrink-0">
+              <button id="btnViewModeTable" onclick="window.app.setCasosViewMode('table')" class="px-2.5 py-1 text-xs font-bold rounded-md bg-slate-900 text-white shadow-sm transition flex items-center gap-1.5">
+                <i class="fa-solid fa-table-list"></i> Tabla
+              </button>
+              <button id="btnViewModeKanban" onclick="window.app.setCasosViewMode('kanban')" class="px-2.5 py-1 text-xs font-bold rounded-md bg-white text-slate-700 hover:text-slate-900 transition flex items-center gap-1.5">
+                <i class="fa-solid fa-bars-progress"></i> Kanban Procesal
+              </button>
+            </div>
+
+            <div class="relative flex-1 min-w-[180px] w-full sm:w-auto">
+              <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+              <input type="text" id="searchCasos" oninput="window.app.renderCasos()" placeholder="Buscar expediente, carátula, patrocinado o juzgado..." class="w-full pl-8 pr-3 py-1.5 text-xs rounded-lg border border-slate-300 focus:outline-none focus:ring-1 focus:ring-blue-600">
+            </div>
+
+            <select id="filterMateriaCasos" onchange="window.app.renderCasos()" class="w-full sm:w-auto text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todas las Materias</option>
+              <option value="Civil / Comercial">Civil / Comercial</option>
+              <option value="Penal">Penal</option>
+              <option value="Laboral">Laboral Minero</option>
+              <option value="Corporativo">Corporativo</option>
+              <option value="Constitucional / Ambiental">Constitucional / Ambiental</option>
+            </select>
+            <select id="filterEstadoCasos" onchange="window.app.renderCasos()" class="w-full sm:w-auto text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Todos los Estados</option>
+              <option value="En trámite">En trámite</option>
+              <option value="Concluido / Ganado">Concluido / Ganado</option>
+              <option value="Archivado">Archivado</option>
+            </select>
+            <select id="filterResolucionCasos" onchange="window.app.renderCasos()" class="w-full sm:w-auto text-xs py-1.5 px-2.5 rounded-lg border border-slate-300 bg-white font-medium">
+              <option value="ALL">Expediente & Resolución (Todos)</option>
+              <option value="CON_PDF">Con Algún PDF Adjunto</option>
+              <option value="CON_EXPEDIENTE">Con Expediente PDF</option>
+              <option value="CON_RESOLUCION">Con Resolución PDF</option>
+              <option value="CON_AMBOS">Con Ambos PDFs</option>
+              <option value="SIN_PDF">Sin Documentos PDF</option>
+            </select>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+            <button onclick="window.app.openCargarResolucionRapidaModal()" style="display:none;" class="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Subir expediente digital o resolución judicial en PDF">
+              <i class="fa-solid fa-cloud-arrow-up"></i> Cargar Expediente / Resolución
+            </button>
+            <button onclick="window.app.openCasoModal()" class="w-full sm:w-auto justify-center bg-blue-900 hover:bg-blue-950 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-plus"></i> Nuevo Expediente Judicial
+            </button>
+          </div>
+
+        </div>
+
+  
+
+        <!-- 1. Contenedor de Vista Tabular -->
+        <div id="casosTableViewContainer" class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="overflow-x-auto">
+            <table class="w-full text-left legal-table">
+              <thead>
+                <tr>
+                  <th>Expediente & Juzgado</th>
+                  <th>Carátula / Patrocinado</th>
+                  <th>Materia</th>
+                  <th>Plazo Fatal / Vencimiento</th>
+                  <th>Próxima Audiencia</th>
+                  <th>Etapa Procesal</th>
+                  <th class="text-center">Expediente & Resolución</th>
+                  <th class="text-center">Ciclo</th>
+                  <th class="text-center">Acciones</th>
+                </tr>
+              </thead>
+              <tbody id="casosTableBody"></tbody>
+            </table>
+          </div>
+
+  
+
+</div>
+
+  
+
+<!-- 2. Contenedor de Vista Kanban Procesal -->
+        <div id="casosKanbanViewContainer" class="hidden">
+          <div id="casosKanbanColumnsContainer" class="flex gap-3 overflow-x-auto pb-4"></div>
+
+  
+        </div>
+
+  
+
+</section>
+
+      <!-- =====================================================================
+           VISTA NUEVA: EXPEDIENTES & RESOLUCIONES JUDICIALES (PDF)
+           ===================================================================== -->
+      
+
+      <!-- =====================================================================
+           VISTA 4: CITAS & AUDIENCIAS
+           ===================================================================== -->

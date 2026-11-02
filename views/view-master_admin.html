@@ -1,0 +1,716 @@
+    <section id="view-master_admin" class="tab-view hidden space-y-6">
+      <!-- Encabezado de Gobierno del Estudio -->
+      <div class="bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/70 text-white p-5 rounded-2xl border border-amber-500/40 shadow-xl flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center gap-3.5">
+          <div class="w-12 h-12 rounded-2xl bg-amber-500/20 text-amber-400 border border-amber-400/50 flex items-center justify-center text-2xl shadow-inner">
+            <i class="fa-solid fa-crown"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-lg font-black tracking-wide text-white uppercase">Panel de Control Total & Gobierno</h2>
+              <span class="text-[10px] bg-amber-400 text-slate-950 px-2 py-0.5 rounded-full font-black uppercase tracking-wider shadow-sm">Root Master</span>
+            </div>
+            <p class="text-xs text-slate-300 mt-0.5">Dr. Paolo Aldea Quincho — Socio Fundador & Titular del Estudio Jurídico</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2.5">
+          <span class="text-[11px] font-mono text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-3 py-1.5 rounded-xl flex items-center gap-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span> Sesión Maestra Desbloqueada
+          </span>
+          <button type="button" onclick="window.app.lockMasterAdmin()" class="bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-600 px-3 py-1.5 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm" title="Bloquear panel de superadministrador">
+            <i class="fa-solid fa-lock"></i> Bloquear Panel
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de Sub-Pestañas del Master Admin -->
+      <div class="bg-white p-2 rounded-xl border border-slate-200 shadow-sm flex flex-wrap items-center gap-2">
+        <button type="button" onclick="window.app.switchMasterSubTab('modulos')" id="master-subtab-btn-modulos" class="master-subtab-btn px-4 py-2 rounded-lg text-xs font-bold bg-amber-500 text-slate-950 shadow-sm transition flex items-center gap-2">
+          <i class="fa-solid fa-shapes"></i> Módulos & Apartados
+        </button>
+        <button type="button" onclick="window.app.switchMasterSubTab('sedes')" id="master-subtab-btn-sedes" class="master-subtab-btn px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center gap-2">
+          <i class="fa-solid fa-network-wired"></i> Sincronización & Red Multi-Sede
+        </button>
+        <button type="button" onclick="window.app.switchMasterSubTab('rbac')" id="master-subtab-btn-rbac" class="master-subtab-btn px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center gap-2">
+          <i class="fa-solid fa-user-shield"></i> Permisos por Rol (RBAC)
+        </button>
+                <button type="button" onclick="window.app.switchMasterSubTab('ajustes')" id="master-subtab-btn-ajustes" class="master-subtab-btn px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center gap-2">
+          <i class="fa-solid fa-building-shield"></i> Ajustes de Sede & Identidad
+        </button>
+                <button type="button" onclick="window.app.switchMasterSubTab('historial')" id="master-subtab-btn-historial" class="master-subtab-btn px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center gap-2">
+          <i class="fa-solid fa-clock-rotate-left"></i> Historial & Trazabilidad
+        </button>
+        <button type="button" onclick="window.app.switchMasterSubTab('seguridad')" id="master-subtab-btn-seguridad" class="master-subtab-btn px-4 py-2 rounded-lg text-xs font-bold bg-slate-100 text-slate-700 hover:bg-slate-200 transition flex items-center gap-2">
+          <i class="fa-solid fa-key"></i> Claves Maestras & Auditoría
+        </button>
+      </div>
+
+      <!-- =====================================================================
+           SUB-PESTAÑA 1: GESTIÓN DE MÓDULOS & APARTADOS
+           ===================================================================== -->
+      <div id="master-subview-modulos" class="master-subview space-y-4">
+        <!-- Barra de Herramientas -->
+        <div class="bg-slate-900 text-white p-4 rounded-xl border border-slate-800 shadow-sm flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h3 class="font-bold text-sm text-amber-400 flex items-center gap-2">
+              <i class="fa-solid fa-sliders"></i> Arquitectura de Apartados del Sistema
+            </h3>
+            <p class="text-xs text-slate-400">Active, oculte, renombre o agregue nuevos módulos a la aplicación en tiempo real.</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="window.app.openNuevoModuloModal()" class="bg-amber-500 hover:bg-amber-400 text-slate-950 font-black px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-plus"></i> Crear Nuevo Apartado
+            </button>
+            <button type="button" onclick="window.app.resetDefaultModules()" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-bold px-3 py-2 rounded-xl text-xs flex items-center gap-1.5 transition border border-slate-700">
+              <i class="fa-solid fa-rotate-left"></i> Restaurar Defectos
+            </button>
+          </div>
+        </div>
+
+        <!-- Grid de Tarjetas de Módulos -->
+        <div id="masterModulosGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3.5">
+          <!-- Inyectado dinámicamente por app.renderMasterModulosGrid() -->
+        </div>
+      </div>
+
+      <!-- =====================================================================
+           SUB-PESTAÑA 2: SINCRONIZACIÓN & RED MULTI-SEDE
+           ===================================================================== -->
+      <div id="master-subview-sedes" class="master-subview hidden space-y-4">
+        <!-- Tarjeta Informativa de Arquitectura Multi-Sede -->
+        <div class="bg-gradient-to-r from-blue-950 to-slate-900 text-white p-4 rounded-xl border border-blue-500/30 flex items-start gap-3.5">
+          <div class="w-10 h-10 rounded-xl bg-blue-500/20 text-blue-400 flex items-center justify-center text-lg shrink-0 border border-blue-400/30">
+            <i class="fa-solid fa-tower-broadcast"></i>
+          </div>
+          <div class="space-y-1 text-xs text-slate-300">
+            <h4 class="font-bold text-sm text-white flex items-center gap-2">
+              Sincronización Inter-Sedes de PAOLO ALDEA & ABOGADOS
+            </h4>
+            <p class="leading-relaxed">
+              Cada sede (Challhuahuacho, Miraflores, Abancay, Cusco, Huaraz) opera con almacenamiento local seguro en su disco duro.
+              Para que los datos se guarden y compartan entre todas las sedes, cuenta con dos vías de sincronización:
+              <strong>Paquetes de Sincronización Inter-Sedes (.lexsync)</strong> para uso 100% offline (sin requerir servidores),
+              y <strong>Conector de Nube Centralizada</strong> para sincronización automática en tiempo real.
+            </p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <!-- PANEL A: PAQUETES INTER-SEDES .LEXSYNC (100% OFFLINE) -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-emerald-100 text-emerald-700 flex items-center justify-center text-sm font-bold">
+                  <i class="fa-solid fa-file-zipper"></i>
+                </div>
+                <div>
+                  <h4 class="font-extrabold text-sm text-slate-900">Paquetes Inter-Sedes (.lexsync)</h4>
+                  <p class="text-[11px] text-slate-500">Sincronización segura por WhatsApp, Correo o USB</p>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">100% Offline</span>
+            </div>
+
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Exporte el paquete de datos de esta máquina para enviarlo a otra sede, o importe el paquete generado en otra sede para fusionar casos, caja chica, asistencias e inventario sin duplicados.
+            </p>
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+              <button type="button" onclick="window.app.exportarPaqueteSincronizacion()" class="px-3.5 py-2.5 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-sm">
+                <i class="fa-solid fa-download"></i> Exportar Paquete Sede
+              </button>
+
+              <label class="px-3.5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-sm cursor-pointer text-center">
+                <i class="fa-solid fa-upload"></i> Importar & Fusionar Sede
+                <input type="file" id="inputSyncPackage" accept=".json,.lexsync" onchange="window.app.importarPaqueteSincronizacion(event)" class="hidden">
+              </label>
+            </div>
+
+            <div id="syncMergeReport" class="hidden p-3 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-700 space-y-1">
+              <!-- Reporte inyectado tras la importación -->
+            </div>
+          </div>
+
+          <!-- PANEL B: LIVE CLOUD SYNC (NUBE CENTRALIZADA EN TIEMPO REAL) -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+              <div class="flex items-center gap-2">
+                <div class="w-8 h-8 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-sm font-bold">
+                  <i class="fa-solid fa-cloud-arrow-up"></i>
+                </div>
+                <div>
+                  <h4 class="font-extrabold text-sm text-slate-900">Sincronización en la Nube (Live Cloud)</h4>
+                  <p class="text-[11px] text-slate-500">Conexión con Supabase, Firebase o Servidor Central</p>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full">Tiempo Real</span>
+            </div>
+
+            <div class="space-y-3 text-xs">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">URL del Endpoint de Sincronización:</label>
+                <input type="url" id="masterCloudEndpoint" value="https://cznxzrwhogyobpqmfxnk.supabase.co" placeholder="https://cznxzrwhogyobpqmfxnk.supabase.co" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-600 font-mono text-[11px]">
+              </div>
+
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Token de Acceso / API Key:</label>
+                <input type="password" id="masterCloudApiKey" placeholder="Bearer Token o Clave Secreta de Despacho" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-indigo-600 font-mono text-[11px]">
+              </div>
+
+              <div class="flex items-center justify-between pt-1">
+                <label class="flex items-center gap-2 font-semibold text-slate-700 cursor-pointer">
+                  <input type="checkbox" id="masterCloudAutoSync" checked class="rounded text-indigo-600">
+                  <span>Auto-sincronizar al registrar datos</span>
+                </label>
+                <button type="button" onclick="window.app.guardarAjustesNube()" class="text-indigo-600 hover:text-indigo-800 font-bold underline">
+                  Guardar Ajustes
+                </button>
+              </div>
+
+              <div class="flex items-center gap-2 pt-2">
+                <button type="button" onclick="window.app.probarConexionNube()" class="flex-1 px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-lg text-xs transition border border-slate-300">
+                  <i class="fa-solid fa-plug"></i> Probar Conexión
+                </button>
+                <button type="button" onclick="window.app.sincronizarConNube()" class="flex-1 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-lg text-xs transition shadow-sm">
+                  <i class="fa-solid fa-rotate"></i> Sincronizar Ahora
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+                  <!-- PANEL C: FIREBASE BACKEND & REAL-TIME CLOUD AUTH -->
+          <div class="bg-gradient-to-br from-slate-900 to-indigo-950 text-white p-5 rounded-2xl border border-amber-500/30 shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-indigo-800/60 pb-3">
+              <div class="flex items-center gap-2.5">
+                <div class="w-9 h-9 rounded-xl bg-amber-500/20 text-amber-400 border border-amber-500/40 flex items-center justify-center text-lg font-bold">
+                  <i class="fa-solid fa-fire-flame-curved"></i>
+                </div>
+                <div>
+                  <h4 class="font-extrabold text-sm text-amber-300">Firebase Backend & Autenticación Real (Google Cloud)</h4>
+                  <p class="text-[11px] text-slate-300">Autenticación server-side segura con roles y base de datos Cloud Firestore</p>
+                </div>
+              </div>
+              <span class="text-[10px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/40 px-2.5 py-0.5 rounded-full">Recomendado</span>
+            </div>
+
+            <div class="space-y-3 text-xs">
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block font-bold text-slate-300 mb-1">Firebase Project ID *</label>
+                  <input type="text" id="fbProjectId" value="paolo-aldea-juridico-3c5cb" placeholder="paolo-aldea-juridico-3c5cb" class="w-full px-3 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white font-mono text-[11px] focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                  <label class="block font-bold text-slate-300 mb-1">Web API Key *</label>
+                  <input type="password" id="fbApiKey" placeholder="AIzaSy..." class="w-full px-3 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white font-mono text-[11px] focus:outline-none focus:border-amber-400">
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label class="block font-bold text-slate-300 mb-1">Auth Domain</label>
+                  <input type="text" id="fbAuthDomain" value="paolo-aldea-juridico-3c5cb.firebaseapp.com" placeholder="paolo-aldea-juridico-3c5cb.firebaseapp.com" class="w-full px-3 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white font-mono text-[11px] focus:outline-none focus:border-amber-400">
+                </div>
+                <div>
+                  <label class="block font-bold text-slate-300 mb-1">Storage Bucket</label>
+                  <input type="text" id="fbStorageBucket" value="paolo-aldea-juridico-3c5cb.appspot.com" placeholder="paolo-aldea-juridico-3c5cb.appspot.com" class="w-full px-3 py-2 bg-slate-800/90 border border-slate-700 rounded-lg text-white font-mono text-[11px] focus:outline-none focus:border-amber-400">
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-indigo-900/60">
+                <div class="flex items-center gap-2">
+                  <button type="button" onclick="window.app.guardarAjustesFirebase()" class="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-floppy-disk"></i> Guardar Firebase
+                  </button>
+                  <button type="button" onclick="window.app.probarConexionFirebase()" class="px-3.5 py-2 bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-bold rounded-lg text-xs transition flex items-center gap-1.5 cursor-pointer">
+                    <i class="fa-solid fa-plug"></i> Probar Conexión
+                  </button>
+                </div>
+                <button type="button" onclick="window.app.sincronizarConFirebase()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white font-bold rounded-lg text-xs transition shadow-md flex items-center gap-1.5 cursor-pointer">
+                  <i class="fa-solid fa-cloud-arrow-up"></i> Sincronizar Todo a Firestore
+                </button>
+              </div>
+            </div>
+          </div>
+
+        <!-- Gestor de Sedes de la Firma -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h4 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-building-columns text-amber-500"></i> Directorio Oficial de Sedes de la Firma
+              </h4>
+              <p class="text-xs text-slate-500">Controle las sedes activas, agregue nuevas ciudades y configure geocercas.</p>
+            </div>
+            <button type="button" onclick="window.app.openNuevaSedeModal()" class="bg-blue-900 hover:bg-blue-950 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-plus"></i> Registrar Nueva Sede
+            </button>
+          </div>
+
+          <div id="masterSedesContainer" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+            <!-- Inyectado dinámicamente por app.renderMasterSedes() -->
+          </div>
+        </div>
+      </div>
+
+      <!-- =====================================================================
+           SUB-PESTAÑA 3: MATRIZ DE PERMISOS RBAC
+           ===================================================================== -->
+      <div id="master-subview-rbac" class="master-subview hidden space-y-4">
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h4 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-user-shield text-indigo-600"></i> Matriz Dinámica de Permisos por Rol
+              </h4>
+              <p class="text-xs text-slate-500">Defina con precisión a qué apartados tiene acceso cada integrante del estudio.</p>
+            </div>
+            <button type="button" onclick="window.app.guardarMatrizPermisos()" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm">
+              <i class="fa-solid fa-floppy-disk"></i> Guardar Permisos
+            </button>
+          </div>
+
+          <div class="overflow-x-auto">
+            <table class="w-full text-left text-xs legal-table border border-slate-200">
+              <thead class="bg-slate-900 text-white">
+                <tr>
+                  <th class="p-2.5">Apartado / Módulo</th>
+                  <th class="p-2.5 text-center">Asistente Legal</th>
+                  <th class="p-2.5 text-center">Asistente Admin</th>
+                  <th class="p-2.5 text-center">Abogado Asociado</th>
+                  <th class="p-2.5 text-center text-slate-300">Administrador / Socio</th>
+                  <th class="p-2.5 text-center bg-slate-950 text-amber-300 border-l border-amber-500/40">&#128081; Super Admin</th>
+                </tr>
+              </thead>
+              <tbody id="masterRbacTableBody">
+                <!-- Inyectado dinámicamente por app.renderMasterRbacTable() -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- =====================================================================
+           SUB-PESTAÑA 4: CLAVES MAESTRAS & AUDITORÍA INTEGRAL
+           ===================================================================== -->
+            <!-- SUB-PESTAÑA 5: AJUSTES INSTITUCIONALES, MEMBRETE & NOTIFICACIONES -->
+      <div id="master-subview-ajustes" class="master-subview hidden space-y-4">
+        <!-- Identidad Institucional -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <div>
+              <h4 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+                <i class="fa-solid fa-building-columns text-amber-600"></i> Identidad Institucional & Membrete Oficial
+              </h4>
+              <p class="text-xs text-slate-500">Parámetros que encabezarán los reportes oficiales en Excel y PDF con membrete del Estudio.</p>
+            </div>
+          </div>
+          <form id="formSettings" onsubmit="window.app.saveSettings(event)" class="space-y-4">
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Nombre del Estudio Jurídico</label>
+                <input type="text" id="cfgFirmName" required class="w-full text-xs p-2 rounded-lg border border-slate-300 font-bold text-slate-900">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Sede Operativa Principal</label>
+                <input type="text" id="cfgFirmBranch" required class="w-full text-xs p-2 rounded-lg border border-slate-300 font-semibold text-blue-900">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Abogado Director / Titular</label>
+                <input type="text" id="cfgManagingAttorney" required class="w-full text-xs p-2 rounded-lg border border-slate-300 font-medium">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Colegiatura Profesional (CAL / ICAP)</label>
+                <input type="text" id="cfgFirmLicense" required class="w-full text-xs p-2 rounded-lg border border-slate-300 font-medium">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Responsable Administrativo</label>
+                <input type="text" id="cfgAdminOfficer" required class="w-full text-xs p-2 rounded-lg border border-slate-300 font-medium">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Especialidad / Cargo</label>
+                <input type="text" id="cfgAdminTitle" required class="w-full text-xs p-2 rounded-lg border border-slate-300 font-medium">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Teléfono / Central</label>
+                <input type="text" id="cfgFirmPhone" class="w-full text-xs p-2 rounded-lg border border-slate-300 font-mono">
+              </div>
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-1">Moneda Contable</label>
+                <select id="cfgCurrency" class="w-full text-xs p-2 rounded-lg border border-slate-300 font-medium bg-white">
+                  <option value="S/">S/ - Soles Peruanos (PEN)</option>
+                  <option value="$">$ - Dólares Americanos (USD)</option>
+                </select>
+              </div>
+              <div class="sm:col-span-2">
+                <label class="block text-xs font-bold text-slate-700 mb-1">Dirección Oficial de la Sede</label>
+                <input type="text" id="cfgFirmAddress" class="w-full text-xs p-2 rounded-lg border border-slate-300">
+              </div>
+            </div>
+            <div class="flex justify-end pt-2">
+              <button type="submit" class="bg-slate-900 hover:bg-black text-white font-bold px-4 py-2 rounded-lg text-xs transition">
+                Guardar Ajustes Institucionales
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <!-- Notificaciones Móviles Push (ntfy) -->
+        <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h4 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
+              <i class="fa-solid fa-mobile-screen-button text-amber-600"></i> Notificaciones Móviles Push (ntfy.sh)
+            </h4>
+            <span class="text-xs bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full">Multi-Dispositivo</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 mb-1">Canal Privado de Avisos</label>
+              <div class="flex items-center gap-1.5">
+                <input type="text" id="cfgPushTopic" value="aldea_notificaciones_seguras" class="flex-1 p-2 rounded-lg border border-slate-300 font-mono font-bold text-slate-900">
+                <button type="button" onclick="window.app.generateNewPushTopic()" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2.5 py-2 rounded-lg text-xs font-semibold" title="Generar nuevo canal">
+                  <i class="fa-solid fa-dice"></i>
+                </button>
+              </div>
+            </div>
+            <div class="flex items-end gap-2">
+              <button type="button" onclick="window.app.testPushNotification()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition">
+                <i class="fa-solid fa-paper-plane"></i> Enviar Prueba al Celular
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+            <!-- =====================================================================
+           SUB-PESTAÑA: HISTORIAL & TRAZABILIDAD POR SEDE Y USUARIO
+           ===================================================================== -->
+      <div id="master-subview-historial" class="master-subview hidden space-y-5">
+        <!-- Encabezado de Sección con Acciones -->
+        <div class="bg-gradient-to-r from-slate-900 via-slate-800 to-indigo-950 text-white p-5 rounded-2xl border border-indigo-500/30 shadow-md flex flex-wrap items-center justify-between gap-4">
+          <div class="flex items-center gap-3">
+            <div class="w-12 h-12 rounded-xl bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center justify-center text-2xl shadow-inner">
+              <i class="fa-solid fa-clock-rotate-left"></i>
+            </div>
+            <div>
+              <div class="flex items-center gap-2">
+                <h3 class="font-extrabold text-base text-white tracking-wide">Historial de Operaciones & Trazabilidad Total</h3>
+                <span class="text-[10px] bg-indigo-500/30 text-indigo-300 border border-indigo-500/40 px-2 py-0.5 rounded-full font-bold uppercase tracking-wider">Multi-Sede</span>
+              </div>
+              <p class="text-xs text-slate-300 mt-0.5">Control inmutable por sede: visualice qué usuario agregó, modificó o eliminó registros con fecha, hora y detalle.</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button type="button" onclick="window.app.exportarHistorialExcel()" class="bg-emerald-600 hover:bg-emerald-500 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer" title="Exportar historial filtrado en formato CSV compatible con Excel">
+              <i class="fa-solid fa-file-excel"></i> Exportar a Excel
+            </button>
+            <button type="button" onclick="window.app.renderMasterHistorial()" class="bg-indigo-600 hover:bg-indigo-500 text-white font-bold px-3.5 py-2 rounded-xl text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer" title="Recargar eventos recientes">
+              <i class="fa-solid fa-arrows-rotate"></i> Actualizar
+            </button>
+          </div>
+        </div>
+
+        <!-- Tarjetas de Resumen KPI de Actividad -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3.5">
+          <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+            <div>
+              <div class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Eventos</div>
+              <div id="historialKpiTotal" class="text-2xl font-black text-slate-800 mt-1">0</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">Operaciones registradas</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-slate-100 text-slate-600 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-list-check"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-emerald-200/80 shadow-xs flex items-center justify-between">
+            <div>
+              <div class="text-[11px] font-bold text-emerald-600 uppercase tracking-wider">Agregados</div>
+              <div id="historialKpiCrear" class="text-2xl font-black text-emerald-700 mt-1">0</div>
+              <div class="text-[10px] text-emerald-600/80 mt-0.5">Nuevos registros creados</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-plus-circle"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-amber-200/80 shadow-xs flex items-center justify-between">
+            <div>
+              <div class="text-[11px] font-bold text-amber-600 uppercase tracking-wider">Modificados / Editados</div>
+              <div id="historialKpiEditar" class="text-2xl font-black text-amber-700 mt-1">0</div>
+              <div class="text-[10px] text-amber-600/80 mt-0.5">Actualizaciones de datos</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </div>
+          </div>
+
+          <div class="bg-white p-4 rounded-xl border border-rose-200/80 shadow-xs flex items-center justify-between">
+            <div>
+              <div class="text-[11px] font-bold text-rose-600 uppercase tracking-wider">Eliminados</div>
+              <div id="historialKpiEliminar" class="text-2xl font-black text-rose-700 mt-1">0</div>
+              <div class="text-[10px] text-rose-600/80 mt-0.5">Bajas de registros</div>
+            </div>
+            <div class="w-10 h-10 rounded-xl bg-rose-50 text-rose-600 border border-rose-200 flex items-center justify-center text-lg">
+              <i class="fa-solid fa-trash-can"></i>
+            </div>
+          </div>
+        </div>
+
+        <!-- Barra de Filtros Multifactorial: Sede, Usuario, Acción, Módulo, Búsqueda -->
+        <div class="bg-white p-4 rounded-xl border border-slate-200 shadow-sm space-y-3">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-2">
+            <h4 class="font-bold text-xs uppercase tracking-wider text-slate-700 flex items-center gap-2">
+              <i class="fa-solid fa-filter text-indigo-500"></i> Filtros de Auditoría & Trazabilidad
+            </h4>
+            <button type="button" onclick="window.app.limpiarFiltrosHistorial()" class="text-xs text-indigo-600 hover:text-indigo-800 font-bold flex items-center gap-1 cursor-pointer">
+              <i class="fa-solid fa-rotate-left"></i> Restablecer Filtros
+            </button>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+            <!-- Filtro 1: Sede -->
+            <div>
+              <label for="historialFiltroSede" class="block text-[11px] font-bold text-slate-700 mb-1">
+                <i class="fa-solid fa-location-dot text-amber-500 mr-1"></i> Filtrar por Sede:
+              </label>
+              <select id="historialFiltroSede" onchange="window.app.renderMasterHistorial()" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                <option value="todas">&#127970; Todas las Sedes (Red Nacional)</option>
+                <option value="challhuahuacho">&#128205; Sede Challhuahuacho (Apurímac)</option>
+                <option value="miraflores">&#128205; Sede Miraflores (Lima)</option>
+                <option value="abancay">&#128205; Sede Abancay (Apurímac)</option>
+                <option value="cusco">&#128205; Sede Cusco</option>
+                <option value="huaraz">&#128205; Sede Huaraz (Áncash)</option>
+              </select>
+            </div>
+
+            <!-- Filtro 2: Usuario -->
+            <div>
+              <label for="historialFiltroUsuario" class="block text-[11px] font-bold text-slate-700 mb-1">
+                <i class="fa-solid fa-user text-indigo-500 mr-1"></i> Filtrar por Usuario:
+              </label>
+              <select id="historialFiltroUsuario" onchange="window.app.renderMasterHistorial()" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                <option value="todos">&#128101; Todos los Usuarios</option>
+              </select>
+            </div>
+
+            <!-- Filtro 3: Acción (Agregó / Editó / Eliminó) -->
+            <div>
+              <label for="historialFiltroAccion" class="block text-[11px] font-bold text-slate-700 mb-1">
+                <i class="fa-solid fa-bolt text-emerald-500 mr-1"></i> Tipo de Acción:
+              </label>
+              <select id="historialFiltroAccion" onchange="window.app.renderMasterHistorial()" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                <option value="todas">⚡ Todas las Acciones</option>
+                <option value="CREAR">&#129001; Agregó (Creación)</option>
+                <option value="EDITAR">&#129000; Editó / Modificó (Actualización)</option>
+                <option value="ELIMINAR">&#128308; Eliminó (Baja / Borrado)</option>
+              </select>
+            </div>
+
+            <!-- Filtro 4: Módulo -->
+            <div>
+              <label for="historialFiltroModulo" class="block text-[11px] font-bold text-slate-700 mb-1">
+                <i class="fa-solid fa-shapes text-blue-500 mr-1"></i> Módulo / Sección:
+              </label>
+              <select id="historialFiltroModulo" onchange="window.app.renderMasterHistorial()" class="w-full px-3 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 focus:outline-none focus:border-indigo-500">
+                <option value="todos">&#128193; Todos los Módulos</option>
+                <option value="casos">⚖️ Expedientes / Casos</option>
+                <option value="caja_chica">💰 Caja Chica / Finanzas</option>
+                <option value="citas">&#128197; Citas &amp; Agenda</option>
+                <option value="presupuestos">&#128209; Presupuestos &amp; Cotizaciones</option>
+                <option value="inventario">&#128230; Inventario &amp; Bienes</option>
+                <option value="documentos">&#128196; Documentos &amp; Mesa de Partes</option>
+                <option value="personal">&#128101; Personal &amp; Abogados</option>
+                <option value="asistencia">⏱️ Asistencia & Tareo</option>
+                <option value="sistema">⚙️ Sistema & Seguridad</option>
+              </select>
+            </div>
+          </div>
+
+          <!-- Buscador de texto en tiempo real -->
+          <div class="pt-1">
+            <div class="relative">
+              <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+              <input type="text" id="historialBuscadorTexto" oninput="window.app.renderMasterHistorial()" placeholder="Buscar por palabra clave, código de expediente, nombre de cliente, monto, detalle del cambio o ID..." class="w-full pl-9 pr-4 py-2 bg-slate-50 border border-slate-300 rounded-lg text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:border-indigo-500">
+            </div>
+          </div>
+        </div>
+
+        <!-- Tabla de Registros de Auditoría -->
+        <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-5 py-3.5 bg-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2">
+            <div class="flex items-center gap-2">
+              <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              <span class="font-extrabold text-xs text-slate-800">Bitácora de Eventos Registrados</span>
+            </div>
+            <div id="historialContadorFiltrados" class="text-xs font-semibold text-slate-500 font-mono">
+              Cargando historial...
+            </div>
+          </div>
+
+          <div class="overflow-x-auto max-h-[580px] overflow-y-auto">
+            <table class="w-full text-left text-xs border-collapse">
+              <thead class="bg-slate-100/90 text-slate-600 sticky top-0 z-10 font-bold uppercase text-[10px] tracking-wider border-b border-slate-200">
+                <tr>
+                  <th class="p-3 w-36">Fecha & Hora</th>
+                  <th class="p-3 w-36">Sede</th>
+                  <th class="p-3 w-48">Usuario Responsable</th>
+                  <th class="p-3 w-28 text-center">Acción</th>
+                  <th class="p-3 w-36">Módulo</th>
+                  <th class="p-3 w-32">Registro Afectado</th>
+                  <th class="p-3">Detalle de la Operación</th>
+                  <th class="p-3 w-20 text-center">Detalle</th>
+                </tr>
+              </thead>
+              <tbody id="historialTableBody" class="divide-y divide-slate-100">
+                <!-- Filas renderizadas dinámicamente -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <!-- Modal de Detalle Técnico / Comparativo de Registro -->
+      <div id="modalDetalleAuditoria" class="fixed inset-0 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 hidden">
+        <div class="bg-white rounded-2xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in fade-in duration-200">
+          <div class="bg-slate-900 text-white p-4 flex items-center justify-between border-b border-slate-800">
+            <div class="flex items-center gap-2.5">
+              <div class="w-8 h-8 rounded-lg bg-indigo-500/20 text-indigo-400 border border-indigo-500/40 flex items-center justify-center text-sm">
+                <i class="fa-solid fa-fingerprint"></i>
+              </div>
+              <div>
+                <h4 class="font-bold text-sm text-white">Inspección de Registro de Auditoría</h4>
+                <p id="modalDetalleAuditId" class="text-[10px] font-mono text-indigo-300">AUD-0000</p>
+              </div>
+            </div>
+            <button type="button" onclick="document.getElementById('modalDetalleAuditoria').classList.add('hidden')" class="text-slate-400 hover:text-white text-base cursor-pointer p-1">
+              <i class="fa-solid fa-xmark"></i>
+            </button>
+          </div>
+          <div class="p-5 overflow-y-auto space-y-4 text-xs">
+            <div class="grid grid-cols-2 gap-3 bg-slate-50 p-3 rounded-xl border border-slate-200">
+              <div><span class="text-slate-500 block text-[10px] uppercase font-bold">Fecha / Hora:</span><span id="modalAuditFecha" class="font-bold text-slate-800 font-mono"></span></div>
+              <div><span class="text-slate-500 block text-[10px] uppercase font-bold">Sede:</span><span id="modalAuditSede" class="font-bold text-slate-800"></span></div>
+              <div><span class="text-slate-500 block text-[10px] uppercase font-bold">Usuario:</span><span id="modalAuditUsuario" class="font-bold text-slate-800"></span></div>
+              <div><span class="text-slate-500 block text-[10px] uppercase font-bold">Acción Realizada:</span><span id="modalAuditAccion" class="font-bold"></span></div>
+              <div><span class="text-slate-500 block text-[10px] uppercase font-bold">Módulo Afectado:</span><span id="modalAuditModulo" class="font-bold text-slate-800"></span></div>
+              <div><span class="text-slate-500 block text-[10px] uppercase font-bold">ID de Registro:</span><span id="modalAuditRegistroId" class="font-mono font-bold text-indigo-600"></span></div>
+            </div>
+
+            <div>
+              <span class="text-slate-500 block text-[10px] uppercase font-bold mb-1">Descripción de la Operación:</span>
+              <div id="modalAuditDetalles" class="p-3 bg-slate-100 rounded-lg text-slate-800 font-medium leading-relaxed border border-slate-200"></div>
+            </div>
+
+            <div>
+              <span class="text-slate-500 block text-[10px] uppercase font-bold mb-1">Carga Técnica / Metadata Registrada:</span>
+              <pre id="modalAuditJson" class="p-3 bg-slate-950 text-emerald-400 rounded-lg font-mono text-[11px] overflow-x-auto max-h-56 border border-slate-800"></pre>
+            </div>
+          </div>
+          <div class="bg-slate-50 px-5 py-3 border-t border-slate-200 flex justify-end">
+            <button type="button" onclick="document.getElementById('modalDetalleAuditoria').classList.add('hidden')" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white font-bold rounded-xl text-xs transition cursor-pointer">
+              Cerrar Vista
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="master-subview-seguridad" class="master-subview hidden space-y-4">
+        <!-- Credenciales de Acceso - Super Administrador (Login Principal) -->
+        <div class="bg-white dark:bg-slate-900/90 p-5 rounded-2xl border border-amber-500/30 dark:border-amber-500/40 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+            <div>
+              <h4 class="font-extrabold text-sm text-slate-900 dark:text-white flex items-center gap-2">
+                <i class="fa-solid fa-user-shield text-amber-500"></i> Credenciales de Acceso - Super Administrador
+              </h4>
+              <p class="text-xs text-slate-500 dark:text-slate-400">Configure el usuario y contrase&ntilde;a del Administrador Maestro para iniciar sesi&oacute;n en el Despacho Jur&iacute;dico.</p>
+            </div>
+            <span class="text-[10.5px] font-mono bg-amber-500/10 text-amber-600 dark:text-amber-400 font-bold px-2.5 py-1 rounded-lg border border-amber-500/30">SUPER ADMIN</span>
+          </div>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 text-xs">
+            <div>
+              <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Usuario de Super Admin:</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <i class="fa-solid fa-user"></i>
+                </span>
+                <input type="text" id="superAdminNewUser" placeholder="admin" class="w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-bold focus:outline-none focus:border-amber-500">
+              </div>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Nueva Contrase&ntilde;a:</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <i class="fa-solid fa-lock"></i>
+                </span>
+                <input type="password" id="superAdminNewPass" placeholder="Nueva contrase&ntilde;a..." class="w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-amber-500">
+              </div>
+            </div>
+            <div>
+              <label class="block font-bold text-slate-700 dark:text-slate-300 mb-1">Confirmar Contrase&ntilde;a:</label>
+              <div class="relative">
+                <span class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+                  <i class="fa-solid fa-lock"></i>
+                </span>
+                <input type="password" id="superAdminConfirmPass" placeholder="Repita contrase&ntilde;a..." class="w-full pl-9 pr-3 py-2 border border-slate-300 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-white font-mono focus:outline-none focus:border-amber-500">
+              </div>
+            </div>
+          </div>
+          <div class="flex items-center justify-between pt-1">
+            <span class="text-[11px] text-slate-500 dark:text-slate-400 italic">
+              <i class="fa-solid fa-shield-halved text-emerald-500 mr-1"></i>Protecci&oacute;n criptogr&aacute;fica SHA-256 aplicada autom&aacute;ticamente al guardar.
+            </span>
+            <button type="button" onclick="window.app.guardarCredencialesSuperAdmin()" class="px-5 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold rounded-xl text-xs transition shadow-sm flex items-center gap-2 cursor-pointer">
+              <i class="fa-solid fa-floppy-disk"></i> Actualizar Credenciales Super Admin
+            </button>
+          </div>
+        </div>
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <!-- Cambio de Clave Maestra -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h4 class="font-extrabold text-sm text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-2">
+              <i class="fa-solid fa-key text-amber-500"></i> Credenciales de Acceso al Panel Master
+            </h4>
+            <div class="space-y-3 text-xs">
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Nueva Clave Maestra del Socio Fundador:</label>
+                <input type="password" id="masterNewPassword" placeholder="Mínimo 6 caracteres" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-mono">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-700 mb-1">Nuevo PIN Maestro (4 dígitos):</label>
+                <input type="password" id="masterNewPin" maxlength="6" placeholder="Ej. PIN de 4 a 6 dígitos" class="w-full px-3 py-2 border border-slate-300 rounded-lg focus:outline-none focus:border-amber-500 font-mono font-bold">
+              </div>
+              <button type="button" onclick="window.app.guardarCredencialesMaestras()" class="w-full px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-xl text-xs transition shadow-sm">
+                Actualizar Clave Maestra & PIN
+              </button>
+            </div>
+          </div>
+
+          <!-- Auditoría & Respaldo Integral -->
+          <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+            <h4 class="font-extrabold text-sm text-slate-900 flex items-center gap-2 border-b border-slate-100 pb-2">
+              <i class="fa-solid fa-database text-blue-600"></i> Respaldo Maestro Cifrado
+            </h4>
+            <p class="text-xs text-slate-600 leading-relaxed">
+              Descargue un volcado total de la base de datos que incluye todas las sedes, expedientes, resoluciones PDF en base64, registros contables y personal.
+            </p>
+            <div class="space-y-2 pt-2">
+              <button type="button" onclick="window.app.triggerServerBackup()" class="w-full px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-sm" title="Crear instantánea versionada de seguridad en la carpeta _backups">
+                <i class="fa-solid fa-camera-retro"></i> Crear Snapshot de Seguridad Local (_backups)
+              </button>
+              <button type="button" onclick="window.app.exportBackupJson()" class="w-full px-4 py-2.5 bg-blue-900 hover:bg-blue-950 text-white font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition shadow-sm">
+                <i class="fa-solid fa-file-export"></i> Descargar Respaldo Total (.JSON)
+              </button>
+              <label class="w-full px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold rounded-xl text-xs flex items-center justify-center gap-2 cursor-pointer transition border border-slate-300">
+                <i class="fa-solid fa-upload"></i> Restaurar desde Archivo JSON
+                <input type="file" accept=".json" onchange="window.app.importBackupJson(event)" class="hidden">
+              </label>
+              <button type="button" onclick="window.app.clearAllData()" class="w-full px-4 py-2 bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold rounded-xl text-xs flex items-center justify-center gap-2 transition border border-rose-200">
+                <i class="fa-solid fa-trash-can"></i> Reinicio Seguro / Vaciar Datos de Prueba
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
