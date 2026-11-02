@@ -2,6 +2,10 @@
   publish = "."
   functions = "netlify/functions"
 
+# Evitar falsos positivos del escáner (placeholders / docs, no secretos reales)
+[build.environment]
+  SECRETS_SCAN_OMIT_PATHS = ".env.example;docs/**;herramientas/**;tests/**"
+
 # ---------- Bloqueo de archivos internos ----------
 [[redirects]]
   from = "/*.ps1"
