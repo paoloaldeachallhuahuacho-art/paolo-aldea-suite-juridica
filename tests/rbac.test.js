@@ -90,7 +90,6 @@ JSDOM.fromURL("http://localhost:" + port() + "/index.html", {
   check("isSuperAdmin: usuario llamado 'admin' sin rol NO es super admin", db.isSuperAdmin({ id: "X1", rol: "abogado", usuario: "admin", nombre: "admin", dni: "admin" }) === false);
   check("isSuperAdmin: socio NO es super admin", db.isSuperAdmin({ id: "X2", rol: "socio" }) === false);
   check("isSuperAdmin: WRK-000 si", db.isSuperAdmin({ id: "WRK-000", rol: "super_admin" }) === true);
-  check("restaurar backup bloqueado a no super admin", true);
   db.importAllDataJson("{}").then(r => {
     check("restaurar backup bloqueado a no super admin", r.success === false);
     // --- 5. Aislamiento por sede ---

@@ -34,6 +34,7 @@ JSDOM.fromURL("http://localhost:" + server.address().port + "/index.html", {
   }
 }).then(dom => setTimeout(async () => {
   const w = dom.window, db = w.db, app = w.app, doc = w.document;
+  if (db && db.ready) { try { await db.ready(); } catch (_) {} }
   let current = { id: "WRK-000", rol: "super_admin", sede: "todas", nombre: "Super Admin" };
   db.getCurrentUser = () => current;
   const toasts = []; app.showToast = (m, t) => toasts.push([t, m]);

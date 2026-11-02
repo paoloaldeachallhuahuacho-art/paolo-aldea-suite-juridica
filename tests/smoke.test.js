@@ -80,6 +80,8 @@ JSDOM.fromURL("http://localhost:8765/index.html", {
 }).then(dom => {
   const w = dom.window;
   setTimeout(async () => {
+    if (w.db && w.db.ready) { try { await w.db.ready(); } catch (_) {} }
+    if (w.app && w.app.init && !w.app.currentTab) { try { await w.app.init(); } catch (_) {} }
     const app = w.app; console.log("USER:", JSON.stringify(w.db.getCurrentUser()), "| ss keys:", Object.keys(w.sessionStorage).join(",")); console.log("TOASTS:", [...w.document.querySelectorAll("[id*=toast],.toast")].map(e=>e.textContent.trim().slice(0,120)).join(" || "));
     console.log("window.app:", !!app, "| currentTab:", app && app.currentTab);
     const checks = ["switchTab", "toggleMobileSidebar", "setupEventListeners", "compressImageDataUrl", "updateProfilePhotoUI", "handleProfilePhotoUpload", "removeProfilePhoto"];

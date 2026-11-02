@@ -1571,16 +1571,16 @@
     <!-- =========================================================================
          MODAL: AUTENTICACIÓN MAESTRA DEL SOCIO FUNDADOR (MODALMASTERAUTH)
          ========================================================================= -->
-  <!-- Modales diferidos: views/view-modals.html vÃ­a ComponentLoader (Semana 3) -->
+  <!-- Modales diferidos: views/view-modals.html vía ComponentLoader (Semana 3) -->
   <!-- Scripts del Sistema -->
-  <script src="js/data.js?v=20261101_week4_arch"></script>
+  <script src="js/data.js?v=20261101_week4_qa"></script>
   <script src="js/alerts.js?v=20261101_week2_firebase_xss"></script>
   <script src="js/charts.js?v=20261101_week3_perf"></script>
   <script src="js/attendance.js?v=20261101_week3_perf"></script>
   <script src="js/draft-autosave.js?v=20261101_week2_firebase_xss"></script>
   <!-- Controllers: carga diferida por pestaña (Semana 4) -->
-  <script src="js/controller-loader.js?v=20261101_week4_arch"></script>
-  <script src="js/component-loader.js?v=20261101_week3_perf"></script>
+  <script src="js/controller-loader.js?v=20261101_week4_qa"></script>
+  <script src="js/component-loader.js?v=20261101_week4_qa"></script>
   <script src="js/excel-export.js?v=20261101_week3_perf"></script>
   <script src="js/pdf-export.js?v=20261101_week3_perf"></script>
   <!-- Supabase Cloud SDK v2 & Realtime Engine -->
@@ -1590,24 +1590,26 @@
   <script src="https://www.gstatic.com/firebasejs/10.14.2/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/10.14.2/firebase-firestore-compat.js"></script>
   <script src="js/firebase-auth.js?v=20261101_week2_firebase_xss"></script>
-  <script src="js/app.js?v=20261101_week4_arch"></script>
+  <script src="js/app.js?v=20261101_week4_qa"></script>
 
   <script>
     // Puente oficial de envío del formulario de inicio de sesión / bootstrap
-    window._ensureLegalApp = function() {
+    window._ensureLegalApp = async function() {
       if (!window.app && typeof LegalApp === "function") {
         try {
           window.app = new LegalApp();
-          window.app.init();
+          await window.app.init();
         } catch (e) {
           console.error("Error al arrancar LegalApp bajo demanda:", e);
         }
+      } else if (window.db && typeof window.db.ready === "function") {
+        try { await window.db.ready(); } catch (_) {}
       }
       return window.app;
     };
-    window.ejecutarAccesoDespacho = function(event) {
+    window.ejecutarAccesoDespacho = async function(event) {
       if (event) event.preventDefault();
-      const app = window._ensureLegalApp();
+      const app = await window._ensureLegalApp();
       if (app && typeof app.handleLogin === "function") {
         app.handleLogin(event);
       } else {
@@ -1619,9 +1621,9 @@
         }
       }
     };
-    window.ejecutarBootstrapDespacho = function(event) {
+    window.ejecutarBootstrapDespacho = async function(event) {
       if (event) event.preventDefault();
-      const app = window._ensureLegalApp();
+      const app = await window._ensureLegalApp();
       if (app && typeof app.completeAuthBootstrap === "function") {
         app.completeAuthBootstrap(event);
       }

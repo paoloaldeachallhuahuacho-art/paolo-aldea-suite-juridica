@@ -534,8 +534,12 @@ class SafeStorageAdapter {
     this._lsMirrorDelayMs = 180;
     this._crossTabRefreshTimer = null;
     this._legacyDbNames = ["PaoloAldeaJuridicoDB", "PaoloAldeaJuridicoDB_v1"];
+    this._isReady = false;
     this.readyPromise = new Promise((resolve) => {
-      this._resolveReady = resolve;
+      this._resolveReady = (ok) => {
+        this._isReady = true;
+        resolve(ok);
+      };
     });
     this.initIndexedDB();
     this.setupCrossTabCacheSync();
@@ -631,12 +635,19 @@ class SafeStorageAdapter {
       };
       request.onsuccess = (e) => {
         this.idb = e.target.result;
-        if (this.pendingQueue.length > 0) {
-          const queue = [...this.pendingQueue];
-          this.pendingQueue = [];
-          queue.forEach(item => this.mirrorToIndexedDB(item.key, item.data));
-        }
+        // Hidratar ANTES de vaciar pendientes (evita que un [] prematuro borre IDB)
         this.hydrateFromIndexedDB().finally(() => {
+          if (this.pendingQueue.length > 0) {
+            const queue = [...this.pendingQueue];
+            this.pendingQueue = [];
+            queue.forEach((item) => {
+              if (Array.isArray(item.data) && item.data.length === 0 && this.memoryCache.has(item.key)) {
+                const existing = this.memoryCache.get(item.key);
+                if (Array.isArray(existing) && existing.length > 0) return;
+              }
+              this.mirrorToIndexedDB(item.key, item.data);
+            });
+          }
           if (this._resolveReady) this._resolveReady(true);
         });
       };
@@ -798,7 +809,10 @@ class SafeStorageAdapter {
           return parsed;
         }
         if (parsed && parsed._storedInIndexedDB) {
+          // Stub: no cachear [] — esperar hidratación / rehydrate async
           this._rehydrateKeyFromIdb(key);
+          if (this.memoryCache.has(key)) return this.memoryCache.get(key);
+          return fallback;
         }
       }
     } catch (e) {
@@ -817,6 +831,8 @@ class SafeStorageAdapter {
       }
     } catch (e) {}
 
+    // Antes de ready: no envenenar memoryCache con fallback vacío
+    if (!this._isReady) return fallback;
     this.memoryCache.set(key, fallback);
     return fallback;
   }
@@ -843,10 +859,11 @@ class SafeStorageAdapter {
 
 class DataManager {
   ready() {
-    return this.storage ? this.storage.readyPromise : Promise.resolve(true);
+    return this._bootPromise || (this.storage ? this.storage.readyPromise : Promise.resolve(true));
   }
 
   async checkStorageHealth() {
+    await this.ready();
     const health = this.storage ? await this.storage.checkHealth() : { error: "No storage adapter" };
     const collections = ["caja_chica", "casos", "citas", "inventario", "documentos", "presupuestos", "attendance", "workers"];
     const stats = {};
@@ -866,7 +883,14 @@ class DataManager {
   constructor() {
     this.STORAGE_KEY_PREFIX = "PAOLO ALDEA_PAOLO_ALDEA_";
     this.storage = new SafeStorageAdapter(this.STORAGE_KEY_PREFIX);
-    this.init();
+    this._booted = false;
+    // Esperar IndexedDB antes de clean-slate / seeds (evita borrar workers reales)
+    this._bootPromise = this.storage.readyPromise
+      .catch(() => false)
+      .then(() => {
+        this.init();
+        this._booted = true;
+      });
   }
 
   init() {
@@ -882,39 +906,41 @@ class DataManager {
       // Blindaje de contingencia: solo purgar datos si no existen causas u operaciones activas
       const existingCasos = this.getRaw("casos");
       const existingCaja = this.getRaw("caja_chica");
-      if ((!existingCasos || existingCasos.length === 0) && (!existingCaja || existingCaja.length === 0)) {
+      const existingWorkers = this.getRaw("workers");
+      const hasWorkers = Array.isArray(existingWorkers) && existingWorkers.length > 0;
+      if (!hasWorkers && (!existingCasos || existingCasos.length === 0) && (!existingCaja || existingCaja.length === 0)) {
         this.clearAllOperationalData(true);
       }
       localStorage.setItem(this.STORAGE_KEY_PREFIX + CLEAN_KEY, "true");
     }
 
-    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "settings")) {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "settings", JSON.stringify(DEFAULT_SETTINGS));
+    const ensureCol = (col, seed) => {
+      if (this.storage.memoryCache.has(col)) return;
+      const full = this.STORAGE_KEY_PREFIX + col;
+      try {
+        const raw = localStorage.getItem(full);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed && parsed._storedInIndexedDB) return; // datos viven en IDB
+        } else {
+          this.save(col, seed);
+        }
+      } catch (_) {
+        this.save(col, seed);
+      }
+    };
+
+    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "settings") && !this.storage.memoryCache.has("settings")) {
+      this.saveSettings({ ...DEFAULT_SETTINGS });
     }
-    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "caja_chica")) {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "caja_chica", JSON.stringify([]));
-    }
-    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "casos")) {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "casos", JSON.stringify([]));
-    }
-    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "citas")) {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "citas", JSON.stringify([]));
-    }
-    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "inventario")) {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "inventario", JSON.stringify([]));
-    }
-    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "documentos")) {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "documentos", JSON.stringify([]));
-    }
-    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "presupuestos")) {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "presupuestos", JSON.stringify([]));
-    }
-    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "workers")) {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "workers", JSON.stringify([]));
-    }
-    if (!localStorage.getItem(this.STORAGE_KEY_PREFIX + "attendance")) {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "attendance", JSON.stringify(DEMO_ATTENDANCE));
-    }
+    ensureCol("caja_chica", []);
+    ensureCol("casos", []);
+    ensureCol("citas", []);
+    ensureCol("inventario", []);
+    ensureCol("documentos", []);
+    ensureCol("presupuestos", []);
+    ensureCol("workers", []);
+    ensureCol("attendance", DEMO_ATTENDANCE);
 
     // Auto-migración y saneamiento multi-sede
     this.migrateMultiSede();
@@ -1868,8 +1894,12 @@ class DataManager {
 
   getSettings() {
     try {
-      const s = localStorage.getItem(this.STORAGE_KEY_PREFIX + "settings");
-      const parsed = s ? { ...DEFAULT_SETTINGS, ...JSON.parse(s) } : { ...DEFAULT_SETTINGS };
+      let raw = this.storage ? this.storage.load("settings", null) : null;
+      if (!raw || raw._storedInIndexedDB) {
+        const s = localStorage.getItem(this.STORAGE_KEY_PREFIX + "settings");
+        raw = s ? JSON.parse(s) : null;
+      }
+      const parsed = raw ? { ...DEFAULT_SETTINGS, ...raw } : { ...DEFAULT_SETTINGS };
       // Nunca reinyectar hashes por defecto: si faltan, quedan vacíos hasta el bootstrap
       if (!parsed.adminPasswordHash) parsed.adminPasswordHash = "";
       if (!parsed.masterPasswordHash) parsed.masterPasswordHash = "";
@@ -1893,7 +1923,8 @@ class DataManager {
 
   saveSettings(settings) {
     try {
-      localStorage.setItem(this.STORAGE_KEY_PREFIX + "settings", JSON.stringify(settings));
+      if (this.storage) this.storage.save("settings", settings);
+      else localStorage.setItem(this.STORAGE_KEY_PREFIX + "settings", JSON.stringify(settings));
       return true;
     } catch (e) {
       return false;

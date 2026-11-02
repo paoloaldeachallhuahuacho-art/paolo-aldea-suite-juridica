@@ -8,6 +8,7 @@ class ComponentLoader {
   constructor() {
     this.viewsCache = new Map();
     this.loadedViews = new Set();
+    this._inflightViews = new Map();
     this._modalsLoaded = false;
     this._modalsPromise = null;
   }
@@ -30,28 +31,52 @@ class ComponentLoader {
       return existing;
     }
 
-    try {
-      let html = this.viewsCache.get(viewId);
-      if (!html) {
-        const resp = await fetch(`views/view-${viewId}.html`);
-        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-        html = await resp.text();
-        this.viewsCache.set(viewId, html);
-      }
-
-      const container = document.querySelector(containerSelector) || document.body;
-      const tempWrapper = document.createElement("div");
-      tempWrapper.innerHTML = html.trim();
-      const newElement = tempWrapper.firstElementChild;
-      if (newElement) {
-        container.appendChild(newElement);
-        this.loadedViews.add(viewId);
-        return newElement;
-      }
-    } catch (err) {
-      console.warn(`[ComponentLoader] No se pudo cargar vista externa para '${viewId}':`, err);
+    if (this._inflightViews.has(viewId)) {
+      return this._inflightViews.get(viewId);
     }
-    return null;
+
+    const job = (async () => {
+      try {
+        // Re-check after await race
+        const again = document.getElementById(fullId);
+        if (again) {
+          this.loadedViews.add(viewId);
+          return again;
+        }
+
+        let html = this.viewsCache.get(viewId);
+        if (!html) {
+          const resp = await fetch(`views/view-${viewId}.html`);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          html = await resp.text();
+          this.viewsCache.set(viewId, html);
+        }
+
+        const still = document.getElementById(fullId);
+        if (still) {
+          this.loadedViews.add(viewId);
+          return still;
+        }
+
+        const container = document.querySelector(containerSelector) || document.body;
+        const tempWrapper = document.createElement("div");
+        tempWrapper.innerHTML = html.trim();
+        const newElement = tempWrapper.firstElementChild;
+        if (newElement) {
+          container.appendChild(newElement);
+          this.loadedViews.add(viewId);
+          return newElement;
+        }
+      } catch (err) {
+        console.warn(`[ComponentLoader] No se pudo cargar vista externa para '${viewId}':`, err);
+      } finally {
+        this._inflightViews.delete(viewId);
+      }
+      return null;
+    })();
+
+    this._inflightViews.set(viewId, job);
+    return job;
   }
 
   /**

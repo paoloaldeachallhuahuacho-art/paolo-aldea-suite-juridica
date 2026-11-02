@@ -5,7 +5,7 @@
 // Compatible con Android (Chrome) e iOS (Safari PWA 16.4+)
 // =========================================================================
 
-const CACHE_NAME = 'paolo-aldea-pwa-v2026.11-prod-audit-v3';
+const CACHE_NAME = 'paolo-aldea-pwa-v2026.11-week4-hardening';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
@@ -22,6 +22,8 @@ const ASSETS_TO_CACHE = [
   './lib/fa/webfonts/fa-regular-400.woff2',
   './lib/fa/webfonts/fa-brands-400.woff2',
   './js/data.js',
+  './js/lib-loader.js',
+  './js/controller-loader.js',
   './js/attendance.js',
   './js/draft-autosave.js',
   './js/controllers/cases.controller.js',

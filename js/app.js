@@ -36,6 +36,20 @@ const escapeHtml = (str) => {
 };
 window.escapeHtml = escapeHtml;
 
+/** Serializa un valor para usarlo como literal JS en onclick (evita breakout de comillas). */
+const jsStr = (val) => JSON.stringify(String(val ?? ""));
+window.jsStr = jsStr;
+
+/** Solo data:image o https/http seguros para fotos de perfil. */
+const safeImageSrc = (src) => {
+  if (!src || typeof src !== "string") return "";
+  const s = src.trim();
+  if (/^data:image\/(png|jpe?g|gif|webp);base64,[a-z0-9+/=\s]+$/i.test(s)) return s;
+  if (/^https?:\/\//i.test(s) && !/[\s\"\'<>]/.test(s)) return s;
+  return "";
+};
+window.safeImageSrc = safeImageSrc;
+
 class LegalApp {
 
   constructor() {
@@ -397,35 +411,38 @@ class LegalApp {
     } catch (_) {}
   }
 
-  init() {
+  async init() {
     this.initTheme();
     this.initLocalServerConnection();
     this.initPwa();
     this.initRealtimeMeetSync();
+
+    // Esperar IndexedDB + clean-slate antes de auth/UI (evita bootstrap falso / wipe)
+    if (window.db && typeof window.db.ready === "function") {
+      try { await window.db.ready(); } catch (_) {}
+    }
+
     // Gestión de Sesiones Senior:
     // 1. Bloquea únicamente si el usuario recarga la página (F5 / Recargar) o si expiró por inactividad (2-3 min).
     // 2. Permite navegación fluida entre múltiples pestañas/ventanas sin bloquear al cambiar de pestaña.
     this.initSessionLifecycle();
     this.checkAuthentication();
     this.setupScreenLockSecurity();
-    window.alerts.evaluateAlerts();
+    if (window.alerts) window.alerts.evaluateAlerts();
     this.applySettingsToUI();
-    if (typeof this.renderDynamicSidebarModules === 'function') this.renderDynamicSidebarModules();
-    this.switchTab("asistencia");
+    if (typeof this.renderDynamicSidebarModules === "function") this.renderDynamicSidebarModules();
+    await this.switchTab("asistencia");
     this.setupEventListeners();
     this.setupAutoSaveSettings();
     if (window.AttendanceModule) {
       window.AttendanceModule.init();
     }
 
-        setInterval(() => {
-      window.alerts.evaluateAlerts();
+    setInterval(() => {
+      if (window.alerts) window.alerts.evaluateAlerts();
     }, 300000);
 
     setTimeout(async () => {
-      if (window.db && typeof window.db.ready === "function") {
-        try { await window.db.ready(); } catch (_) {}
-      }
       if (typeof this.actualizarIndicadorNube === "function") {
         this.cargarAjustesFirebaseUI();
         this.actualizarIndicadorNube("online", "Nube Multi-Sede");
@@ -675,7 +692,11 @@ class LegalApp {
     }
 
     if (window.componentLoader && typeof window.componentLoader.ensureViewLoaded === "function") {
-      await window.componentLoader.ensureViewLoaded(tabId, "main");
+      const mounted = await window.componentLoader.ensureViewLoaded(tabId, "main");
+      if (!mounted && !document.getElementById("view-" + tabId)) {
+        this.showToast(`No se pudo cargar el módulo «${tabId}». Verifique conexión o recargue.`, "error");
+        return;
+      }
     }
     if (window.PaoloControllerLoader && typeof window.PaoloControllerLoader.ensure === "function") {
       await window.PaoloControllerLoader.ensure(tabId);
@@ -908,27 +929,27 @@ class LegalApp {
       const estado = item.estadoFlujo || "pendiente_asistente";
       let estadoBadge = "";
       if (estado === "pendiente_asistente") {
-        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal('${item.id}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Clic para revisar / consultar estado">
+        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal(${jsStr(item.id)})" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-300 hover:bg-amber-100 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Clic para revisar / consultar estado">
           <i class="fa-solid fa-hourglass-half text-amber-600 animate-pulse"></i>
           <span>1. Pend. Asistente</span>
         </button>`;
       } else if (estado === "elevado_admin") {
-        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal('${item.id}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-300 hover:bg-blue-100 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Clic para revisar / consultar estado">
+        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal(${jsStr(item.id)})" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-blue-50 text-blue-800 border border-blue-300 hover:bg-blue-100 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Clic para revisar / consultar estado">
           <i class="fa-solid fa-arrow-up-right-from-square text-blue-600"></i>
           <span>2. Elevado a Socio</span>
         </button>`;
       } else if (estado === "observado") {
-        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal('${item.id}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-100 text-orange-800 border border-orange-300 hover:bg-orange-200 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Clic para ver observaciones">
+        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal(${jsStr(item.id)})" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-orange-100 text-orange-800 border border-orange-300 hover:bg-orange-200 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Clic para ver observaciones">
           <i class="fa-solid fa-triangle-exclamation text-orange-600 animate-bounce"></i>
           <span>Observado</span>
         </button>`;
       } else if (estado === "aprobado") {
-        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal('${item.id}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Aprobado y desembolsado">
+        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal(${jsStr(item.id)})" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 hover:bg-emerald-100 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Aprobado y desembolsado">
           <i class="fa-solid fa-circle-check text-emerald-600"></i>
           <span>Aprobado</span>
         </button>`;
       } else if (estado === "rechazado") {
-        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal('${item.id}')" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300 hover:bg-rose-100 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Rechazado">
+        estadoBadge = `<button type="button" onclick="window.app.openFlujoCajaModal(${jsStr(item.id)})" class="px-2.5 py-1 rounded-full text-[11px] font-bold bg-rose-50 text-rose-800 border border-rose-300 hover:bg-rose-100 flex items-center gap-1.5 transition mx-auto shadow-xs" title="Rechazado">
           <i class="fa-solid fa-ban text-rose-600"></i>
           <span>Rechazado</span>
         </button>`;
@@ -958,9 +979,9 @@ class LegalApp {
             ${estadoBadge}
           </td>
           <td class="text-center whitespace-nowrap">
-            <button onclick="window.app.openFlujoCajaModal('${item.id}')" class="text-emerald-600 hover:text-emerald-800 p-1.5 transition" title="Ver Trazabilidad & Estado de Flujo"><i class="fa-solid fa-route"></i></button>
-            <button onclick="window.app.editCajaItem('${item.id}')" class="text-slate-500 hover:text-blue-600 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
-            <button onclick="window.app.deleteCajaItem('${item.id}')" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
+            <button onclick="window.app.openFlujoCajaModal(${jsStr(item.id)})" class="text-emerald-600 hover:text-emerald-800 p-1.5 transition" title="Ver Trazabilidad & Estado de Flujo"><i class="fa-solid fa-route"></i></button>
+            <button onclick="window.app.editCajaItem(${jsStr(item.id)})" class="text-slate-500 hover:text-blue-600 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="window.app.deleteCajaItem(${jsStr(item.id)})" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
           </td>
         </tr>
       `;
@@ -1727,13 +1748,13 @@ class LegalApp {
               <!-- Documento 1: Expediente Digital Completo -->
               <div class="inline-flex items-center gap-1">
                 ${docExp ? `
-                  <button onclick="window.app.viewCasoPdf('${c.id}', 'expediente')" class="bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-bold px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1 shadow-sm transition" title="Ver Expediente: ${escapeHtml(docExp.fileName || 'Expediente Digital')}">
+                  <button onclick="window.app.viewCasoPdf(${jsStr(c.id)}, 'expediente')" class="bg-blue-50 hover:bg-blue-100 text-blue-800 border border-blue-200 font-bold px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1 shadow-sm transition" title="Ver Expediente: ${escapeHtml(docExp.fileName || 'Expediente Digital')}">
                     <i class="fa-solid fa-folder-closed text-blue-600"></i>
                     <span class="truncate max-w-[70px]">${escapeHtml(docExp.fileName || 'Exp. PDF')}</span>
                   </button>
-                  <button onclick="window.app.downloadCasoPdf('${c.id}', 'expediente')" class="text-slate-400 hover:text-blue-700 p-0.5 text-xs" title="Descargar Expediente PDF"><i class="fa-solid fa-download"></i></button>
+                  <button onclick="window.app.downloadCasoPdf(${jsStr(c.id)}, 'expediente')" class="text-slate-400 hover:text-blue-700 p-0.5 text-xs" title="Descargar Expediente PDF"><i class="fa-solid fa-download"></i></button>
                 ` : `
-                  <button onclick="window.app.openCargarResolucionRapidaModal('${c.id}', 'expediente')" class="text-blue-700 hover:text-blue-900 bg-blue-50/70 hover:bg-blue-100 border border-dashed border-blue-300 font-semibold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1 transition" title="Cargar archivo PDF del expediente digital completo">
+                  <button onclick="window.app.openCargarResolucionRapidaModal(${jsStr(c.id)}, 'expediente')" class="text-blue-700 hover:text-blue-900 bg-blue-50/70 hover:bg-blue-100 border border-dashed border-blue-300 font-semibold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1 transition" title="Cargar archivo PDF del expediente digital completo">
                     <i class="fa-solid fa-cloud-arrow-up text-blue-600 text-[10px]"></i> + Exp. PDF
                   </button>
                 `}
@@ -1741,13 +1762,13 @@ class LegalApp {
               <!-- Documento 2: Resolución Judicial -->
               <div class="inline-flex items-center gap-1">
                 ${docRes ? `
-                  <button onclick="window.app.viewCasoPdf('${c.id}', 'resolucion')" class="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-bold px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1 shadow-sm transition" title="Ver Resolución: ${escapeHtml(docRes.fileName || 'Resolución Judicial')}">
+                  <button onclick="window.app.viewCasoPdf(${jsStr(c.id)}, 'resolucion')" class="bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 font-bold px-2 py-0.5 rounded text-[11px] inline-flex items-center gap-1 shadow-sm transition" title="Ver Resolución: ${escapeHtml(docRes.fileName || 'Resolución Judicial')}">
                     <i class="fa-solid fa-file-lines text-rose-600"></i>
                     <span class="truncate max-w-[70px]">${escapeHtml(docRes.fileName || 'Res. PDF')}</span>
                   </button>
-                  <button onclick="window.app.downloadCasoPdf('${c.id}', 'resolucion')" class="text-slate-400 hover:text-rose-700 p-0.5 text-xs" title="Descargar Resolución PDF"><i class="fa-solid fa-download"></i></button>
+                  <button onclick="window.app.downloadCasoPdf(${jsStr(c.id)}, 'resolucion')" class="text-slate-400 hover:text-rose-700 p-0.5 text-xs" title="Descargar Resolución PDF"><i class="fa-solid fa-download"></i></button>
                 ` : `
-                  <button onclick="window.app.openCargarResolucionRapidaModal('${c.id}', 'resolucion')" class="text-rose-700 hover:text-rose-900 bg-rose-50/70 hover:bg-rose-100 border border-dashed border-rose-300 font-semibold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1 transition" title="Cargar archivo PDF de la resolución judicial">
+                  <button onclick="window.app.openCargarResolucionRapidaModal(${jsStr(c.id)}, 'resolucion')" class="text-rose-700 hover:text-rose-900 bg-rose-50/70 hover:bg-rose-100 border border-dashed border-rose-300 font-semibold px-2 py-0.5 rounded text-[10px] inline-flex items-center gap-1 transition" title="Cargar archivo PDF de la resolución judicial">
                     <i class="fa-solid fa-cloud-arrow-up text-rose-600 text-[10px]"></i> + Res. PDF
                   </button>
                 `}
@@ -1758,10 +1779,10 @@ class LegalApp {
             ${c.tiempoCicloDias || 45} d
           </td>
           <td class="text-center whitespace-nowrap">
-            <button onclick="window.app.openGeneradorEscritoModal('${c.id}')" class="text-amber-600 hover:text-amber-800 p-1.5 transition" title="Redactar Escrito Judicial Automático"><i class="fa-solid fa-file-signature"></i></button>
-            <button onclick="window.app.openTimelineCasoModal('${c.id}')" class="text-cyan-600 hover:text-cyan-800 p-1.5 transition" title="Ver Línea de Tiempo Procesal"><i class="fa-solid fa-timeline"></i></button>
-            <button onclick="window.app.editCaso('${c.id}')" class="text-slate-500 hover:text-blue-600 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
-            <button onclick="window.app.deleteCaso('${c.id}')" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
+            <button onclick="window.app.openGeneradorEscritoModal(${jsStr(c.id)})" class="text-amber-600 hover:text-amber-800 p-1.5 transition" title="Redactar Escrito Judicial Automático"><i class="fa-solid fa-file-signature"></i></button>
+            <button onclick="window.app.openTimelineCasoModal(${jsStr(c.id)})" class="text-cyan-600 hover:text-cyan-800 p-1.5 transition" title="Ver Línea de Tiempo Procesal"><i class="fa-solid fa-timeline"></i></button>
+            <button onclick="window.app.editCaso(${jsStr(c.id)})" class="text-slate-500 hover:text-blue-600 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="window.app.deleteCaso(${jsStr(c.id)})" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
           </td>
         </tr>
       `;
@@ -1845,7 +1866,7 @@ class LegalApp {
                     <span class="text-blue-800 font-bold truncate flex items-center gap-1" title="${escapeHtml(docExp.fileName || 'Expediente')}">
                       <i class="fa-solid fa-folder-closed text-blue-600"></i> ${escapeHtml(docExp.fileName || 'Expediente')}
                     </span>
-                    <button type="button" onclick="window.app.viewCasoPdf('${c.id}', 'expediente')" class="text-blue-700 hover:text-blue-950 font-bold underline ml-1 shrink-0">Ver</button>
+                    <button type="button" onclick="window.app.viewCasoPdf(${jsStr(c.id)}, 'expediente')" class="text-blue-700 hover:text-blue-950 font-bold underline ml-1 shrink-0">Ver</button>
                   </div>
                 ` : ''}
                 ${docRes ? `
@@ -1853,7 +1874,7 @@ class LegalApp {
                     <span class="text-rose-800 font-bold truncate flex items-center gap-1" title="${escapeHtml(docRes.fileName || 'Resolución')}">
                       <i class="fa-solid fa-file-lines text-rose-600"></i> ${escapeHtml(docRes.fileName || 'Resolución')}
                     </span>
-                    <button type="button" onclick="window.app.viewCasoPdf('${c.id}', 'resolucion')" class="text-rose-700 hover:text-rose-950 font-bold underline ml-1 shrink-0">Ver</button>
+                    <button type="button" onclick="window.app.viewCasoPdf(${jsStr(c.id)}, 'resolucion')" class="text-rose-700 hover:text-rose-950 font-bold underline ml-1 shrink-0">Ver</button>
                   </div>
                 ` : ''}
               </div>
@@ -1861,7 +1882,7 @@ class LegalApp {
 
             <div class="flex items-center justify-between pt-2 border-t border-slate-100 text-[10px]">
               <span class="font-bold text-blue-900">${curr} ${Number(c.honorarios || 0).toLocaleString()}</span>
-              <button onclick="window.app.advanceCasoStage('${c.id}')" class="text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded transition" title="Avanzar Etapa">
+              <button onclick="window.app.advanceCasoStage(${jsStr(c.id)})" class="text-amber-800 hover:text-amber-950 font-bold flex items-center gap-1 bg-amber-50 hover:bg-amber-100 px-2 py-0.5 rounded transition" title="Avanzar Etapa">
                 Avanzar <i class="fa-solid fa-chevron-right text-[8px]"></i>
               </button>
             </div>
@@ -2794,30 +2815,30 @@ class LegalApp {
             ${cleanPhone ? `
               <div class="flex items-center gap-1 flex-wrap">
                 ${isPendiente ? `
-                  <button onclick="window.app.openWhatsAppModal('${c.id}', 'pendiente')" class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1 rounded shadow-sm transition animate-pulse" title="Enviar solicitud de confirmación con frase de caso y lista de documentos">
+                  <button onclick="window.app.openWhatsAppModal(${jsStr(c.id)}, 'pendiente')" class="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 px-2.5 py-1 rounded shadow-sm transition animate-pulse" title="Enviar solicitud de confirmación con frase de caso y lista de documentos">
                     <i class="fa-brands fa-whatsapp text-emerald-600 text-sm"></i> Confirmar Cita
                   </button>
                 ` : (isToday ? `
-                  <button onclick="window.app.openWhatsAppModal('${c.id}', 'recordatorio_hoy')" class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-900 bg-rose-100 hover:bg-rose-200 border border-rose-300 px-2.5 py-1 rounded shadow-sm transition" title="Enviar recordatorio urgente de cita para hoy">
+                  <button onclick="window.app.openWhatsAppModal(${jsStr(c.id)}, 'recordatorio_hoy')" class="inline-flex items-center gap-1 text-[11px] font-bold text-rose-900 bg-rose-100 hover:bg-rose-200 border border-rose-300 px-2.5 py-1 rounded shadow-sm transition" title="Enviar recordatorio urgente de cita para hoy">
                     <i class="fa-regular fa-clock text-rose-600 text-xs"></i> Recordar Cita Hoy
                   </button>
                 ` : (isSoon ? `
-                  <button onclick="window.app.openWhatsAppModal('${c.id}', 'recordatorio_24h')" class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-900 bg-blue-100 hover:bg-blue-200 border border-blue-300 px-2.5 py-1 rounded shadow-sm transition" title="Enviar recordatorio de cita próxima">
+                  <button onclick="window.app.openWhatsAppModal(${jsStr(c.id)}, 'recordatorio_24h')" class="inline-flex items-center gap-1 text-[11px] font-bold text-blue-900 bg-blue-100 hover:bg-blue-200 border border-blue-300 px-2.5 py-1 rounded shadow-sm transition" title="Enviar recordatorio de cita próxima">
                     <i class="fa-regular fa-bell text-blue-600 text-xs"></i> Recordar Cita (24h)
                   </button>
                 ` : `
-                  <button onclick="window.app.openWhatsAppModal('${c.id}', 'confirmada')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded transition" title="Enviar ficha de confirmación oficial">
+                  <button onclick="window.app.openWhatsAppModal(${jsStr(c.id)}, 'confirmada')" class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded transition" title="Enviar ficha de confirmación oficial">
                     <i class="fa-brands fa-whatsapp text-emerald-600"></i> WhatsApp
                   </button>
                 `))}
 
-                <button onclick="window.app.openWhatsAppModal('${c.id}', 'auto')" class="text-slate-400 hover:text-emerald-700 p-1 text-xs" title="Opciones avanzadas de WhatsApp"><i class="fa-solid fa-sliders"></i></button>
+                <button onclick="window.app.openWhatsAppModal(${jsStr(c.id)}, 'auto')" class="text-slate-400 hover:text-emerald-700 p-1 text-xs" title="Opciones avanzadas de WhatsApp"><i class="fa-solid fa-sliders"></i></button>
               </div>
             ` : '<span class="text-[11px] text-slate-400 italic">Sin celular</span>'}
 
             <div class="flex items-center gap-1 ml-auto">
-              <button onclick="window.app.editCita('${c.id}')" class="text-slate-400 hover:text-blue-600 p-1.5 transition" title="Editar Cita"><i class="fa-solid fa-pen-to-square"></i></button>
-              <button onclick="window.app.deleteCita('${c.id}')" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
+              <button onclick="window.app.editCita(${jsStr(c.id)})" class="text-slate-400 hover:text-blue-600 p-1.5 transition" title="Editar Cita"><i class="fa-solid fa-pen-to-square"></i></button>
+              <button onclick="window.app.deleteCita(${jsStr(c.id)})" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
             </div>
           </div>
         </div>
@@ -4693,8 +4714,8 @@ ${callToAction}
             </div>
             <div class="flex items-center gap-2 flex-shrink-0">
               <span class="font-mono font-bold text-xs text-emerald-800">${curr} ${item.amount.toFixed(2)}</span>
-              <button type="button" onclick="window.app.switchSubcatById('${item.id}')" class="text-blue-600 hover:text-blue-800 p-1 text-xs" title="Editar este rubro"><i class="fa-solid fa-pen"></i></button>
-              <button type="button" onclick="window.app.clearSubcat('${item.id}')" class="text-slate-400 hover:text-red-600 p-1 text-xs" title="Limpiar y quitar este rubro"><i class="fa-solid fa-trash-can"></i></button>
+              <button type="button" onclick="window.app.switchSubcatById(${jsStr(item.id)})" class="text-blue-600 hover:text-blue-800 p-1 text-xs" title="Editar este rubro"><i class="fa-solid fa-pen"></i></button>
+              <button type="button" onclick="window.app.clearSubcat(${jsStr(item.id)})" class="text-slate-400 hover:text-red-600 p-1 text-xs" title="Limpiar y quitar este rubro"><i class="fa-solid fa-trash-can"></i></button>
             </div>
           </div>
         `).join("");
@@ -5258,8 +5279,8 @@ ${callToAction}
             ${curr} ${(Number(item.stock || 0) * Number(item.costoUnitario || 0)).toFixed(2)}
           </td>
           <td class="text-center whitespace-nowrap">
-            <button onclick="window.app.editInventario('${item.id}')" class="text-slate-500 hover:text-blue-600 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
-            <button onclick="window.app.deleteInventario('${item.id}')" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
+            <button onclick="window.app.editInventario(${jsStr(item.id)})" class="text-slate-500 hover:text-blue-600 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+            <button onclick="window.app.deleteInventario(${jsStr(item.id)})" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
           </td>
         </tr>
       `;
@@ -5413,13 +5434,13 @@ ${callToAction}
           </div>
 
           <div class="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between">
-            <button onclick="window.app.previewDocument('${d.id}')" class="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded transition">
+            <button onclick="window.app.previewDocument(${jsStr(d.id)})" class="text-xs font-semibold text-blue-700 hover:text-blue-900 flex items-center gap-1.5 bg-blue-50 hover:bg-blue-100 px-2.5 py-1 rounded transition">
               <i class="fa-solid fa-eye text-blue-600"></i> Leer Escrito
             </button>
 
             <div class="flex items-center gap-1">
-              <button onclick="window.app.editDocument('${d.id}')" class="text-slate-400 hover:text-blue-600 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
-              <button onclick="window.app.deleteDocument('${d.id}')" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
+              <button onclick="window.app.editDocument(${jsStr(d.id)})" class="text-slate-400 hover:text-blue-600 p-1.5 transition" title="Editar"><i class="fa-solid fa-pen-to-square"></i></button>
+              <button onclick="window.app.deleteDocument(${jsStr(d.id)})" class="text-slate-400 hover:text-red-600 p-1.5 transition" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
             </div>
           </div>
         </div>
@@ -5980,9 +6001,15 @@ ${callToAction}
           } else if (msg.type === "SESSION_LOGIN") {
             const userObjStr = localStorage.getItem("PAOLO ALDEA_AUTH_USER_OBJ");
             const userStr = localStorage.getItem("PAOLO ALDEA_AUTH_USER");
+            const sig = localStorage.getItem("PAOLO ALDEA_AUTH_SIG");
             sessionStorage.setItem("PAOLO ALDEA_AUTH_LOGGED_IN", "true");
             if (userObjStr) sessionStorage.setItem("PAOLO ALDEA_AUTH_USER_OBJ", userObjStr);
             if (userStr) sessionStorage.setItem("PAOLO ALDEA_AUTH_USER", userStr);
+            if (sig) sessionStorage.setItem("PAOLO ALDEA_AUTH_SIG", sig);
+            if (!this.isSessionActive() || !window.db.getCurrentUser()) {
+              this.clearSessionStorageState();
+              return;
+            }
             this.hideLoginOverlay();
             this.applySettingsToUI();
             if (typeof this.renderDynamicSidebarModules === "function") this.renderDynamicSidebarModules();
@@ -6000,7 +6027,13 @@ ${callToAction}
         if (e.newValue === "true") {
           sessionStorage.setItem("PAOLO ALDEA_AUTH_LOGGED_IN", "true");
           const userObjStr = localStorage.getItem("PAOLO ALDEA_AUTH_USER_OBJ");
+          const sig = localStorage.getItem("PAOLO ALDEA_AUTH_SIG");
           if (userObjStr) sessionStorage.setItem("PAOLO ALDEA_AUTH_USER_OBJ", userObjStr);
+          if (sig) sessionStorage.setItem("PAOLO ALDEA_AUTH_SIG", sig);
+          if (!this.isSessionActive() || !window.db.getCurrentUser()) {
+            this.clearSessionStorageState();
+            return;
+          }
           this.hideLoginOverlay();
           this.applySettingsToUI();
         } else if (!e.newValue) {
@@ -6597,7 +6630,7 @@ ${callToAction}
           <!-- Colaborador / DNI -->
           <td class="py-3 px-3">
             <div class="flex items-center gap-2.5">
-${w.foto ? `<img src="${w.foto}" class="w-8 h-8 rounded-full object-cover border border-amber-400 shrink-0 shadow-sm" alt="Foto">` : `
+${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="w-8 h-8 rounded-full object-cover border border-amber-400 shrink-0 shadow-sm" alt="Foto">` : `
               <div class="w-8 h-8 rounded-full border flex items-center justify-center font-bold text-xs shrink-0 ${avatarBg}">
                 ${initials}
               </div>
@@ -8228,7 +8261,7 @@ _________________________________                _______________________________
           </td>
           ${roles.map(r => `
             <td class="p-2.5 text-center">
-              <input type="checkbox" onchange="window.app.onRbacCheckChange('${m.id}', '${r}', this.checked)" ${allowed.includes(r) ? 'checked' : ''} class="w-4 h-4 text-amber-500 rounded border-slate-300 focus:ring-amber-400 cursor-pointer">
+              <input type="checkbox" onchange="window.app.onRbacCheckChange(${jsStr(m.id)}, '${r}', this.checked)" ${allowed.includes(r) ? 'checked' : ''} class="w-4 h-4 text-amber-500 rounded border-slate-300 focus:ring-amber-400 cursor-pointer">
             </td>
           `).join("")}
           <td class="p-2.5 text-center text-xs">
@@ -8701,9 +8734,14 @@ _________________________________                _______________________________
       }
 
       // Si es el hub local de despacho o servidor intermedio
+      const localTok = window.__LOCAL_SERVER_API_KEY__ || sessionStorage.getItem("PA_LOCAL_API_TOKEN") || "";
+      if (localTok && !headers.Authorization) {
+        headers.Authorization = "Bearer " + localTok;
+      }
       const res = await fetch(endpoint, {
         method: "POST",
         headers: headers,
+        credentials: "same-origin",
         body: JSON.stringify(payload)
       });
 
@@ -8711,33 +8749,18 @@ _________________________________                _______________________________
         let cloudData = await res.json();
         // Semana 4: ACK liviano → hidratar con stream /api/cloud_snapshot (sin 2.ª serialización)
         if (cloudData && cloudData.ackOnly) {
-          try {
-            const snapUrl = endpoint.replace(/\/api\/cloud_sync.*/i, "/api/cloud_snapshot");
-            const snapRes = await fetch(snapUrl, { method: "GET", headers: headers, credentials: "same-origin" });
-            if (snapRes.ok) {
-              const snap = await snapRes.json();
-              cloudData = {
-                protocol: cloudData.protocol || "LEX_MULTI_SEDE_SYNC_V2",
-                status: "ok",
-                data: snap,
-                deletedIds: (snap && snap._deletedIds) || cloudData.deletedIds || {}
-              };
-            } else {
-              cloudData = {
-                protocol: cloudData.protocol,
-                status: "ok",
-                data: {},
-                deletedIds: cloudData.deletedIds || {}
-              };
-            }
-          } catch (_) {
-            cloudData = {
-              protocol: cloudData.protocol,
-              status: "ok",
-              data: {},
-              deletedIds: cloudData.deletedIds || {}
-            };
+          const snapUrl = endpoint.replace(/\/api\/cloud_sync.*/i, "/api/cloud_snapshot");
+          const snapRes = await fetch(snapUrl, { method: "GET", headers: headers, credentials: "same-origin" });
+          if (!snapRes.ok) {
+            throw new Error("Snapshot cloud no disponible (HTTP " + snapRes.status + "). Sync cancelado para no aplicar solo tombstones.");
           }
+          const snap = await snapRes.json();
+          cloudData = {
+            protocol: cloudData.protocol || "LEX_MULTI_SEDE_SYNC_V2",
+            status: "ok",
+            data: snap,
+            deletedIds: (snap && snap._deletedIds) || cloudData.deletedIds || {}
+          };
         }
         if (cloudData && (cloudData.data || cloudData.deletedIds)) {
           const stats = window.db.mergeSyncPackage(cloudData);
@@ -9091,7 +9114,7 @@ _________________________________                _______________________________
       // Boton Detalle
       const safeId = escapeHtml(item.id);
       const btnDetalle = `
-        <button type="button" onclick="window.app.abrirDetalleAuditoria('${safeId}')" class="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition cursor-pointer" title="Ver detalles técnicos y metadata">
+        <button type="button" onclick="window.app.abrirDetalleAuditoria(${jsStr(safeId)})" class="p-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 transition cursor-pointer" title="Ver detalles técnicos y metadata">
           <i class="fa-solid fa-eye text-xs"></i>
         </button>
       `;
@@ -9638,13 +9661,13 @@ _________________________________                _______________________________
   }
 }
 
-function bootLegalApp() {
-  if (!window.app && typeof LegalApp === 'function') {
+async function bootLegalApp() {
+  if (!window.app && typeof LegalApp === "function") {
     try {
       window.app = new LegalApp();
-      window.app.init();
+      await window.app.init();
     } catch (e) {
-      console.error('Error al inicializar LegalApp:', e);
+      console.error("Error al inicializar LegalApp:", e);
     }
   }
 }
