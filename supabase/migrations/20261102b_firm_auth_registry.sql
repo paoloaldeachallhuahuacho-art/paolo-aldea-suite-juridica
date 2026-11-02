@@ -38,6 +38,14 @@ ALTER TABLE public.staff_directory ENABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS firm_settings_deny_all ON public.firm_settings;
 DROP POLICY IF EXISTS staff_directory_deny_all ON public.staff_directory;
 
+-- Grants explícitos (evita 42501 permission denied con PostgREST + service_role)
+REVOKE ALL ON TABLE public.firm_settings FROM PUBLIC;
+REVOKE ALL ON TABLE public.staff_directory FROM PUBLIC;
+REVOKE ALL ON TABLE public.firm_settings FROM anon, authenticated;
+REVOKE ALL ON TABLE public.staff_directory FROM anon, authenticated;
+GRANT ALL ON TABLE public.firm_settings TO postgres, service_role;
+GRANT ALL ON TABLE public.staff_directory TO postgres, service_role;
+
 INSERT INTO public.firm_settings (key, value)
 VALUES ('auth_bootstrapped', '{"bootstrapped": false}'::jsonb)
 ON CONFLICT (key) DO NOTHING;
