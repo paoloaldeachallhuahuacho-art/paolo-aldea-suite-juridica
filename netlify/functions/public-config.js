@@ -35,6 +35,22 @@ exports.handler = async (event) => {
   const supabaseAnonKey = process.env.SUPABASE_ANON_KEY || "";
   const enterpriseEnabled = !!(supabaseUrl && supabaseAnonKey);
 
+  let authBootstrapped = null;
+  if (enterpriseEnabled && process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    try {
+      const { supabaseRest } = require("./_supabaseAdmin");
+      const rows = await supabaseRest("firm_settings?key=eq.auth_bootstrapped&select=value");
+      if (Array.isArray(rows) && rows[0] && rows[0].value) {
+        authBootstrapped = rows[0].value.bootstrapped === true;
+      } else {
+        const staff = await supabaseRest("staff_directory?select=id&limit=1");
+        authBootstrapped = Array.isArray(staff) && staff.length > 0;
+      }
+    } catch (_) {
+      authBootstrapped = null;
+    }
+  }
+
   return {
     statusCode: 200,
     headers,
@@ -42,7 +58,8 @@ exports.handler = async (event) => {
       enterprise: enterpriseEnabled,
       supabaseUrl: enterpriseEnabled ? supabaseUrl : null,
       supabaseAnonKey: enterpriseEnabled ? supabaseAnonKey : null,
-      firebaseConfigured: !!(process.env.FIREBASE_API_KEY || process.env.FIREBASE_PROJECT_ID)
+      firebaseConfigured: !!(process.env.FIREBASE_API_KEY || process.env.FIREBASE_PROJECT_ID),
+      authBootstrapped
     })
   };
 };

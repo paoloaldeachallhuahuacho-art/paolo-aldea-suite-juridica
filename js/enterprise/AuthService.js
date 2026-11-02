@@ -64,7 +64,102 @@
     return !!(c && c.role === "super_admin");
   }
 
+  /** Consulta si la firma ya tiene Super Admin en la nube (multi-dispositivo). */
+  async function fetchFirmBootstrapped() {
+    try {
+      const res = await fetch("/.netlify/functions/auth-firm-status", { credentials: "same-origin" });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return !!(data && data.bootstrapped);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  async function pushCloudBootstrap(workerPayload) {
+    const res = await fetch("/.netlify/functions/auth-bootstrap", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerPayload || {})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error((data && data.error) || ("HTTP " + res.status));
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    return data;
+  }
+
+  async function cloudLogin(usuario, password) {
+    const res = await fetch("/.netlify/functions/auth-login", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ usuario, password })
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error((data && data.error) || ("HTTP " + res.status));
+      err.status = res.status;
+      err.body = data;
+      throw err;
+    }
+    return data;
+  }
+
+  async function upsertStaffCloud(workerPayload) {
+    const res = await fetch("/.netlify/functions/auth-staff-upsert", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(workerPayload || {})
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error((data && data.error) || ("HTTP " + res.status));
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  function hydrateLocalWorkers(directory) {
+    if (!global.db || !Array.isArray(directory) || !directory.length) return;
+    const cleaned = directory.map((w) => global.db.sanitizeWorkerCredentials
+      ? global.db.sanitizeWorkerCredentials(w)
+      : w);
+    global.db._trusted = true;
+    try {
+      global.db.save("workers", cleaned);
+      const s = global.db.getSettings();
+      s.authBootstrapped = true;
+      const admin = cleaned.find((w) => w && (w.rol === "super_admin" || w.id === "WRK-000"));
+      if (admin) {
+        s.adminUser = admin.usuario || s.adminUser;
+        if (admin.passwordHash) s.adminPasswordHash = admin.passwordHash;
+      }
+      global.db.saveSettings(s);
+    } finally {
+      global.db._trusted = false;
+    }
+  }
+
   global.PaoloAuthService = {
-    init, signIn, signOut, getClient, getAccessToken, getClaims, isSuperAdmin, getSession: () => session
+    init,
+    signIn,
+    signOut,
+    getClient,
+    getAccessToken,
+    getClaims,
+    isSuperAdmin,
+    getSession: () => session,
+    fetchFirmBootstrapped,
+    pushCloudBootstrap,
+    cloudLogin,
+    upsertStaffCloud,
+    hydrateLocalWorkers
   };
 })(typeof window !== "undefined" ? window : globalThis);

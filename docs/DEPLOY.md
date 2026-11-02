@@ -30,8 +30,15 @@
 | **Auth** | Supabase Auth JWT con `app_metadata.role` + `app_metadata.branch_id` |
 | **Datos** | PostgreSQL + outbox IndexedDB + LWW `server_ts` |
 | **Edge** | `attendance-validate`, `petty-cash-transition`, `public-config`, `telegram-proxy` |
-| **Schema** | [`supabase/migrations/20261102_enterprise_zero_trust.sql`](../supabase/migrations/20261102_enterprise_zero_trust.sql) (único; el legacy `database_cloud_schema.sql` fue eliminado) |
+| **Schema** | [`supabase/migrations/20261102_enterprise_zero_trust.sql`](../supabase/migrations/20261102_enterprise_zero_trust.sql) + [`20261102b_firm_auth_registry.sql`](../supabase/migrations/20261102b_firm_auth_registry.sql) (auth multi-dispositivo) |
 | **Auditoría** | [`docs/AUDIT_CHECKLIST_MULTI_SEDE.md`](AUDIT_CHECKLIST_MULTI_SEDE.md) |
+
+### Auth multi-dispositivo (Super Admin compartido)
+1. En Supabase SQL Editor ejecute **también** `20261102b_firm_auth_registry.sql`.
+2. Netlify Functions: `auth-firm-status`, `auth-bootstrap`, `auth-login`, `auth-staff-upsert`.
+3. Al crear el Super Admin en un PC/celular, se publica en `staff_directory`.
+4. Otro dispositivo vacío ya **no** pide “crear admin”: muestra login y valida contra la nube.
+5. Variables: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALLOWED_ORIGIN=https://paoloaldea-abogados.netlify.app`.
 
 ### Roles JWT
 `super_admin` | `admin` (BranchAdmin) | `abogado` | `asistente_*` | `accountant`

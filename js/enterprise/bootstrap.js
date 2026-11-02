@@ -12,6 +12,9 @@
         return false;
       }
       global.__ENTERPRISE_CLOUD__ = true;
+      if (typeof cfg.authBootstrapped === "boolean") {
+        global.__CLOUD_AUTH_BOOTSTRAPPED__ = cfg.authBootstrapped;
+      }
       if (global.PaoloAuthService) await global.PaoloAuthService.init();
       if (global.PaoloSyncManager) await global.PaoloSyncManager.start();
       console.info("[PaoloEnterprise] Modo B zero-trust activo");

@@ -427,6 +427,9 @@ class LegalApp {
       try { await window.PaoloEnterprise.boot(); } catch (_) {}
     }
 
+    // Multi-dispositivo: sincronizar si ya existe Super Admin en la nube (Supabase)
+    try { await this.syncCloudAuthGate(); } catch (_) {}
+
     // Gestión de Sesiones Senior:
     // 1. Bloquea únicamente si el usuario recarga la página (F5 / Recargar) o si expiró por inactividad (2-3 min).
     // 2. Permite navegación fluida entre múltiples pestañas/ventanas sin bloquear al cambiar de pestaña.
@@ -6127,9 +6130,70 @@ ${callToAction}
     }
   }
 
+  /**
+   * Consulta/registra el estado de autenticación en la nube (Modo B).
+   * Evita que un celular vacío pida "crear Super Admin" si ya existe en Supabase.
+   */
+  async syncCloudAuthGate() {
+    if (!window.__ENTERPRISE_CLOUD__ || !window.PaoloAuthService) {
+      window.__CLOUD_AUTH_BOOTSTRAPPED__ = false;
+      return false;
+    }
+    let cloudBoot = null;
+    try {
+      cloudBoot = await window.PaoloAuthService.fetchFirmBootstrapped();
+    } catch (_) {
+      cloudBoot = null;
+    }
+    if (cloudBoot === true) {
+      window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+      return true;
+    }
+
+    // Si este navegador ya tiene admin local y la nube aún no, publicar registro (una vez)
+    const localReady = window.db && typeof window.db.needsAuthBootstrap === "function" && !window.db.needsAuthBootstrap();
+    if (localReady && cloudBoot === false) {
+      try {
+        const workers = window.db.getRaw("workers") || [];
+        const admin = workers.find((w) => w && w.activo !== false && (w.rol === "super_admin" || w.id === "WRK-000") && w.passwordHash);
+        if (admin) {
+          await window.PaoloAuthService.pushCloudBootstrap({
+            id: admin.id,
+            usuario: admin.usuario || admin.username,
+            email: admin.email || "",
+            dni: admin.dni || "",
+            nombre: admin.nombre,
+            cargo: admin.cargo,
+            rol: admin.rol || "super_admin",
+            sede: admin.sede || "todas",
+            passwordHash: admin.passwordHash,
+            pinHash: admin.pinHash || "",
+            permisos: admin.permisos || null
+          });
+          window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+          return true;
+        }
+      } catch (e) {
+        console.warn("[Auth] No se pudo publicar admin local a la nube:", e && e.message);
+      }
+    }
+
+    window.__CLOUD_AUTH_BOOTSTRAPPED__ = cloudBoot === true;
+    return !!window.__CLOUD_AUTH_BOOTSTRAPPED__;
+  }
+
+  /** true si hay que mostrar el formulario de registro inicial. */
+  needsAuthBootstrapUI() {
+    const localNeeds = window.db && typeof window.db.needsAuthBootstrap === "function" && window.db.needsAuthBootstrap();
+    if (!localNeeds) return false;
+    // Si la nube ya tiene admin, nunca pedir bootstrap en un dispositivo vacío
+    if (window.__CLOUD_AUTH_BOOTSTRAPPED__) return false;
+    return true;
+  }
+
   /** Alterna login vs registro inicial (borrón y cuenta nueva). */
   updateAuthGateUI() {
-    const needsBootstrap = window.db && typeof window.db.needsAuthBootstrap === "function" && window.db.needsAuthBootstrap();
+    const needsBootstrap = this.needsAuthBootstrapUI();
     const loginForm = document.getElementById("formLogin");
     const bootForm = document.getElementById("formBootstrapAdmin");
     const bootBanner = document.getElementById("authBootstrapBanner");
@@ -6219,7 +6283,7 @@ ${callToAction}
       }
     };
 
-    if (!window.db || typeof window.db.needsAuthBootstrap !== "function" || !window.db.needsAuthBootstrap()) {
+    if (!this.needsAuthBootstrapUI()) {
       showErr("El sistema ya tiene un administrador registrado. Use el formulario de acceso.");
       this.updateAuthGateUI();
       return;
@@ -6238,6 +6302,18 @@ ${callToAction}
     const pwErr = this._validatePasswordPolicy(pass);
     if (pwErr) return showErr(pwErr);
     if (pass !== conf) return showErr("Las contraseñas no coinciden.");
+
+    // En Modo B, revalidar nube antes de crear (evita dos Super Admin)
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService) {
+      try {
+        const remote = await window.PaoloAuthService.fetchFirmBootstrapped();
+        if (remote === true) {
+          window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+          this.updateAuthGateUI();
+          return showErr("Ya existe un Super Administrador en la nube. Inicie sesión con esas credenciales.");
+        }
+      } catch (_) {}
+    }
 
     const passHash = await window.hashSecret(pass);
     const worker = {
@@ -6280,6 +6356,33 @@ ${callToAction}
       window.db.saveSettings(s);
     } finally {
       window.db._trusted = false;
+    }
+
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService) {
+      try {
+        await window.PaoloAuthService.pushCloudBootstrap({
+          id: worker.id,
+          usuario: worker.usuario,
+          email: worker.email,
+          dni: worker.dni,
+          nombre: worker.nombre,
+          cargo: worker.cargo,
+          rol: worker.rol,
+          sede: worker.sede,
+          passwordHash: worker.passwordHash,
+          pinHash: worker.pinHash,
+          permisos: worker.permisos
+        });
+        window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+      } catch (cloudErr) {
+        if (cloudErr && cloudErr.status === 409) {
+          window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+          this.updateAuthGateUI();
+          return showErr("Ya existe un Super Administrador en la nube. Use el formulario de acceso con esas credenciales.");
+        }
+        console.warn("[Auth] Bootstrap local OK; nube pendiente:", cloudErr && cloudErr.message);
+        this.showToast("Admin local creado. La publicación en nube falló; reintente al tener conexión.", "warning");
+      }
     }
 
     try { window.db.logAudit("BOOTSTRAP_ADMIN", "seguridad", "WRK-000", "Registro inicial del Super Administrador '" + usuario + "'", null, null); } catch (_) {}
@@ -6338,7 +6441,7 @@ ${callToAction}
 
   async handleLogin(e) {
     if (e) e.preventDefault();
-    if (window.db && typeof window.db.needsAuthBootstrap === "function" && window.db.needsAuthBootstrap()) {
+    if (this.needsAuthBootstrapUI()) {
       return this.completeAuthBootstrap(e);
     }
 
@@ -6372,9 +6475,9 @@ ${callToAction}
       return;
     }
 
-    const workers = window.db ? window.db.getRaw("workers") : [];
+    let workers = window.db ? window.db.getRaw("workers") : [];
     const uLower = user.toLowerCase().trim();
-    const matchedWorker = workers.find(w =>
+    let matchedWorker = workers.find(w =>
       (w.dni && String(w.dni).toLowerCase() === uLower) ||
       (w.usuario && String(w.usuario).toLowerCase() === uLower) ||
       (w.email && String(w.email).toLowerCase() === uLower)
@@ -6401,6 +6504,22 @@ ${callToAction}
     }
 
     let isValid = !!(matchedWorker && isWorkerValid);
+
+    // Dispositivo vacío / sin nómina local: autenticar contra Supabase (staff_directory)
+    if (!isValid && window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && navigator.onLine) {
+      try {
+        const cloud = await window.PaoloAuthService.cloudLogin(user, pass);
+        if (cloud && cloud.ok && cloud.worker) {
+          window.PaoloAuthService.hydrateLocalWorkers(cloud.directory || [cloud.worker]);
+          workers = window.db.getRaw("workers") || [];
+          matchedWorker = workers.find(w => String(w.id) === String(cloud.worker.id)) || cloud.worker;
+          isValid = true;
+          window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+        }
+      } catch (cloudErr) {
+        console.warn("[Login] Nube:", cloudErr && cloudErr.message);
+      }
+    }
 
     if (!isValid && matchedWorker && matchedWorker.activo !== false && user.includes("@") && window.firebaseService && window.firebaseService.hasCredentials() && navigator.onLine) {
       try {
@@ -7280,6 +7399,29 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
     }
 
     this.editingPersonalId = null;
+
+    // Publicar colaborador en directorio nube (multi-dispositivo)
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && window.__CLOUD_AUTH_BOOTSTRAPPED__) {
+      try {
+        await window.PaoloAuthService.upsertStaffCloud({
+          id: workerData.id,
+          usuario: workerData.usuario,
+          email: workerData.email,
+          dni: workerData.dni,
+          nombre: workerData.nombre,
+          cargo: workerData.cargo,
+          rol: workerData.rol,
+          sede: workerData.sede,
+          passwordHash: workerData.passwordHash,
+          pinHash: workerData.pinHash,
+          activo: workerData.activo,
+          permisos: workerData.permisos
+        });
+      } catch (cloudStaffErr) {
+        console.warn("[Personal] Sync nube:", cloudStaffErr && cloudStaffErr.message);
+        this.showToast("Guardado local OK. Sync nube pendiente: " + (cloudStaffErr.message || "error"), "warning");
+      }
+    }
 
     // Garantizar que los filtros de la vista Gestión de Personal no oculten al colaborador recién editado o creado
     const sInput = document.getElementById("searchPersonal");

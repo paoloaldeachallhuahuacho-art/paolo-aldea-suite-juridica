@@ -3,6 +3,8 @@
  * Mutaciones: siempre con JWT de usuario (anon key + Bearer user).
  * Service role: solo utilidades internas explícitas — NUNCA como fallback abierto.
  */
+const crypto = require("crypto");
+
 function requireEnv(name) {
   const v = process.env[name];
   if (!v) throw new Error(`Missing env ${name}`);
@@ -225,6 +227,28 @@ function jsonError(headers, err, fallbackStatus) {
   };
 }
 
+/** Verifica hash pbkdf2$iter$saltB64$hashB64 (mismo formato que el cliente WebCrypto). */
+function verifyPbkdf2Secret(plain, stored) {
+  if (!plain || !stored || typeof stored !== "string") return false;
+  if (!stored.startsWith("pbkdf2$")) {
+    const legacy = crypto.createHash("sha256").update(String(plain), "utf8").digest("hex");
+    return legacy === stored;
+  }
+  const parts = stored.split("$");
+  if (parts.length !== 4) return false;
+  const iterations = parseInt(parts[1], 10);
+  const salt = Buffer.from(parts[2], "base64");
+  const expected = Buffer.from(parts[3], "base64");
+  if (!iterations || !salt.length || expected.length !== 32) return false;
+  const derived = crypto.pbkdf2Sync(String(plain), salt, iterations, 32, "sha256");
+  if (derived.length !== expected.length) return false;
+  return crypto.timingSafeEqual(derived, expected);
+}
+
+function isValidPasswordHash(stored) {
+  return typeof stored === "string" && (stored.startsWith("pbkdf2$") || /^[a-f0-9]{64}$/i.test(stored));
+}
+
 module.exports = {
   requireEnv,
   extractBearer,
@@ -237,5 +261,7 @@ module.exports = {
   corsHeaders,
   assertAllowedOrigin,
   clientMeta,
-  jsonError
+  jsonError,
+  verifyPbkdf2Secret,
+  isValidPasswordHash
 };
