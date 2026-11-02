@@ -45,6 +45,25 @@ exports.handler = async (event) => {
     let staffCount = 0;
     let detail = "empty";
 
+    const describeErr = (e) => {
+      const body = e && e.body;
+      const msg = String(
+        (body && (body.message || body.error || body.hint || body.code)) ||
+          (e && e.message) ||
+          ""
+      );
+      const code = (body && body.code) || "";
+      const missing =
+        /relation|does not exist|42P01|PGRST205|Could not find|schema cache/i.test(msg + " " + code) ||
+        (e && e.status === 404);
+      return {
+        missing,
+        code: String(code || "").slice(0, 40),
+        message: msg.slice(0, 160),
+        status: e && e.status ? e.status : null
+      };
+    };
+
     try {
       const rows = await supabaseRest("firm_settings?key=eq.auth_bootstrapped&select=value");
       registryReady = true;
@@ -53,8 +72,8 @@ exports.handler = async (event) => {
         detail = "firm_settings";
       }
     } catch (e) {
-      const msg = String((e && e.body && (e.body.message || e.body)) || (e && e.message) || "");
-      if (/relation|does not exist|42P01|Could not find/i.test(msg) || (e && e.status === 404)) {
+      const info = describeErr(e);
+      if (info.missing) {
         return {
           statusCode: 200,
           headers,
@@ -62,11 +81,25 @@ exports.handler = async (event) => {
             ok: true,
             bootstrapped: false,
             detail: "missing_tables",
-            hint: "Ejecute en Supabase SQL Editor el archivo 20261102b_firm_auth_registry.sql"
+            hint: "Ejecute en Supabase SQL Editor el archivo 20261102b_firm_auth_registry.sql",
+            debug: info
           })
         };
       }
       detail = "firm_settings_error";
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: true,
+          bootstrapped: false,
+          registryReady: false,
+          staffCount: 0,
+          detail,
+          hint: "Revise SERVICE_ROLE (proyecto correcto) o ejecute el SQL firm_auth_registry.",
+          debug: info
+        })
+      };
     }
 
     try {
@@ -78,8 +111,8 @@ exports.handler = async (event) => {
         detail = "staff_directory";
       }
     } catch (e) {
-      const msg = String((e && e.body && (e.body.message || e.body)) || (e && e.message) || "");
-      if (/relation|does not exist|42P01|Could not find/i.test(msg) || (e && e.status === 404)) {
+      const info = describeErr(e);
+      if (info.missing) {
         return {
           statusCode: 200,
           headers,
@@ -87,11 +120,24 @@ exports.handler = async (event) => {
             ok: true,
             bootstrapped: false,
             detail: "missing_tables",
-            hint: "Ejecute en Supabase SQL Editor el archivo 20261102b_firm_auth_registry.sql"
+            hint: "Ejecute en Supabase SQL Editor el archivo 20261102b_firm_auth_registry.sql",
+            debug: info
           })
         };
       }
-      if (detail === "empty") detail = "staff_error";
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: true,
+          bootstrapped: false,
+          registryReady,
+          staffCount: 0,
+          detail: "staff_error",
+          hint: "Tabla staff_directory no accesible. Ejecute el SQL o revise SERVICE_ROLE.",
+          debug: info
+        })
+      };
     }
 
     if (bootstrapped) detail = detail || "ok";
