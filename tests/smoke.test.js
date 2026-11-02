@@ -66,7 +66,7 @@ JSDOM.fromURL("http://localhost:8765/index.html", {
     w.HTMLCanvasElement.prototype.getContext = () => ({});
     w.fetch = (input) => {
       const s = String(typeof input === "string" ? input : (input && input.url) || "");
-      if (/views\//.test(s) || /lib\//.test(s)) {
+      if (/views\//.test(s) || /lib\//.test(s) || /js\/controllers\//.test(s)) {
         const abs = s.startsWith("http") ? s : `http://localhost:8765/${s.replace(/^\//, "")}`;
         return globalThis.fetch(abs);
       }

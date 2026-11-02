@@ -677,6 +677,9 @@ class LegalApp {
     if (window.componentLoader && typeof window.componentLoader.ensureViewLoaded === "function") {
       await window.componentLoader.ensureViewLoaded(tabId, "main");
     }
+    if (window.PaoloControllerLoader && typeof window.PaoloControllerLoader.ensure === "function") {
+      await window.PaoloControllerLoader.ensure(tabId);
+    }
 
     this.currentTab = tabId;
     if (window.innerWidth < 768) {
@@ -8705,7 +8708,37 @@ _________________________________                _______________________________
       });
 
       if (res.ok) {
-        const cloudData = await res.json();
+        let cloudData = await res.json();
+        // Semana 4: ACK liviano → hidratar con stream /api/cloud_snapshot (sin 2.ª serialización)
+        if (cloudData && cloudData.ackOnly) {
+          try {
+            const snapUrl = endpoint.replace(/\/api\/cloud_sync.*/i, "/api/cloud_snapshot");
+            const snapRes = await fetch(snapUrl, { method: "GET", headers: headers, credentials: "same-origin" });
+            if (snapRes.ok) {
+              const snap = await snapRes.json();
+              cloudData = {
+                protocol: cloudData.protocol || "LEX_MULTI_SEDE_SYNC_V2",
+                status: "ok",
+                data: snap,
+                deletedIds: (snap && snap._deletedIds) || cloudData.deletedIds || {}
+              };
+            } else {
+              cloudData = {
+                protocol: cloudData.protocol,
+                status: "ok",
+                data: {},
+                deletedIds: cloudData.deletedIds || {}
+              };
+            }
+          } catch (_) {
+            cloudData = {
+              protocol: cloudData.protocol,
+              status: "ok",
+              data: {},
+              deletedIds: cloudData.deletedIds || {}
+            };
+          }
+        }
         if (cloudData && (cloudData.data || cloudData.deletedIds)) {
           const stats = window.db.mergeSyncPackage(cloudData);
           if (!silent) {

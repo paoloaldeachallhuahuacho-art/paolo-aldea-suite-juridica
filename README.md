@@ -13,7 +13,8 @@ Sistema integral de gestión diseñado específicamente para la **Sede Challhuah
 > - Puedes **llenar datos, editar, eliminar, consultar y exportar a Excel sin tener conexión a internet**.
 > - Todos los archivos de diseño, fuentes, librerías (`Chart.js`, `ExcelJS`, `Tailwind`, `FontAwesome`) se encuentran descargados en tu propia máquina dentro de la carpeta `lib/`.
 > - Tus datos no viajan a ningún servidor externo, garantizando el **secreto profesional y confidencialidad absoluta** de los clientes y litigios del estudio en Challhuahuacho.
-> - La información se guarda automáticamente y de forma persistente en tu navegador (`localStorage`), y puedes generar copias de seguridad en archivo `.json` cuando lo desees.
+> - La información se guarda automáticamente (IndexedDB primario + espejo localStorage) y puedes generar copias de seguridad en archivo `.json` cuando lo desees.
+> - **Modo de despliegue canónico:** local unipersonal — ver [`docs/DEPLOY.md`](docs/DEPLOY.md).
 
 ---
 
