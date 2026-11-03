@@ -2778,9 +2778,25 @@ const AttendanceModule = (function () {
   }
 
   /**
-   * Inicializa el módulo con detección automática de GPS y Geocerca
+   * Refresco suave tras sync/sede: actualiza datos sin echar al usuario del panel de supervisión.
    */
-  function init() {
+  function softRefresh() {
+    renderWorkerSelectorDropdown();
+    updateLocationValidationOptions();
+    updateAnchorOfficeVisibility();
+    updatePendingBadge();
+    if (canManageAttendanceRecords()) adminAuthenticated = true;
+    if (currentRole === "admin" && adminAuthenticated) {
+      renderAdminKpis();
+      renderAdminAttendanceTable();
+    }
+  }
+
+  /**
+   * Inicializa el módulo con detección automática de GPS y Geocerca.
+   * @param {{ forceKiosk?: boolean }} [opts] forceKiosk=true solo en login/boot explícito.
+   */
+  function init(opts = {}) {
     renderWorkerSelectorDropdown();
     startClock();
     updateLocationValidationOptions();
@@ -2801,21 +2817,32 @@ const AttendanceModule = (function () {
       }
     }
 
-    // Roles privilegiados: supervisión lista, pero al entrar siempre kiosco colaborador.
     if (canManageAttendanceRecords()) {
       adminAuthenticated = true;
     }
-    enterKioskColaborador();
+
+    // No forzar Kiosco en cada sync/refresh: eso expulsaba de Supervisión Jefes a los pocos segundos.
+    if (opts.forceKiosk === true) {
+      enterKioskColaborador();
+    } else if (currentRole === "admin" && adminAuthenticated) {
+      setRoleView("admin");
+    }
   }
 
-  /** Pantalla de ingreso por defecto: Kiosco Colaborador (nunca abre Supervisión sola). */
+  /** Pantalla de ingreso por defecto: Kiosco Colaborador (solo login/boot explícito). */
   function enterKioskColaborador() {
     if (canManageAttendanceRecords()) adminAuthenticated = true;
     setRoleView("colaborador");
   }
 
+  function getCurrentRoleView() {
+    return currentRole;
+  }
+
   return {
     init,
+    softRefresh,
+    getCurrentRoleView,
     enterKioskColaborador,
     startAutoGeofenceTracking,
     calculateHaversineDistance,

@@ -517,7 +517,9 @@ class LegalApp {
     this.setupEventListeners();
     this.setupAutoSaveSettings();
     if (window.AttendanceModule) {
-      window.AttendanceModule.init();
+      if (typeof window.AttendanceModule.init === "function") {
+        window.AttendanceModule.init({ forceKiosk: true });
+      }
       if (typeof window.AttendanceModule.enterKioskColaborador === "function") {
         window.AttendanceModule.enterKioskColaborador();
       }
@@ -934,7 +936,13 @@ class LegalApp {
     if (tabId === "kpis") {
       if (window.kpiDashboard) window.kpiDashboard.refresh();
     } else if (tabId === "asistencia") {
-      if (window.AttendanceModule) window.AttendanceModule.init();
+      if (window.AttendanceModule) {
+        if (typeof window.AttendanceModule.softRefresh === "function") {
+          window.AttendanceModule.softRefresh();
+        } else if (typeof window.AttendanceModule.init === "function") {
+          window.AttendanceModule.init();
+        }
+      }
     } else if (tabId === "caja_chica") {
       this.renderCajaChica();
     } else if (tabId === "presupuestos") {

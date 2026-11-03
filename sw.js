@@ -5,7 +5,7 @@
 // Compatible con Android (Chrome) e iOS (Safari PWA 16.4+)
 // =========================================================================
 
-const CACHE_NAME = 'paolo-aldea-pwa-v2026.11.03-sede-picker';
+const CACHE_NAME = 'paolo-aldea-pwa-v2026.11.03-att-kpis-fix';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',

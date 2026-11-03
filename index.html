@@ -1470,7 +1470,101 @@
   
           </div>
 
-  
+          <!-- =================================================================
+               KPIs POWER BI — Mapeo semanal / mensual de asistencia
+               ================================================================= -->
+          <div id="asistencia-kpi-powerbi" class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+            <div class="p-3.5 sm:p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="w-8 h-8 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                  <i class="fa-solid fa-chart-column text-sm"></i>
+                </span>
+                <div class="min-w-0">
+                  <h3 class="text-xs sm:text-sm font-bold text-white tracking-wide">KPIs de Asistencia · estilo Power BI</h3>
+                  <p class="text-[10px] sm:text-[11px] text-slate-400 truncate">Mapeo por semana y por mes · puntualidad, geocerca y jornada</p>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+                  <button type="button" data-mode="week" class="att-kpi-mode-btn px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-950 shadow transition" onclick="window.AttendanceKpis && AttendanceKpis.setMode('week')">Semana</button>
+                  <button type="button" data-mode="month" class="att-kpi-mode-btn px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-slate-100 transition" onclick="window.AttendanceKpis && AttendanceKpis.setMode('month')">Mes</button>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button type="button" onclick="window.AttendanceKpis && AttendanceKpis.shiftPeriod(-1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center transition" title="Período anterior"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                  <span id="att-kpi-period-label" class="min-w-[9.5rem] text-center text-[11px] font-bold text-amber-300 px-1">—</span>
+                  <button type="button" onclick="window.AttendanceKpis && AttendanceKpis.shiftPeriod(1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center transition" title="Período siguiente"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                </div>
+                <select id="att-kpi-sede-filter" onchange="window.AttendanceKpis && AttendanceKpis.setSede(this.value)" class="p-1.5 bg-slate-950 border border-slate-700 rounded-xl text-[11px] text-slate-200 focus:outline-none focus:border-cyan-500 max-w-[11rem]">
+                  <option value="ALL">Todas las sedes</option>
+                </select>
+              </div>
+            </div>
+            <div class="p-3.5 sm:p-4 space-y-4">
+              <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5">
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">% Asistencia</div>
+                  <div id="att-kpi-asistencia-pct" class="text-xl font-black text-emerald-400 font-mono">0%</div>
+                  <p id="att-kpi-asistencia-sub" class="text-[9px] text-slate-500 leading-snug">slots laborables</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Tardeos</div>
+                  <div id="att-kpi-tardeos" class="text-xl font-black text-amber-400 font-mono">0</div>
+                  <p class="text-[9px] text-slate-500">ingreso &gt; 09:15</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Fuera geocerca</div>
+                  <div id="att-kpi-fuera" class="text-xl font-black text-rose-400 font-mono">0</div>
+                  <p class="text-[9px] text-slate-500">diligencias / GPS externo</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Jornada promedio</div>
+                  <div id="att-kpi-horas" class="text-xl font-black text-cyan-400 font-mono">0 h</div>
+                  <p class="text-[9px] text-slate-500">neto (menos almuerzo)</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Marcajes</div>
+                  <div id="att-kpi-marcajes" class="text-xl font-black text-white font-mono">0</div>
+                  <p class="text-[9px] text-slate-500">registros del período</p>
+                </div>
+                <div class="bg-slate-950/70 border border-amber-500/30 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-amber-400/90 font-bold">Pendientes</div>
+                  <div id="att-kpi-pendientes-periodo" class="text-xl font-black text-amber-400 font-mono">0</div>
+                  <p class="text-[9px] text-amber-300/70">en el período filtrado</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 xl:grid-cols-12 gap-3">
+                <div class="xl:col-span-8 bg-slate-950/50 border border-slate-800 rounded-xl p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Asistencia por día</h4>
+                    <span class="text-[9px] text-slate-500">Presentes · Tardeos · Fuera geocerca</span>
+                  </div>
+                  <div class="h-52 relative">
+                    <canvas id="chartAttKpiDaily" aria-label="Gráfico de asistencia diaria"></canvas>
+                  </div>
+                </div>
+                <div class="xl:col-span-4 bg-slate-950/50 border border-slate-800 rounded-xl p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Modalidad de marcaje</h4>
+                  </div>
+                  <div class="h-52 relative">
+                    <canvas id="chartAttKpiModality" aria-label="Donut modalidades de marcaje"></canvas>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-slate-950/50 border border-slate-800 rounded-xl p-3 space-y-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Mapa colaborador × día</h4>
+                  <div class="flex flex-wrap items-center gap-2 text-[9px] text-slate-400">
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-emerald-500/80"></span> Presente</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-amber-500/90"></span> Tardeo</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-sky-500/80"></span> Externa</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-slate-800"></span> Sin marcaje</span>
+                  </div>
+                </div>
+                <div id="att-kpi-heatmap" class="min-h-[4rem]"></div>
+              </div>
+            </div>
+          </div>
 
           <!-- Bandeja de Excepciones Pendientes de Aprobación -->
           <div id="asistencia-pending-queue-wrapper" class="hidden bg-slate-900 border border-amber-500/50 rounded-2xl p-4 shadow-xl space-y-3">
@@ -1596,8 +1690,8 @@
   <script src="js/data.js?v=20261115_auth_sig_hardening"></script>
   <script src="js/alerts.js?v=20261114_confirm_modal"></script>
   <script src="js/charts.js?v=20261101_week3_perf"></script>
-  <script src="js/attendance.js?v=20261115_att_kpis"></script>
-  <script src="js/attendance-kpis.js?v=20261115_att_kpis"></script>
+  <script src="js/attendance.js?v=20261103_att_kpis_fix"></script>
+  <script src="js/attendance-kpis.js?v=20261103_att_kpis_fix"></script>
   <script src="js/draft-autosave.js?v=20261102_jsstr_all"></script>
   <!-- Controllers: carga diferida por pestaña (Semana 4) -->
   <script src="js/controller-loader.js?v=20261101_week4_qa"></script>
@@ -1621,7 +1715,7 @@
   <script src="js/enterprise/BudgetAnalytics.js?v=20261102_zt"></script>
   <script src="js/enterprise/bootstrap.js?v=20261102_mode_badge2"></script>
   <script src="js/app-update.js?v=20261115_prod_hardening"></script>
-  <script src="js/app.js?v=20261103_sede_picker"></script>
+  <script src="js/app.js?v=20261103_att_kpis_fix"></script>
   <script src="js/auth-bridge.js?v=20261103_release"></script>
 </body>
 </html>
