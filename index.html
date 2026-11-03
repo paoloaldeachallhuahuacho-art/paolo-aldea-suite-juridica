@@ -38,17 +38,33 @@
   <script src="js/lib-loader.js?v=20261101_week3_perf"></script>
 
   <!-- Estilos Personalizados del Estudio Jurídico -->
-  <link rel="stylesheet" href="css/styles.css?v=20261103_confirm_del">
+  <link rel="stylesheet" href="css/styles.css?v=20261103_update_ui">
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased flex h-screen overflow-hidden">
 
-  <div id="appUpdateBanner" class="hidden fixed bottom-24 md:bottom-4 left-1/2 -translate-x-1/2 z-[10050] w-[min(36rem,calc(100%-1.5rem))] items-start gap-3 bg-slate-950 text-white border border-amber-400/70 rounded-2xl shadow-2xl p-4" role="status">
-    <i class="fa-solid fa-cloud-arrow-down text-amber-400 mt-0.5"></i>
-    <div class="flex-1 space-y-2">
-      <p id="appUpdateBannerText" class="text-xs leading-relaxed">Hay una actualización lista. Al aplicarla se recarga el despacho y tendrá que volver a ingresar. Termine el registro abierto y luego confirme.</p>
-      <div class="flex gap-2">
-        <button type="button" id="btnApplyAppUpdate" class="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 text-[11px] font-bold">Actualizar ahora</button>
-        <button type="button" id="btnDismissAppUpdate" class="px-3 py-1.5 rounded-lg border border-slate-600 text-[11px] text-slate-200">Después</button>
+  <div id="appUpdateBanner" class="app-update-banner hidden fixed bottom-24 md:bottom-5 left-1/2 -translate-x-1/2 z-[10050] w-[min(22.5rem,calc(100%-1.5rem))] items-stretch" role="status" aria-live="polite">
+    <div class="w-full rounded-2xl border border-amber-500/40 bg-slate-950/95 text-white shadow-2xl overflow-hidden backdrop-blur-md">
+      <div class="h-1 bg-gradient-to-r from-amber-600 via-amber-400 to-amber-600"></div>
+      <div class="p-3.5 sm:p-4 flex gap-3">
+        <span class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/35 text-amber-400 flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+        </span>
+        <div class="flex-1 min-w-0 space-y-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="text-sm font-extrabold tracking-wide text-white leading-none">Actualización lista</p>
+            <span id="appUpdateBannerVersion" class="text-[10px] font-bold uppercase tracking-wider text-amber-300/95 bg-amber-500/10 border border-amber-500/30 rounded-md px-1.5 py-0.5">v—</span>
+          </div>
+          <p id="appUpdateBannerText" class="text-[11px] leading-snug text-slate-300">Se reiniciará la sesión. Guarde su trabajo y actualice.</p>
+          <p id="appUpdateBannerNotes" class="hidden text-[10px] leading-snug text-slate-500"></p>
+          <div class="flex gap-2 pt-0.5">
+            <button type="button" id="btnApplyAppUpdate" class="min-h-[40px] px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-extrabold inline-flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-rotate"></i> Actualizar
+            </button>
+            <button type="button" id="btnDismissAppUpdate" class="min-h-[40px] px-3.5 py-2 rounded-xl border border-slate-600 hover:bg-slate-900 text-[11px] font-bold text-slate-200 transition">
+              Después
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1716,7 +1732,7 @@
   <script src="js/enterprise/CaseService.js?v=20261102_zt"></script>
   <script src="js/enterprise/BudgetAnalytics.js?v=20261102_zt"></script>
   <script src="js/enterprise/bootstrap.js?v=20261102_mode_badge2"></script>
-  <script src="js/app-update.js?v=20261115_prod_hardening"></script>
+  <script src="js/app-update.js?v=20261103_update_ui"></script>
   <script src="js/app.js?v=20261103_confirm_del"></script>
   <script src="js/auth-bridge.js?v=20261103_release"></script>
 </body>

@@ -2,10 +2,10 @@
  * Actualización de la PWA sin cortar el trabajo en curso.
  * El service worker descarga la versión nueva y espera.
  * El usuario aplica el cambio cuando termina lo que está haciendo.
- * Poll de version.json + banner con notas de release.
+ * Poll de version.json + banner institucional resumido.
  */
 (function (global) {
-  var APP_RELEASE = "2026.11.15";
+  var APP_RELEASE = "2026.11.16";
   var DISMISS_KEY = "PA_UPDATE_DISMISSED";
   var APPLY_KEY = "PA_APPLY_UPDATE";
   var DISMISS_VERSION_KEY = "PA_UPDATE_DISMISS_VER";
@@ -19,6 +19,14 @@
 
   function bannerText() {
     return document.getElementById("appUpdateBannerText");
+  }
+
+  function bannerVersion() {
+    return document.getElementById("appUpdateBannerVersion");
+  }
+
+  function bannerNotes() {
+    return document.getElementById("appUpdateBannerNotes");
   }
 
   function wasDismissedFor(version) {
@@ -37,15 +45,32 @@
     } catch (_) {}
   }
 
-  function formatBannerMessage(meta) {
+  function shortNote(note) {
+    var s = String(note || "").trim();
+    if (!s) return "";
+    // Quitar jerga técnica para el aviso al usuario del despacho
+    s = s
+      .replace(/AUTH_SIG[^·]*/gi, "Mayor seguridad de acceso")
+      .replace(/jwt_role[^·]*/gi, "Perfiles reforzados")
+      .replace(/cases_safe[^·]*/gi, "")
+      .replace(/DevTools[^·]*/gi, "")
+      .replace(/Migración SQL[^·]*/gi, "Base de datos actualizada")
+      .replace(/hashes de terceros/gi, "datos sensibles en login")
+      .replace(/\s+/g, " ")
+      .replace(/\s*[·|]\s*$/g, "")
+      .trim();
+    if (s.length > 52) s = s.slice(0, 49).trim() + "…";
+    return s;
+  }
+
+  function formatBannerCopy(meta) {
     var ver = (meta && meta.version) || "nueva";
-    var notes = meta && Array.isArray(meta.notes) ? meta.notes.filter(Boolean) : [];
-    var base =
-      "Hay una actualización lista (v" +
-      ver +
-      "). Al aplicarla se recarga el despacho y tendrá que volver a ingresar. Termine el registro abierto y luego confirme.";
-    if (!notes.length) return base;
-    return base + " Cambios: " + notes.slice(0, 3).join(" · ") + ".";
+    var notes = meta && Array.isArray(meta.notes) ? meta.notes.map(shortNote).filter(Boolean) : [];
+    return {
+      versionLabel: "v" + ver,
+      message: "Se reiniciará la sesión. Guarde su trabajo y actualice.",
+      notesLine: notes.length ? notes.slice(0, 2).join(" · ") : ""
+    };
   }
 
   function showBanner(meta) {
@@ -53,8 +78,21 @@
     if (!el) return;
     var ver = (meta && meta.version) || (remoteMeta && remoteMeta.version) || APP_RELEASE;
     if (wasDismissedFor(ver)) return;
+    var copy = formatBannerCopy(meta || remoteMeta);
     var text = bannerText();
-    if (text) text.textContent = formatBannerMessage(meta || remoteMeta);
+    var verEl = bannerVersion();
+    var notesEl = bannerNotes();
+    if (text) text.textContent = copy.message;
+    if (verEl) verEl.textContent = copy.versionLabel;
+    if (notesEl) {
+      if (copy.notesLine) {
+        notesEl.textContent = copy.notesLine;
+        notesEl.classList.remove("hidden");
+      } else {
+        notesEl.textContent = "";
+        notesEl.classList.add("hidden");
+      }
+    }
     el.classList.remove("hidden");
     el.classList.add("flex");
   }
@@ -93,7 +131,6 @@
       registration.waiting.postMessage({ type: "SKIP_WAITING" });
       return;
     }
-    // Sin SW waiting: forzar recarga limpia (cache bust de version.json ya detectó cambio)
     if (registration && typeof registration.update === "function") {
       registration.update().catch(function () {}).finally(function () {
         global.location.reload();
@@ -168,7 +205,6 @@
       if (registration && registration.update) registration.update().catch(function () {});
       checkRemoteVersion();
     });
-    // Poll cada 10 min en despacho activo; al volver de segundo plano también.
     setInterval(function () {
       if (registration && registration.update) registration.update().catch(function () {});
       checkRemoteVersion();

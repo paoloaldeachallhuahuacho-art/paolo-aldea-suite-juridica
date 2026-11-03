@@ -648,6 +648,22 @@ html.dark #globalSedeSelect {
   color: #F8FAFC !important;
 }
 
+/* Banner de actualización PWA */
+#appUpdateBanner.flex {
+  animation: appUpdateIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes appUpdateIn {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 12px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
 /* Confirmación institucional (reemplaza window.confirm) */
 #modalAppConfirm.flex .app-confirm-sheet {
   animation: appConfirmIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
