@@ -298,7 +298,7 @@ class KpiDashboard {
         plugins: {
           legend: {
             position: 'top',
-            labels: { boxWidth: 12, font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: '600' } }
+            labels: { boxWidth: 12, font: { family: "'Source Sans 3', sans-serif", size: 11, weight: '600' } }
           },
           tooltip: {
             callbacks: {
@@ -366,7 +366,7 @@ class KpiDashboard {
             position: 'right',
             labels: {
               boxWidth: 11,
-              font: { family: "'Plus Jakarta Sans', sans-serif", size: 10, weight: '500' },
+              font: { family: "'Source Sans 3', sans-serif", size: 10, weight: '500' },
               padding: 8
             }
           }

@@ -353,7 +353,7 @@ class LegalPdfExporter {
       }
 
       contentHtml = `
-        <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Source Sans 3', Arial, sans-serif; margin-top: 8px;">
           <thead>
             <tr style="background: #1C2541; color: #FFFFFF; font-size: 7.5px; text-align: center;">
               <th style="padding: 6px;">SEDE</th>
@@ -418,7 +418,7 @@ class LegalPdfExporter {
       }
 
       contentHtml = `
-        <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Source Sans 3', Arial, sans-serif; margin-top: 8px;">
           <thead>
             <tr style="background: #1C2541; color: #FFFFFF; font-size: 7.5px; text-align: center;">
               <th style="padding: 6px;">SEDE</th>
@@ -469,7 +469,7 @@ class LegalPdfExporter {
       }
 
       contentHtml = `
-        <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Source Sans 3', Arial, sans-serif; margin-top: 8px;">
           <thead>
             <tr style="background: #1C2541; color: #FFFFFF; font-size: 7.5px; text-align: center;">
               <th style="padding: 6px;">SEDE</th>
@@ -552,7 +552,7 @@ class LegalPdfExporter {
           </div>
         </div>
 
-        <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif;">
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Source Sans 3', Arial, sans-serif;">
           <thead>
             <tr style="background: #1C2541; color: #FFFFFF; font-size: 7.5px; text-align: center;">
               <th style="padding: 5px;">CÓDIGO</th>
@@ -606,7 +606,7 @@ class LegalPdfExporter {
       }
 
       contentHtml = `
-        <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Source Sans 3', Arial, sans-serif; margin-top: 8px;">
           <thead>
             <tr style="background: #1C2541; color: #FFFFFF; font-size: 8.5px; text-align: center;">
               <th style="padding: 7px;">CÓDIGO</th>
@@ -645,7 +645,7 @@ class LegalPdfExporter {
       }
 
       contentHtml = `
-        <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Source Sans 3', Arial, sans-serif; margin-top: 8px;">
           <thead>
             <tr style="background: #1C2541; color: #FFFFFF; font-size: 8.5px; text-align: center;">
               <th style="padding: 7px; text-align: left;">TÍTULO DEL DOCUMENTO</th>
@@ -681,7 +681,7 @@ class LegalPdfExporter {
       const totalValorInv = inv.reduce((s, i) => s + (Number(i.stock || 0) * Number(i.costoUnitario || 0)), 0);
 
       contentHtml = `
-        <div style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 10px;">
+        <div style="font-family: 'Source Sans 3', Arial, sans-serif; margin-top: 10px;">
           <table style="width: 100%; border-collapse: collapse; font-size: 10px; margin-bottom: 15px;">
             <tr style="background: #1C2541; color: #fff;">
               <th style="padding: 8px; text-align: left;">INDICADOR CLAVE DE GESTIÓN (KPI)</th>
@@ -757,7 +757,7 @@ class LegalPdfExporter {
       }
 
       contentHtml = `
-        <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Source Sans 3', Arial, sans-serif; margin-top: 8px;">
           <thead>
             <tr style="background: #0B132B; color: #FFFFFF; font-size: 7.5px;">
               <th style="padding: 5px; text-align: center;">Sede</th>
@@ -820,7 +820,7 @@ class LegalPdfExporter {
       }
 
       contentHtml = `
-        <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
+        <table style="width: 100%; border-collapse: collapse; font-family: 'Source Sans 3', Arial, sans-serif; margin-top: 8px;">
           <thead>
             <tr style="background: #1C2541; color: #FFFFFF; font-size: 8px; text-align: center;">
               <th style="padding: 6px;">DNI</th>
@@ -961,7 +961,7 @@ class LegalPdfExporter {
         <title>PAOLO ALDEA & ABOGADOS - Reporte Oficial</title>
         <style>
           @page { size: ${orientation === 'landscape' ? 'landscape' : 'portrait'}; margin: 8mm; }
-          body { font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin: 0; padding: 10px; color: #0F172A; background: #ffffff; }
+          body { font-family: 'Source Sans 3', Arial, sans-serif; margin: 0; padding: 10px; color: #0F172A; background: #ffffff; }
           table { border-collapse: collapse; width: 100%; }
           img { max-width: 100%; }
         </style>

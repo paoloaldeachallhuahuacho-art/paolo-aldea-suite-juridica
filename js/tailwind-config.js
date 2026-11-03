@@ -6,6 +6,12 @@ tailwind.config = {
   darkMode: "class",
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['"Source Sans 3"', "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
+        serif: ['"Libre Baskerville"', "Georgia", "Cambria", "Times New Roman", "serif"],
+        mono: ['"IBM Plex Mono"', "Consolas", "Courier New", "monospace"],
+        legal: ['"Libre Baskerville"', "Georgia", "serif"]
+      },
       colors: {
         legal: {
           navy: "#141518",
