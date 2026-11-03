@@ -67,6 +67,19 @@
 
 ---
 
+## Publicar en Cloudflare Pages (canónico)
+
+Las edge functions viven en `cloudflare/functions/`. El worker las expone en **`/api/<nombre>`** (alias legacy `/.netlify/functions/<nombre>`).
+
+1. Cuenta gratis en [Cloudflare](https://dash.cloudflare.com/).
+2. Desde la carpeta del proyecto: `npx wrangler login` y luego `npx wrangler pages deploy . --project-name paoloaldea-abogados`.
+3. En el proyecto Pages → Settings → Variables (solo en el panel, nunca en el repo):
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `ALLOWED_ORIGIN` = la URL exacta de `*.pages.dev`, sin barra final
+4. Comprobar `POST /api/sync-pull` sin token: debe responder 401, no 404.
+
 ## Modo C — Híbrido descontrolado (evitar)
 
 Mezclar hub PowerShell público + Firestore + Supabase sin SyncManager/RLS.  
@@ -80,6 +93,7 @@ Si se necesita offline+cloud: usar **Modo B** con outbox (no abrir el hub PS a I
 |------|------|-----|
 | A | `POST /api/session` | Pairing local |
 | A | `POST /api/cloud_sync` + `GET /api/cloud_snapshot` | Sync LAN |
-| B | `GET /.netlify/functions/public-config` | Anon config |
-| B | `POST /.netlify/functions/attendance-validate` | Geocerca server (JWT + Origin) |
-| B | `POST /.netlify/functions/petty-cash-transition` | Flujo caja (JWT + Origin) |
+| B | `GET /api/public-config` | Anon config |
+| B | `POST /api/attendance-validate` | Geocerca server (syncToken o JWT + Origin) |
+| B | `POST /api/petty-cash-transition` | Flujo caja (syncToken o JWT + Origin) |
+| B | `POST /api/sync-pull` / `sync-push` | Sync `app_records` (HMAC syncToken + LWW) |

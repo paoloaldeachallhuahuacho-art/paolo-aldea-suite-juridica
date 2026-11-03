@@ -8,12 +8,12 @@ tailwind.config = {
     extend: {
       colors: {
         legal: {
-          navy: "#0B132B",
-          slate: "#1C2541",
-          card: "#132247",
-          gold: "#C5A059",
-          goldMuted: "#997B28",
-          accent: "#3A506B"
+          navy: "#141518",
+          slate: "#1E293B",
+          card: "#1E293B",
+          gold: "#D97706",
+          goldMuted: "#B45309",
+          accent: "#334155"
         }
       }
     }

@@ -12,6 +12,123 @@ class LegalPdfExporter {
     this.firmName = "PAOLO ALDEA & ABOGADOS";
     this.firmBranch = "Sede Challhuahuacho - Cotabambas, Apurímac";
     this.logoPath = (typeof OFFICIAL_LOGO_B64 !== "undefined" && OFFICIAL_LOGO_B64) ? OFFICIAL_LOGO_B64 : "assets/logo_paolo_aldea.jpg";
+    this._logoDataUrl = null;
+    this._sealCache = null;
+  }
+
+  /** Ruta absoluta usable por html2canvas (evita logo/firma en blanco). */
+  resolveAssetUrl(path) {
+    if (!path) return "";
+    if (/^(data:|blob:|https?:)/i.test(path)) return path;
+    try {
+      return new URL(path, window.location.href).href;
+    } catch (_) {
+      return path;
+    }
+  }
+
+  async ensureLogoDataUrl() {
+    if (this._logoDataUrl) return this._logoDataUrl;
+    const src = this.resolveAssetUrl(this.logoPath);
+    try {
+      const res = await fetch(src, { credentials: "same-origin" });
+      if (!res.ok) throw new Error("HTTP " + res.status);
+      const blob = await res.blob();
+      this._logoDataUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch (_) {
+      this._logoDataUrl = src;
+    }
+    return this._logoDataUrl;
+  }
+
+  /**
+   * Sello/QR como PNG (html2canvas suele dejar SVG en blanco).
+   * @returns {{ dataUrl: string, certCode: string, hashDigest: string, dateStr: string }}
+   */
+  buildDigitalSealPng() {
+    const certCode = "CERT-PAOLO-" + Math.floor(100000 + Math.random() * 900000);
+    const dateStr = new Date().toLocaleString("es-PE", { hour12: false });
+    const hashDigest =
+      "SHA256:" +
+      Array.from({ length: 16 }, () => Math.floor(Math.random() * 16).toString(16))
+        .join("")
+        .toUpperCase();
+
+    const canvas = document.createElement("canvas");
+    canvas.width = 120;
+    canvas.height = 120;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#FFFFFF";
+    ctx.fillRect(0, 0, 120, 120);
+
+    // Patrón tipo QR determinista a partir del certificado
+    let seed = 0;
+    for (let i = 0; i < certCode.length; i++) seed = (seed * 31 + certCode.charCodeAt(i)) >>> 0;
+    const next = () => {
+      seed = (seed * 1664525 + 1013904223) >>> 0;
+      return seed / 0xffffffff;
+    };
+
+    const cell = 6;
+    const grid = 18;
+    const offset = 6;
+    for (let y = 0; y < grid; y++) {
+      for (let x = 0; x < grid; x++) {
+        const finder =
+          (x < 4 && y < 4) || (x > grid - 5 && y < 4) || (x < 4 && y > grid - 5);
+        const on = finder ? (x === 0 || y === 0 || x === 3 || y === 3 || (x > 0 && x < 3 && y > 0 && y < 3)) : next() > 0.45;
+        if (!on) continue;
+        ctx.fillStyle = finder ? "#0F172A" : next() > 0.85 ? "#059669" : "#0F172A";
+        ctx.fillRect(offset + x * cell, offset + y * cell, cell - 1, cell - 1);
+      }
+    }
+    // Centro institucional
+    ctx.fillStyle = "#059669";
+    ctx.fillRect(48, 48, 24, 24);
+    ctx.fillStyle = "#FFFFFF";
+    ctx.font = "bold 10px Arial";
+    ctx.textAlign = "center";
+    ctx.fillText("PA", 60, 64);
+
+    return {
+      dataUrl: canvas.toDataURL("image/png"),
+      certCode,
+      hashDigest,
+      dateStr
+    };
+  }
+
+  getExporterIdentity() {
+    const s = window.db ? window.db.getSettings() : {};
+    const b = this.getBranchInfo();
+    const currentUser = window.db ? window.db.getCurrentUser() : null;
+    const roleRaw = currentUser
+      ? (window.db.getUserRole ? window.db.getUserRole(currentUser) : currentUser.rol)
+      : "";
+    const roleLabel =
+      window.db && typeof window.db.getRoleLabel === "function" && roleRaw
+        ? window.db.getRoleLabel(roleRaw)
+        : roleRaw || "Colaborador Autorizado";
+
+    const name = currentUser
+      ? currentUser.nombre || currentUser.nombres || currentUser.usuario || "Usuario autenticado"
+      : s.adminOfficer || "Usuario autenticado";
+
+    const cargo = currentUser
+      ? currentUser.cargo || roleLabel
+      : s.adminTitle || roleLabel;
+
+    const sedeLine =
+      b.activeSede === "todas"
+        ? "Consolidado Nacional — Todas las Sedes"
+        : b.branchHeaderLabel || b.branchName;
+
+    return { name, cargo, roleLabel, sedeLine, currentUser };
   }
 
   // Obtiene los datos institucionales correspondientes a la sede activa
@@ -70,7 +187,7 @@ class LegalPdfExporter {
   }
 
   // Genera el encabezado institucional para el reporte PDF adaptado a la sede activa
-  buildPdfHeaderHtml(title, subtitle, latinMotto) {
+  buildPdfHeaderHtml(title, subtitle, latinMotto, logoSrc) {
     const s = window.db.getSettings();
     const b = this.getBranchInfo();
     const now = new Date();
@@ -84,115 +201,93 @@ class LegalPdfExporter {
     const sedeDisplay = (b.activeSede === "todas")
       ? "Consolidado Nacional \u2014 Todas las Sedes"
       : ("Sede " + (b.branchSlug || b.branchName).replace(/^SEDE\s+/i, ""));
+    const logo = logoSrc || this._logoDataUrl || this.resolveAssetUrl(this.logoPath);
+    const license = s.firmLicense || "CAL / CAA - REGISTRO PROFESIONAL";
 
     return `
-      <div style="border-bottom: 2px solid #0B132B; padding-bottom: 12px; margin-bottom: 14px; font-family: 'Plus Jakarta Sans', Arial, sans-serif;">
+      <div style="border-bottom: 2px solid #0B132B; padding-bottom: 12px; margin-bottom: 14px; font-family: Arial, Helvetica, sans-serif;">
         <table style="width: 100%; border-collapse: collapse;">
           <tr>
             <td style="width: 80px; vertical-align: middle;">
-              <img src="${this.logoPath}" style="width: 72px; height: 72px; object-fit: contain; border: 1px solid #C5A059; border-radius: 8px; padding: 2px; background: #fff;" />
+              <img src="${logo}" width="72" height="72" crossorigin="anonymous" style="width: 72px; height: 72px; object-fit: contain; border: 1px solid #C5A059; border-radius: 8px; padding: 2px; background: #fff;" />
             </td>
             <td style="vertical-align: middle; padding-left: 14px;">
-              <div style="font-family: 'Cinzel', Georgia, serif; font-size: 16px; font-weight: 800; color: #0B132B; letter-spacing: 0.5px;">
+              <div style="font-family: Georgia, 'Times New Roman', serif; font-size: 16px; font-weight: 800; color: #0B132B; letter-spacing: 0.5px;">
                 ${(s.firmName || "PAOLO ALDEA & ABOGADOS").toUpperCase()}
               </div>
               <div style="font-size: 11px; font-weight: 700; color: #B45309; text-transform: uppercase; margin-top: 2px;">
-                ${b.branchName} | ${s.firmLicense || 'CAL / ICAP'}
+                ${this.escapeHtml(b.branchName)} | ${this.escapeHtml(license)}
               </div>
               <div style="font-size: 9px; color: #64748B; margin-top: 2px;">
-                Director: ${s.managingAttorney || 'Dr. Paolo Aldea Quincho'} | Dirección: ${b.branchAddress} | Central: ${b.branchPhone || '+51 943 410 215'}
+                Director: ${this.escapeHtml(s.managingAttorney || "Dr. Paolo Aldea Quincho")} | Direcci\u00F3n: ${this.escapeHtml(b.branchAddress)} | Central: ${this.escapeHtml(b.branchPhone || "+51 943 410 215")}
               </div>
             </td>
-            <!-- Tarjeta Oficial de Apartado, Fecha, Hora y Sede (Diseño Oficial Imagen 2) -->
             <td style="text-align: right; vertical-align: middle; width: 250px;">
-              <div style="display: inline-block; background: #FFFFFF; border: 1.5px solid #CBD5E1; border-radius: 12px; padding: 8px 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.05); min-width: 215px;">
-                <div style="font-size: 9.5px; font-weight: 800; color: #0F172A; text-transform: uppercase; letter-spacing: 0.5px;">${apartadoHeader}</div>
-                <div style="font-size: 8px; color: #334155; margin-top: 2px; font-weight: 500;">${formattedLegalDate}</div>
-                <div style="font-size: 9px; color: #0284C7; font-weight: bold; margin-top: 2px;">${sedeDisplay}</div>
-              </div>
+              <table style="width: 220px; margin-left: auto; border-collapse: collapse; border: 1.5px solid #CBD5E1; border-radius: 12px; background: #FFFFFF;">
+                <tr><td style="padding: 8px 12px; text-align: center;">
+                  <div style="font-size: 9.5px; font-weight: 800; color: #0F172A; text-transform: uppercase; letter-spacing: 0.5px;">${this.escapeHtml(apartadoHeader)}</div>
+                  <div style="font-size: 8px; color: #334155; margin-top: 2px; font-weight: 500;">${this.escapeHtml(formattedLegalDate)}</div>
+                  <div style="font-size: 9px; color: #0284C7; font-weight: bold; margin-top: 2px;">${this.escapeHtml(sedeDisplay)}</div>
+                </td></tr>
+              </table>
             </td>
           </tr>
         </table>
 
-        <!-- Título del Reporte y Frase Jurídica -->
-        <div style="margin-top: 10px; background: #0B132B; color: #fff; padding: 8px 12px; border-radius: 6px; display: flex; justify-content: space-between; align-items: center;">
-          <span style="font-size: 12px; font-weight: bold; letter-spacing: 0.5px;">${title.toUpperCase()}</span>
-          <span style="font-size: 9px; color: #FDE68A;">${subtitle}</span>
-        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 10px; background: #0B132B; color: #fff; border-radius: 6px;">
+          <tr>
+            <td style="padding: 8px 12px; font-size: 12px; font-weight: bold; letter-spacing: 0.5px;">${this.escapeHtml(String(title || "").toUpperCase())}</td>
+            <td style="padding: 8px 12px; font-size: 9px; color: #FDE68A; text-align: right;">${this.escapeHtml(subtitle || "")}</td>
+          </tr>
+        </table>
 
         <div style="background: #FEF3C7; border: 1px solid #FCD34D; color: #92400E; padding: 5px 10px; border-radius: 4px; margin-top: 6px; font-size: 9px; font-style: italic; text-align: center;">
-          <i class="fa-solid fa-scale-balanced" style="margin-right: 6px;"></i> «${latinMotto}»
+          &#9878; &laquo;${this.escapeHtml(latinMotto || "")}&raquo;
         </div>
       </div>
     `;
   }
 
-  // Genera el pie de firmas institucional
-  // Genera el pie de firmas institucional con Sello Criptográfico Ley N° 27269
-  buildPdfFooterHtml() {
-    const s = window.db ? window.db.getSettings() : {};
-    const b = this.getBranchInfo();
-    const currentUser = window.db ? window.db.getCurrentUser() : null;
-    const currentUserName = currentUser ? (currentUser.nombre || currentUser.nombres || "Ing. Yimer Dami\u00E1n Soto") : (s.adminOfficer || "Ing. Yimer Dami\u00E1n Soto");
-    const currentUserCargo = currentUser ? (currentUser.cargo || "Ingenier\u00EDa Industrial & Control Operativo") : (s.adminTitle || "Ingenier\u00EDa Industrial & Control Operativo");
-    const branchOrSedeText = (b.activeSede === "todas")
-      ? "Consolidado Nacional \u2014 Todas las Sedes"
-      : ("PAOLO ALDEA & ABOGADOS \u2014 " + b.branchName);
-
-    const certCode = "CERT-PAOLO-" + Math.floor(100000 + Math.random() * 900000);
-    const dateStr = new Date().toLocaleString("es-PE", { hour12: false });
-    const hashDigest = "SHA256:" + Array.from({length: 16}, () => Math.floor(Math.random()*16).toString(16)).join('').toUpperCase();
+  // Pie de firmas + sello Ley 27269 (PNG, no SVG) + identidad del usuario/sede activos
+  buildPdfFooterHtml(seal) {
+    const identity = this.getExporterIdentity();
+    const stamp = seal || this.buildDigitalSealPng();
 
     return `
-      <div style="margin-top: 35px; page-break-inside: avoid; font-family: 'Plus Jakarta Sans', Arial, sans-serif;">
-        <table style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+      <div style="margin-top: 28px; page-break-inside: avoid; font-family: Arial, Helvetica, sans-serif;">
+        <table style="width: 100%; border-collapse: collapse; margin-top: 18px;">
           <tr>
-            <!-- Firma Izquierda: SIEMPRE Dr. Paolo Aldea Quincho -->
-            <td style="width: 38%; text-align: center; vertical-align: bottom;">
+            <td style="width: 38%; text-align: center; vertical-align: bottom; padding: 0 8px;">
               <div style="width: 200px; margin: 0 auto; border-top: 1px solid #0F172A; padding-top: 4px;">
                 <div style="font-size: 10px; font-weight: bold; color: #0F172A;">Dr. Paolo Aldea Quincho</div>
-                <div style="font-size: 8.5px; color: #475569;">Abogado Titular & Director</div>
+                <div style="font-size: 8.5px; color: #475569;">Abogado Titular &amp; Director</div>
                 <div style="font-size: 8px; color: #64748B;">CAL / CAA - Registro Profesional</div>
               </div>
             </td>
-            <!-- Sello Digital Central Ley 27269 -->
-            <td style="width: 24%; text-align: center; vertical-align: middle;">
-              <div style="display: inline-block; padding: 4px 6px; border: 1px solid #CBD5E1; border-radius: 6px; background: #F8FAFC; text-align: center;">
-                <svg width="42" height="42" viewBox="0 0 42 42" style="margin: 0 auto; display: block;">
-                  <rect width="42" height="42" fill="#FFFFFF" rx="4" />
-                  <rect x="3" y="3" width="12" height="12" fill="#0F172A" />
-                  <rect x="5" y="5" width="8" height="8" fill="#FFFFFF" />
-                  <rect x="7" y="7" width="4" height="4" fill="#0F172A" />
-                  <rect x="27" y="3" width="12" height="12" fill="#0F172A" />
-                  <rect x="29" y="5" width="8" height="8" fill="#FFFFFF" />
-                  <rect x="31" y="7" width="4" height="4" fill="#0F172A" />
-                  <rect x="3" y="27" width="12" height="12" fill="#0F172A" />
-                  <rect x="5" y="29" width="8" height="8" fill="#FFFFFF" />
-                  <rect x="7" y="31" width="4" height="4" fill="#0F172A" />
-                  <rect x="18" y="18" width="6" height="6" fill="#059669" />
-                  <rect x="18" y="6" width="3" height="6" fill="#0F172A" />
-                  <rect x="6" y="18" width="6" height="3" fill="#0F172A" />
-                  <rect x="27" y="27" width="6" height="6" fill="#0F172A" />
-                  <rect x="33" y="33" width="6" height="6" fill="#0F172A" />
-                </svg>
-                <div style="font-size: 6.5px; font-weight: bold; color: #059669; margin-top: 2px;">FIRMA DIGITAL LEY 27269</div>
-                <div style="font-size: 6px; font-family: monospace; color: #64748B;">${certCode}</div>
-              </div>
+            <td style="width: 24%; text-align: center; vertical-align: middle; padding: 0 4px;">
+              <table style="margin: 0 auto; border-collapse: collapse; border: 1px solid #CBD5E1; background: #F8FAFC;">
+                <tr><td style="padding: 6px 8px; text-align: center;">
+                  <img src="${stamp.dataUrl}" width="56" height="56" alt="Firma digital" style="width: 56px; height: 56px; display: block; margin: 0 auto;" />
+                  <div style="font-size: 6.5px; font-weight: bold; color: #059669; margin-top: 3px;">FIRMA DIGITAL LEY 27269</div>
+                  <div style="font-size: 6px; font-family: monospace; color: #64748B;">${this.escapeHtml(stamp.certCode)}</div>
+                </td></tr>
+              </table>
             </td>
-            <!-- Firma Derecha: DINÁMICA según el usuario que exporta -->
-            <td style="width: 38%; text-align: center; vertical-align: bottom;">
+            <td style="width: 38%; text-align: center; vertical-align: bottom; padding: 0 8px;">
               <div style="width: 230px; margin: 0 auto; border-top: 1px solid #0F172A; padding-top: 4px;">
-                <div style="font-size: 10px; font-weight: bold; color: #0F172A;">${currentUserName}</div>
-                <div style="font-size: 8.5px; color: #475569;">${currentUserCargo}</div>
-                <div style="font-size: 7.5px; color: #64748B; line-height: 1.2;">${branchOrSedeText}</div>
+                <div style="font-size: 10px; font-weight: bold; color: #0F172A;">${this.escapeHtml(identity.name)}</div>
+                <div style="font-size: 8.5px; color: #475569;">${this.escapeHtml(identity.roleLabel || identity.cargo)}</div>
+                <div style="font-size: 7.5px; color: #64748B; line-height: 1.2;">${this.escapeHtml(identity.sedeLine)}</div>
               </div>
             </td>
           </tr>
         </table>
-        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 14px; font-size: 7px; color: #94A3B8; border-top: 1px dashed #CBD5E1; padding-top: 4px;">
-          <span>Doc. Oficial PAOLO ALDEA & ABOGADOS • Modo Aut\u00F3nomo Local</span>
-          <span style="font-family: monospace;">Certificado: ${hashDigest} • Emitido: ${dateStr}</span>
-        </div>
+        <table style="width: 100%; border-collapse: collapse; margin-top: 14px; border-top: 1px dashed #CBD5E1;">
+          <tr>
+            <td style="padding-top: 4px; font-size: 7px; color: #94A3B8; text-align: left;">Doc. Oficial PAOLO ALDEA &amp; ABOGADOS \u2022 Modo Aut\u00F3nomo Local</td>
+            <td style="padding-top: 4px; font-size: 7px; color: #94A3B8; text-align: right; font-family: monospace;">Certificado: ${this.escapeHtml(stamp.hashDigest)} \u2022 Emitido: ${this.escapeHtml(stamp.dateStr)}</td>
+          </tr>
+        </table>
       </div>
     `;
   }
@@ -429,7 +524,7 @@ class LegalPdfExporter {
           </tbody>
           <tfoot>
             <tr style="background: #FEF3C7; font-size: 9px; font-weight: bold; border-top: 2px solid #0B132B;">
-              <td colspan="7" style="padding: 8px; text-align: right; color: #78350F;">TOTAL GENERAL PROYECTADO SEDE CHALLHUAHUACHO:</td>
+              <td colspan="7" style="padding: 8px; text-align: right; color: #78350F;">TOTAL GENERAL PROYECTADO ${this.escapeHtml((bInfo.branchName || sedeDisplay || "").toUpperCase())}:</td>
               <td style="padding: 8px; text-align: right; color: #78350F; font-family: monospace; font-size: 11px;">${curr} ${granTotal.toFixed(2)}</td>
               <td style="padding: 8px; text-align: center; color: #78350F;">${items.length} partidas</td>
             </tr>
@@ -685,28 +780,63 @@ class LegalPdfExporter {
       `;
     }
 
-    // Contenedor temporal para renderizado del PDF con ID exclusivo
+    // Precargar logo (data URL) + sello PNG para que html2canvas no deje cajas vacías
+    const logoDataUrl = await this.ensureLogoDataUrl();
+    const seal = this.buildDigitalSealPng();
+
     const printContainer = document.createElement("div");
     printContainer.id = "printReportContainer";
     printContainer.style.padding = "20px";
     printContainer.style.background = "#FFFFFF";
     printContainer.style.color = "#0F172A";
+    printContainer.style.width = "794px"; // ~A4 @ 96dpi para captura estable
     printContainer.innerHTML = `
-      ${this.buildPdfHeaderHtml(reportTitle, reportSubtitle, latinMotto)}
+      ${this.buildPdfHeaderHtml(reportTitle, reportSubtitle, latinMotto, logoDataUrl)}
       ${contentHtml}
-      ${this.buildPdfFooterHtml()}
+      ${this.buildPdfFooterHtml(seal)}
     `;
 
     document.body.appendChild(printContainer);
     document.body.classList.add("printing-report");
 
-    // bInfo is already available from function scope
+    // Esperar a que las imágenes del contenedor estén listas
+    await Promise.all(
+      Array.from(printContainer.querySelectorAll("img")).map(
+        (img) =>
+          img.complete
+            ? Promise.resolve()
+            : new Promise((resolve) => {
+                img.onload = () => resolve();
+                img.onerror = () => resolve();
+              })
+      )
+    );
+
     const opt = {
-      margin: [8, 8, 8, 8],
+      margin: [8, 8, 8, 10],
       filename: `PAOLO_ALDEA_Reporte_${moduleName.toUpperCase()}_${bInfo.branchSlug}_${(typeof getRelativeDateOnlyStr === "function" ? getRelativeDateOnlyStr(0) : "HOY")}.pdf`,
-      image: { type: 'jpeg', quality: 0.98 },
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: (moduleName === 'casos' || moduleName === 'caja_chica' || moduleName === 'asistencia' || moduleName === 'personal') ? 'landscape' : 'portrait' }
+      image: { type: "jpeg", quality: 0.98 },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        allowTaint: true,
+        logging: false,
+        backgroundColor: "#FFFFFF",
+        scrollX: 0,
+        scrollY: 0
+      },
+      pagebreak: { mode: ["css", "legacy"] },
+      jsPDF: {
+        unit: "mm",
+        format: "a4",
+        orientation:
+          moduleName === "casos" ||
+          moduleName === "caja_chica" ||
+          moduleName === "asistencia" ||
+          moduleName === "personal"
+            ? "landscape"
+            : "portrait"
+      }
     };
 
     window.app.showToast("Generando reporte oficial en PDF...", "info");
@@ -720,7 +850,6 @@ class LegalPdfExporter {
       }
     } catch (err) {
       console.warn("Generación html2pdf directa no completada, abriendo generador de PDF aislado:", err);
-      // Imprimir ÚNICAMENTE el reporte en marco aislado sin barra lateral
       this.printIsolatedReport(printContainer.innerHTML, opt.jsPDF.orientation);
     } finally {
       document.body.classList.remove("printing-report");
@@ -782,20 +911,22 @@ class LegalPdfExporter {
     if (!previewEl) return;
     const docTitle = titleEl ? titleEl.textContent : "Documento Jurídico";
 
+    const logo = this._logoDataUrl || this.resolveAssetUrl(this.logoPath);
+    const seal = this.buildDigitalSealPng();
     const reportHtml = `
-      <div style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; padding: 15px;">
-        ${this.buildPdfHeaderHtml(docTitle, "Modelo Oficial de Despacho", "Verba volant, scripta manent")}
+      <div style="font-family: Arial, Helvetica, sans-serif; padding: 15px;">
+        ${this.buildPdfHeaderHtml(docTitle, "Modelo Oficial de Despacho", "Verba volant, scripta manent", logo)}
         <div style="background: #fff; padding: 20px; font-family: Georgia, serif; font-size: 11px; line-height: 1.8; color: #1E293B; white-space: pre-wrap; border: 1px solid #E2E8F0; border-radius: 6px; margin-top: 10px;">
-          ${previewEl.textContent}
+          ${this.escapeHtml(previewEl.textContent || "")}
         </div>
-        ${this.buildPdfFooterHtml()}
+        ${this.buildPdfFooterHtml(seal)}
       </div>
     `;
-    this.printIsolatedReport(reportHtml, 'portrait');
+    this.printIsolatedReport(reportHtml, "portrait");
   }
 
   // Comprobante Individual de Partida Presupuestaria en PDF
-  exportSinglePresupuestoPdf(presupuestoId) {
+  async exportSinglePresupuestoPdf(presupuestoId) {
     try {
       const item = window.db.get("presupuestos").find(i => i.id === presupuestoId);
       if (!item) {
@@ -803,6 +934,12 @@ class LegalPdfExporter {
         return;
       }
 
+    const bInfo = this.getBranchInfo();
+    const sedeLabel = bInfo.activeSede === "todas"
+      ? "Consolidado Nacional — Todas las Sedes"
+      : (bInfo.branchHeaderLabel || bInfo.branchName);
+    const logoDataUrl = await this.ensureLogoDataUrl();
+    const seal = this.buildDigitalSealPng();
     const curr = window.db.getSettings().currency || "S/";
     const regimenDetalle = item.frecuencia || "Inversión Única";
 
@@ -850,47 +987,52 @@ class LegalPdfExporter {
       }
     }
 
+    const itemSede = item.sede
+      ? ((window.SEDES_CONFIG && window.SEDES_CONFIG[item.sede] && window.SEDES_CONFIG[item.sede].nombre) || String(item.sede).toUpperCase())
+      : sedeLabel;
     const reportHtml = `
-      <div style="font-family: 'Plus Jakarta Sans', Arial, sans-serif; padding: 15px;">
-        ${this.buildPdfHeaderHtml("COMPROBANTE DE PARTIDA PRESUPUESTARIA", `Ficha Técnica Financiera • Partida: ${item.id}`, "Ratio pecuniae in iustitia: Provisio et prosperitas")}
+      <div style="font-family: Arial, Helvetica, sans-serif; padding: 15px;">
+        ${this.buildPdfHeaderHtml("COMPROBANTE DE PARTIDA PRESUPUESTARIA", `Ficha Técnica Financiera • Partida: ${item.id}`, "Ratio pecuniae in iustitia: Provisio et prosperitas", logoDataUrl)}
 
         <!-- Ficha de Datos Principales -->
         <div style="margin-top: 14px; border: 1px solid #CBD5E1; border-radius: 8px; overflow: hidden;">
-          <div style="background: #0F172A; color: #ffffff; padding: 6px 12px; font-size: 10px; font-weight: bold; display: flex; justify-content: space-between; align-items: center;">
-            <span>FICHA TÉCNICA FINANCIERA — PARTIDA N° ${item.id}</span>
-            <span style="background: #C5A059; color: #0F172A; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 800;">${item.tipo}</span>
-          </div>
+          <table style="width: 100%; border-collapse: collapse; background: #0F172A; color: #ffffff;">
+            <tr>
+              <td style="padding: 6px 12px; font-size: 10px; font-weight: bold;">FICHA TÉCNICA FINANCIERA — PARTIDA N° ${this.escapeHtml(item.id)}</td>
+              <td style="padding: 6px 12px; text-align: right;"><span style="background: #C5A059; color: #0F172A; padding: 2px 8px; border-radius: 4px; font-size: 9px; font-weight: 800;">${this.escapeHtml(item.tipo || "")}</span></td>
+            </tr>
+          </table>
 
           <table style="width: 100%; border-collapse: collapse; font-size: 9.5px;">
             <tr style="border-bottom: 1px solid #E2E8F0;">
               <td style="padding: 7px 10px; width: 22%; background: #F8FAFC; font-weight: bold; color: #475569;">Concepto / Objeto:</td>
-              <td colspan="3" style="padding: 7px 10px; font-weight: 800; font-size: 10.5px; color: #0F172A;">${item.concepto}</td>
+              <td colspan="3" style="padding: 7px 10px; font-weight: 800; font-size: 10.5px; color: #0F172A;">${this.escapeHtml(item.concepto || "")}</td>
             </tr>
             <tr style="border-bottom: 1px solid #E2E8F0;">
               <td style="padding: 7px 10px; background: #F8FAFC; font-weight: bold; color: #475569;">Categoría Presupuestal:</td>
-              <td style="padding: 7px 10px; font-weight: 600; color: #1E293B;">${item.categoria}</td>
+              <td style="padding: 7px 10px; font-weight: 600; color: #1E293B;">${this.escapeHtml(item.categoria || "")}</td>
               <td style="padding: 7px 10px; width: 20%; background: #F8FAFC; font-weight: bold; color: #475569;">Subcategoría:</td>
-              <td style="padding: 7px 10px; font-weight: 600; color: #B45309;">${item.subcategoria || 'General / Principal'}</td>
+              <td style="padding: 7px 10px; font-weight: 600; color: #B45309;">${this.escapeHtml(item.subcategoria || "General / Principal")}</td>
             </tr>
             <tr style="border-bottom: 1px solid #E2E8F0;">
               <td style="padding: 7px 10px; background: #F8FAFC; font-weight: bold; color: #475569;">Centro de Costos:</td>
-              <td style="padding: 7px 10px; font-weight: bold; color: #1E3A8A;">${item.centroCosto || (item.id ? item.id.split('-')[1] : 'ADM')} (Sede Challhuahuacho)</td>
+              <td style="padding: 7px 10px; font-weight: bold; color: #1E3A8A;">${this.escapeHtml(item.centroCosto || (item.id ? item.id.split("-")[1] : "ADM"))} (${this.escapeHtml(itemSede)})</td>
               <td style="padding: 7px 10px; background: #F8FAFC; font-weight: bold; color: #475569;">Clase de Gasto (PCGE):</td>
-              <td style="padding: 7px 10px; font-weight: bold; color: #047857;">PCGE Clase ${item.clasePcge || (item.id ? item.id.split('-')[2] : '63')}</td>
+              <td style="padding: 7px 10px; font-weight: bold; color: #047857;">PCGE Clase ${this.escapeHtml(item.clasePcge || (item.id ? item.id.split("-")[2] : "63"))}</td>
             </tr>
             <tr style="border-bottom: 1px solid #E2E8F0;">
               <td style="padding: 7px 10px; background: #F8FAFC; font-weight: bold; color: #475569;">Régimen / Frecuencia:</td>
-              <td style="padding: 7px 10px; font-weight: 600; color: #1E293B;">${regimenDetalle}</td>
+              <td style="padding: 7px 10px; font-weight: 600; color: #1E293B;">${this.escapeHtml(regimenDetalle)}</td>
               <td style="padding: 7px 10px; background: #F8FAFC; font-weight: bold; color: #475569;">Estado / Prioridad:</td>
               <td style="padding: 7px 10px;">
-                <span style="font-weight: bold; color: #0284C7;">${item.estado}</span> • Prioridad: <span style="font-weight: bold; color: #DC2626;">${item.prioridad || 'Alta'}</span>
+                <span style="font-weight: bold; color: #0284C7;">${this.escapeHtml(item.estado || "")}</span> • Prioridad: <span style="font-weight: bold; color: #DC2626;">${this.escapeHtml(item.prioridad || "Alta")}</span>
               </td>
             </tr>
             <tr>
               <td style="padding: 7px 10px; background: #F8FAFC; font-weight: bold; color: #475569;">Responsable Asignado:</td>
-              <td style="padding: 7px 10px; font-weight: 600; color: #1E293B;">${item.responsable || 'Ing. Yimer Damián Soto'}</td>
+              <td style="padding: 7px 10px; font-weight: 600; color: #1E293B;">${this.escapeHtml(item.responsable || this.getExporterIdentity().name)}</td>
               <td style="padding: 7px 10px; background: #F8FAFC; font-weight: bold; color: #475569;">Sede de Aplicación:</td>
-              <td style="padding: 7px 10px; font-weight: 600; color: #059669;">Sede Challhuahuacho (Cotabambas)</td>
+              <td style="padding: 7px 10px; font-weight: 600; color: #059669;">${this.escapeHtml(itemSede)}</td>
             </tr>
           </table>
         </div>
@@ -1017,11 +1159,51 @@ class LegalPdfExporter {
           </div>
         ` : ''}
 
-        ${this.buildPdfFooterHtml()}
+        ${this.buildPdfFooterHtml(seal)}
       </div>
     `;
 
-    this.printIsolatedReport(reportHtml, 'portrait');
+      try {
+        if (typeof html2pdf === "undefined" && window.PaoloLibLoader) {
+          await window.PaoloLibLoader.loadPdf();
+        }
+      } catch (_) {}
+
+      if (typeof html2pdf !== "undefined") {
+        const box = document.createElement("div");
+        box.style.padding = "16px";
+        box.style.background = "#fff";
+        box.style.width = "794px";
+        box.innerHTML = reportHtml;
+        document.body.appendChild(box);
+        await Promise.all(
+          Array.from(box.querySelectorAll("img")).map((img) =>
+            img.complete
+              ? Promise.resolve()
+              : new Promise((r) => {
+                  img.onload = () => r();
+                  img.onerror = () => r();
+                })
+          )
+        );
+        try {
+          await html2pdf()
+            .set({
+              margin: [8, 8, 8, 10],
+              filename: `PAOLO_ALDEA_Partida_${item.id}_${bInfo.branchSlug}.pdf`,
+              image: { type: "jpeg", quality: 0.98 },
+              html2canvas: { scale: 2, useCORS: true, allowTaint: true, backgroundColor: "#FFFFFF" },
+              jsPDF: { unit: "mm", format: "a4", orientation: "portrait" }
+            })
+            .from(box)
+            .save();
+          if (window.app?.showToast) window.app.showToast("Comprobante PDF descargado", "success");
+        } finally {
+          box.remove();
+        }
+      } else {
+        this.printIsolatedReport(reportHtml, "portrait");
+      }
   } catch (err) {
     console.error("Error al exportar comprobante presupuestario a PDF:", err);
     if (window.app?.showToast) {

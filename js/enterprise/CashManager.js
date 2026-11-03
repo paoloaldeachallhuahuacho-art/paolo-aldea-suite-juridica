@@ -1,7 +1,13 @@
 /**
- * CashManager — transiciones de caja vía Edge/RPC; montos en céntimos.
+ * CashManager — transiciones de caja vía Edge (syncToken o JWT).
  */
 (function (global) {
+  function edgeUrl(name) {
+    return (global.PaoloEnterpriseConfig && global.PaoloEnterpriseConfig.edgeUrl)
+      ? global.PaoloEnterpriseConfig.edgeUrl(name)
+      : "/api/" + name;
+  }
+
   function toCentavos(monto) {
     const n = Number(monto);
     if (!Number.isFinite(n)) return 0;
@@ -10,6 +16,20 @@
 
   function fromCentavos(c) {
     return (Number(c) || 0) / 100;
+  }
+
+  function authHeaders() {
+    const headers = { "Content-Type": "application/json" };
+    const jwt = global.PaoloAuthService && global.PaoloAuthService.getAccessToken
+      ? global.PaoloAuthService.getAccessToken()
+      : null;
+    const sync =
+      global.PaoloCloudDataSync && typeof global.PaoloCloudDataSync.getToken === "function"
+        ? global.PaoloCloudDataSync.getToken()
+        : "";
+    if (jwt) headers.Authorization = "Bearer " + jwt;
+    else if (sync) headers.Authorization = "Bearer " + sync;
+    return { headers, syncToken: sync || null, hasAuth: !!(jwt || sync) };
   }
 
   async function enqueueLocalEntry(entry) {
@@ -27,25 +47,41 @@
       };
       await global.PaoloSyncManager.enqueue("caja_chica", "upsert", remote);
     }
+    if (global.PaoloCloudDataSync && typeof global.PaoloCloudDataSync.schedulePush === "function") {
+      global.PaoloCloudDataSync.schedulePush("caja_chica");
+    }
   }
 
-  async function transition(entryId, newState) {
+  async function transition(entryId, newState, comentario) {
     if (!global.PaoloEnterpriseConfig || !global.PaoloEnterpriseConfig.isEnterprise()) {
       return { ok: true, offline: true, state: newState };
     }
-    const tok = global.PaoloAuthService && global.PaoloAuthService.getAccessToken();
-    if (!tok) {
-      throw new Error("Sesión Supabase requerida para transiciones de caja en la nube.");
+
+    const auth = authHeaders();
+    if (!auth.hasAuth) {
+      const local = (global.db && global.db.getRaw)
+        ? (global.db.getRaw("caja_chica") || []).find((r) => String(r.id) === String(entryId))
+        : null;
+      if (local) {
+        try { await enqueueLocalEntry(local); } catch (_) {}
+      }
+      return { ok: true, deferred: true, state: newState, reason: "no_session" };
     }
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + tok
-    };
-    const res = await fetch("/.netlify/functions/petty-cash-transition", {
+
+    // Asegurar que el asiento esté en la nube antes de transicionar.
+    if (global.PaoloCloudDataSync && typeof global.PaoloCloudDataSync.pushCollection === "function") {
+      try { await global.PaoloCloudDataSync.pushCollection("caja_chica"); } catch (_) {}
+    }
+
+    const body = { entry_id: entryId, new_state: newState };
+    if (comentario) body.comentario = comentario;
+    if (auth.syncToken) body.syncToken = auth.syncToken;
+
+    const res = await fetch(edgeUrl("petty-cash-transition"), {
       method: "POST",
-      headers,
+      headers: auth.headers,
       credentials: "same-origin",
-      body: JSON.stringify({ entry_id: entryId, new_state: newState })
+      body: JSON.stringify(body)
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || data.ok === false) {

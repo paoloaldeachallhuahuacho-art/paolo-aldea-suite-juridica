@@ -1,9 +1,15 @@
 /**
- * POST — Sube/actualiza registros a app_records (LWW por updatedAt).
+ * POST — Sube/actualiza registros a app_records con LWW por timestamp.
  * Body: { syncToken, collection, records: [], deletedIds?: [] }
  */
 const { corsHeaders, assertAllowedOrigin, supabaseRest, jsonError } = require("./_supabaseAdmin");
-const { verifySyncToken, SYNC_COLLECTIONS, normalizeBranch } = require("./_syncToken");
+const {
+  verifySyncToken,
+  SYNC_COLLECTIONS,
+  normalizeBranch,
+  stripSensitiveRecord,
+  canWriteStaffCollection
+} = require("./_syncToken");
 
 function parseBody(event) {
   try {
@@ -17,6 +23,17 @@ function branchOf(record, claims) {
   const sede = (record && record.sede) || claims.sede || "challhuahuacho";
   if (sede === "todas") return "challhuahuacho";
   return sede;
+}
+
+function recordTs(rec) {
+  if (!rec) return 0;
+  const client = Math.max(
+    Date.parse(rec.updatedAt || 0) || 0,
+    Date.parse(rec.updated_at || 0) || 0,
+    Date.parse(rec.createdAt || 0) || 0
+  );
+  const server = Date.parse(rec.server_ts || 0) || 0;
+  return Math.max(client, server);
 }
 
 exports.handler = async (event) => {
@@ -56,19 +73,72 @@ exports.handler = async (event) => {
     const userBranch = normalizeBranch(claims.sede, claims.role);
     const records = Array.isArray(body.records) ? body.records : [];
     const deletedIds = Array.isArray(body.deletedIds) ? body.deletedIds : [];
+
+    // El padrón (hashes, roles) no se escribe desde un abogado o asistente.
+    // Respuesta 200 para no romper pushAllLocal del resto de colecciones.
+    if (collection === "workers" && !canWriteStaffCollection(claims)) {
+      return {
+        statusCode: 200,
+        headers,
+        body: JSON.stringify({
+          ok: true,
+          upserted: 0,
+          skipped: records.length + deletedIds.length,
+          deleted: 0,
+          ignored: "workers_role"
+        })
+      };
+    }
     const now = new Date().toISOString();
     let upserted = 0;
+    let skipped = 0;
     let deleted = 0;
 
-    for (const rec of records) {
-      if (!rec || !rec.id) continue;
+    for (const raw of records) {
+      if (!raw || !raw.id) continue;
+      let rec = raw;
+      if (collection === "workers") {
+        rec = stripSensitiveRecord(rec);
+        const targetRole = String(rec.rol || rec.role || "");
+        if ((targetRole === "super_admin" || targetRole === "socio") && !isGlobal) {
+          skipped += 1;
+          continue;
+        }
+      }
       const branchId = branchOf(rec, claims);
       if (!isGlobal && userBranch && branchId !== userBranch) {
-        continue; // no publicar fuera de sede
+        skipped += 1;
+        continue;
       }
+
+      const id = String(rec.id);
+      let existing = null;
+      try {
+        const rows = await supabaseRest(
+          "app_records?collection=eq." +
+            encodeURIComponent(collection) +
+            "&id=eq." +
+            encodeURIComponent(id) +
+            "&select=payload,updated_at,server_ts,deleted_at&limit=1"
+        );
+        existing = Array.isArray(rows) && rows[0] ? rows[0] : null;
+      } catch (_) {
+        existing = null;
+      }
+
+      if (existing && !existing.deleted_at) {
+        const remoteTs = Date.parse(existing.server_ts || existing.updated_at || 0) || 0;
+        const localTs = recordTs(rec);
+        // Si el remoto es más nuevo, no sobrescribir (LWW).
+        if (remoteTs > localTs) {
+          skipped += 1;
+          continue;
+        }
+      }
+
       const row = {
         collection,
-        id: String(rec.id),
+        id,
         branch_id: branchId,
         payload: rec,
         deleted_at: null,
@@ -85,14 +155,17 @@ exports.handler = async (event) => {
 
     for (const id of deletedIds) {
       if (!id) continue;
-      // Soft delete
-      const patchPath =
+      // Soft-delete solo dentro del alcance de sede del actor (anti cross-branch wipe).
+      let delPath =
         "app_records?collection=eq." +
         encodeURIComponent(collection) +
         "&id=eq." +
         encodeURIComponent(String(id));
+      if (!isGlobal && userBranch) {
+        delPath += "&branch_id=eq." + encodeURIComponent(userBranch);
+      }
       try {
-        await supabaseRest(patchPath, {
+        await supabaseRest(delPath, {
           method: "PATCH",
           body: { deleted_at: now, updated_at: now, server_ts: now },
           prefer: "return=minimal"
@@ -104,7 +177,7 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers,
-      body: JSON.stringify({ ok: true, upserted, deleted })
+      body: JSON.stringify({ ok: true, upserted, skipped, deleted, lww: true })
     };
   } catch (err) {
     return jsonError(headers, err, 500);

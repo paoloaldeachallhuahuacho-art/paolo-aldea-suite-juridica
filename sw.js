@@ -5,13 +5,19 @@
 // Compatible con Android (Chrome) e iOS (Safari PWA 16.4+)
 // =========================================================================
 
-const CACHE_NAME = 'paolo-aldea-pwa-v2026.11-app-records-sync';
+const CACHE_NAME = 'paolo-aldea-pwa-v2026.11.06';
 const ASSETS_TO_CACHE = [
   './',
   './index.html',
   './manifest.json',
   './css/styles.css',
   './assets/logo_paolo_aldea.jpg',
+  './assets/sedes/sede-challhuahuacho.jpg',
+  './assets/sedes/sede-cusco.jpg',
+  './assets/sedes/sede-abancay.jpg',
+  './assets/sedes/sede-miraflores.jpg',
+  './assets/sedes/sede-huaraz.jpg',
+  './assets/sedes/sede-nacional.jpg',
   './lib/tailwind.js',
   './lib/chart.min.js',
   './lib/exceljs.min.js',
@@ -23,6 +29,7 @@ const ASSETS_TO_CACHE = [
   './lib/fa/webfonts/fa-brands-400.woff2',
   './js/data.js',
   './js/boot-early.js',
+  './js/app-update.js',
   './js/tailwind-config.js',
   './js/auth-bridge.js',
   './js/lib-loader.js',
@@ -69,7 +76,7 @@ const ASSETS_TO_CACHE = [
 ];
 
 self.addEventListener('install', (event) => {
-  self.skipWaiting();
+  // No activar solo: la pantalla pide confirmación para no cortar un registro a medias.
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
       return cache.addAll(ASSETS_TO_CACHE).catch(err => {
@@ -77,6 +84,12 @@ self.addEventListener('install', (event) => {
       });
     })
   );
+});
+
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('activate', (event) => {
@@ -99,6 +112,7 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
+  if (url.pathname.startsWith('/api/') || url.pathname.startsWith('/.netlify/functions/')) return;
 
   // Ignorar peticiones de APIs en tiempo real (Firestore, Supabase, Telegram, ntfy)
   if (!url.origin.includes(self.location.origin) && !url.origin.includes('fonts.googleapis.com') && !url.origin.includes('fonts.gstatic.com') && !url.origin.includes('gstatic.com')) {

@@ -66,7 +66,10 @@ JSDOM.fromURL("http://localhost:" + port() + "/index.html", {
     const workers = w.db.getRaw("workers");
     ok("workers es array tras ready", Array.isArray(workers));
     ok("stub no rompe needsAuthBootstrap", typeof w.db.needsAuthBootstrap() === "boolean");
-    ok("jsStr escapa comillas peligrosas", w.jsStr("x');alert(1)//") === JSON.stringify("x');alert(1)//"));
+    ok(
+      "jsStr escapa comillas para atributos HTML onclick",
+      w.jsStr("x');alert(1)//") === JSON.stringify("x');alert(1)//").replace(/&/g, "&amp;").replace(/"/g, "&quot;")
+    );
     ok("safeImageSrc bloquea onerror", w.safeImageSrc("\" onerror=\"alert(1)") === "");
     ok("safeImageSrc acepta data jpeg", /^data:image\/jpeg/i.test(w.safeImageSrc("data:image/jpeg;base64,abc=")));
 

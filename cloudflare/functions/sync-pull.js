@@ -3,7 +3,7 @@
  * Body: { syncToken }
  */
 const { corsHeaders, assertAllowedOrigin, supabaseRest, jsonError } = require("./_supabaseAdmin");
-const { verifySyncToken, SYNC_COLLECTIONS, normalizeBranch } = require("./_syncToken");
+const { verifySyncToken, SYNC_COLLECTIONS, normalizeBranch, stripSensitiveRecord } = require("./_syncToken");
 
 function parseBody(event) {
   try {
@@ -52,7 +52,8 @@ exports.handler = async (event) => {
       for (const row of rows) {
         const col = row.collection;
         if (!SYNC_COLLECTIONS.includes(col)) continue;
-        const payload = row.payload && typeof row.payload === "object" ? { ...row.payload } : {};
+        let payload = row.payload && typeof row.payload === "object" ? { ...row.payload } : {};
+        if (col === "workers") payload = stripSensitiveRecord(payload);
         payload.id = payload.id || row.id;
         payload.sede = payload.sede || row.branch_id;
         payload.server_ts = row.server_ts;

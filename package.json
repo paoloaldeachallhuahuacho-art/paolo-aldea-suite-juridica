@@ -1,6 +1,6 @@
 ﻿{
     "name":  "paolo-aldea-suite-juridica",
-    "version":  "2026.11.0",
+    "version":  "2026.11.06",
     "private":  true,
     "description":  "Suite Integral de Gestión Jurídica, Operativa y Administrativa para PAOLO ALDEA \u0026 ABOGADOS (Sede Challhuahuacho y Red Multi-Sede Nacional)",
     "main":  "index.html",
@@ -8,7 +8,7 @@
                     "start":  "powershell -ExecutionPolicy Bypass -File ./servidor_local.ps1",
                     "build":  "powershell -ExecutionPolicy Bypass -File ./herramientas/compilar_bundle_html.ps1",
                     "backup":  "powershell -ExecutionPolicy Bypass -File ./herramientas/respaldo_automatico.ps1",
-                    "test":  "node tests/smoke.test.js \u0026\u0026 node tests/rbac.test.js \u0026\u0026 node tests/modules.test.js \u0026\u0026 node tests/storage-hydrate.test.js \u0026\u0026 node tests/enterprise-zt.test.js \u0026\u0026 node tests/edge-auth.test.js \u0026\u0026 node tests/cloud-auth-gate.test.js",
+                    "test":  "node tests/smoke.test.js \u0026\u0026 node tests/rbac.test.js \u0026\u0026 node tests/modules.test.js \u0026\u0026 node tests/storage-hydrate.test.js \u0026\u0026 node tests/enterprise-zt.test.js \u0026\u0026 node tests/edge-auth.test.js \u0026\u0026 node tests/cloud-auth-gate.test.js && node tests/cloudflare-adapter.test.js && node tests/enterprise-sync-rls.test.js && node tests/ops-flows.test.js",
                     "audit":  "powershell -NoProfile -ExecutionPolicy Bypass -File ./herramientas/compilar_bundle_html.ps1"
                 },
     "keywords":  [

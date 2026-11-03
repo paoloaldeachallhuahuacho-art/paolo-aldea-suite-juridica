@@ -17,7 +17,7 @@
 1. En Supabase → **SQL Editor**, ejecuta el contenido completo de `20261102_enterprise_zero_trust.sql`.
 2. En Netlify, configura `ALLOWED_ORIGIN`, `SUPABASE_URL`, `SUPABASE_ANON_KEY` (ver `.env.example`).
 3. Crea usuarios Auth con `app_metadata.role` + `app_metadata.branch_id`.
-4. Verifica que `POST /.netlify/functions/attendance-validate` sin Bearer responda **401**.
+4. Verifica que `POST /api/attendance-validate` sin Bearer responda **401**.
 
 Detalle completo: **[`docs/DEPLOY.md`](../docs/DEPLOY.md)**.
 

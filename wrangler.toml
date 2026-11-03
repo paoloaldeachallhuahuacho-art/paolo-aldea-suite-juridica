@@ -1,0 +1,4 @@
+name = "paoloaldea-abogados"
+compatibility_date = "2026-11-02"
+compatibility_flags = ["nodejs_compat", "nodejs_compat_populate_process_env"]
+pages_build_output_dir = "."

@@ -12,7 +12,7 @@ function hashLikeBrowser(plain, iterations = 210000) {
   return "pbkdf2$" + iterations + "$" + salt.toString("base64") + "$" + bits.toString("base64");
 }
 
-const { verifyPbkdf2Secret, isValidPasswordHash } = require("../netlify/functions/_supabaseAdmin");
+const { verifyPbkdf2Secret, isValidPasswordHash } = require("../cloudflare/functions/_supabaseAdmin");
 
 const pass = "MinaCotabambas#9";
 const stored = hashLikeBrowser(pass);

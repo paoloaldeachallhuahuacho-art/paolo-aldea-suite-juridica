@@ -1495,7 +1495,13 @@ class LegalExcelExporter {
       const sedeCfg = window.SEDES_CONFIG ? window.SEDES_CONFIG[w.sede] : null;
       const sedeLabel = sedeCfg ? sedeCfg.nombreCorto : (w.sede === "todas" ? "Consolidado Nacional" : w.sede);
       const rolLabel = window.db ? window.db.getRoleLabel(w.rol) : w.rol;
-      const despachoLabel = w.despacho ? ("Despacho " + String(w.despacho).replace(/^despacho\s*/i, "")) : "-";
+      const despachoLegacy = {
+        "Despacho General 1": "Despacho 1",
+        "Despacho General 2": "Despacho 2",
+        "Despacho General 3": "Despacho 3",
+        "Admin General": "Administrador General"
+      };
+      const despachoLabel = w.despacho ? (despachoLegacy[w.despacho] || w.despacho) : "-";
 
       row.values = [
         index + 1,

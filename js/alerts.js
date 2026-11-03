@@ -184,7 +184,7 @@ class AlertEngine {
             const idTok = await window.firebaseService.getIdToken();
             if (idTok) headers.Authorization = "Bearer " + idTok;
           }
-          return fetch("/.netlify/functions/telegram-proxy", {
+          return fetch("/api/telegram-proxy", {
             method: "POST",
             headers,
             body: JSON.stringify({ text })
@@ -837,32 +837,116 @@ class AlertEngine {
     }
   }
 
+  _bannerDismissKey(alert) {
+    if (!alert) return "";
+    return String(alert.type || "") + "|" + String(alert.id || "") + "|" + String(alert.date || "");
+  }
+
+  _loadDismissedBanners() {
+    try {
+      const raw = sessionStorage.getItem("PA_ALERT_BANNER_DISMISSED") || "{}";
+      const data = JSON.parse(raw);
+      return data && typeof data === "object" ? data : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  _saveDismissedBanners(map) {
+    try {
+      sessionStorage.setItem("PA_ALERT_BANNER_DISMISSED", JSON.stringify(map || {}));
+    } catch (_) {}
+  }
+
+  dismissTopBanner(persistKey) {
+    try {
+      clearTimeout(this._bannerAutoHideTimer);
+      this._bannerAutoHideTimer = null;
+      const banner = document.getElementById("topAlertBanner");
+      if (banner) banner.classList.add("hidden");
+      const container = document.getElementById("topAlertBannerContent");
+      if (container) container.innerHTML = "";
+      if (persistKey) {
+        const map = this._loadDismissedBanners();
+        map[String(persistKey)] = Date.now();
+        this._saveDismissedBanners(map);
+      }
+    } catch (err) {
+      console.warn("[alerts] dismissTopBanner:", err && err.message);
+      const banner = document.getElementById("topAlertBanner");
+      if (banner) banner.classList.add("hidden");
+    }
+  }
+
   renderAlertBanner() {
     const banner = document.getElementById("topAlertBanner");
     const container = document.getElementById("topAlertBannerContent");
     if (!banner || !container) return;
 
+    // Restaurar estilo base de alertas críticas (puede haber sido alterado por Meet).
+    banner.className =
+      "hidden bg-gradient-to-r from-red-100 via-rose-50 to-red-100 border-b border-red-300 px-3 sm:px-6 py-2.5 shrink-0 transition-all";
+
     if (this.alerts.urgent.length > 0) {
-      const topAlert = this.alerts.urgent[0];
+      const dismissed = this._loadDismissedBanners();
+      const visible = this.alerts.urgent.filter((a) => !dismissed[this._bannerDismissKey(a)]);
+      if (!visible.length) {
+        banner.classList.add("hidden");
+        container.innerHTML = "";
+        return;
+      }
+      const topAlert = visible[0];
+      const key = this._bannerDismissKey(topAlert);
+      const safeTitle =
+        typeof escapeHtml === "function" ? escapeHtml(topAlert.title || "") : String(topAlert.title || "");
+      const safeSub =
+        typeof escapeHtml === "function" ? escapeHtml(topAlert.subtitle || "") : String(topAlert.subtitle || "");
+      const safeMeta =
+        typeof escapeHtml === "function" ? escapeHtml(topAlert.meta || "") : String(topAlert.meta || "");
       container.innerHTML = `
         <div class="flex items-center justify-between gap-3 text-xs md:text-sm">
-          <div class="flex items-center gap-2">
-            <span class="flex h-3 w-3 relative">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="flex h-3 w-3 relative shrink-0">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span class="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
             </span>
-            <span class="font-bold text-red-900">${topAlert.title}:</span>
-            <span class="text-red-800 truncate max-w-[280px] sm:max-w-md md:max-w-xl">${topAlert.subtitle} - <span class="font-medium underline">${topAlert.meta}</span></span>
+            <span class="font-bold text-red-900 shrink-0">${safeTitle}:</span>
+            <span class="text-red-800 truncate max-w-[200px] sm:max-w-md md:max-w-xl">${safeSub} - <span class="font-medium underline">${safeMeta}</span></span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <span class="bg-red-200 text-red-900 px-2 py-0.5 rounded text-xs font-bold">${this.alerts.urgent.length} alerta(s) crítica(s)</span>
-            <button onclick="window.alerts.openDrawer()" class="bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded text-xs font-semibold transition">Ver Todas</button>
+            <span class="hidden sm:inline bg-red-200 text-red-900 px-2 py-0.5 rounded text-xs font-bold">${visible.length} alerta(s) crítica(s)</span>
+            <button type="button" data-alert-action="open-drawer" class="bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded text-xs font-semibold transition min-h-[36px]">Ver Todas</button>
+            <button type="button" data-alert-action="dismiss" class="min-w-[36px] min-h-[36px] rounded-lg text-red-800 hover:bg-red-200/80 flex items-center justify-center touch-manipulation" title="Cerrar banner" aria-label="Cerrar alerta">
+              <i class="fa-solid fa-xmark pointer-events-none"></i>
+            </button>
           </div>
         </div>
       `;
+      const openBtn = container.querySelector('[data-alert-action="open-drawer"]');
+      const closeBtn = container.querySelector('[data-alert-action="dismiss"]');
+      if (openBtn) {
+        openBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.openDrawer();
+        });
+      }
+      if (closeBtn) {
+        closeBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.dismissTopBanner(key);
+        });
+      }
       banner.classList.remove("hidden");
+      // Auto-ocultar a los 45 s (sigue disponible en el cajón de alertas).
+      clearTimeout(this._bannerAutoHideTimer);
+      this._bannerAutoHideTimer = setTimeout(() => {
+        this.dismissTopBanner(key);
+      }, 45000);
     } else {
       banner.classList.add("hidden");
+      container.innerHTML = "";
     }
   }
 

@@ -67,18 +67,55 @@ class FirebaseLegalService {
   }
 
   /**
-   * Inicializa Firebase si está disponible la librería y la configuración
+   * Carga diferida del SDK solo si hay credenciales Firebase guardadas.
+   * Por defecto el arranque NO incluye gstatic: la nube canónica es Supabase.
+   */
+  async ensureSdk() {
+    if (typeof firebase !== "undefined") return true;
+    if (!this.hasCredentials()) return false;
+    if (this._sdkPromise) return this._sdkPromise;
+    this._sdkPromise = new Promise((resolve) => {
+      const version = "10.14.2";
+      const files = [
+        `https://www.gstatic.com/firebasejs/${version}/firebase-app-compat.js`,
+        `https://www.gstatic.com/firebasejs/${version}/firebase-auth-compat.js`,
+        `https://www.gstatic.com/firebasejs/${version}/firebase-firestore-compat.js`
+      ];
+      let i = 0;
+      const next = () => {
+        if (i >= files.length) {
+          resolve(typeof firebase !== "undefined");
+          return;
+        }
+        const s = document.createElement("script");
+        s.src = files[i++];
+        s.async = true;
+        s.onload = next;
+        s.onerror = () => {
+          console.warn("[Firebase] No se pudo cargar el SDK bajo demanda.");
+          resolve(false);
+        };
+        document.head.appendChild(s);
+      };
+      next();
+    });
+    return this._sdkPromise;
+  }
+
+  /**
+   * Inicializa Firebase solo si hay config local. Sin config: no-op (Supabase es canónico).
    */
   async init() {
     if (this.isInitialized && this.firestore) return true;
 
-    if (typeof firebase === "undefined") {
-      console.info("[Firebase] SDK no cargado en este momento. Funcionando en modo local.");
+    const config = this.getConfig();
+    if (!config || !config.apiKey || !config.projectId) {
       return false;
     }
 
-    const config = this.getConfig();
-    if (!config || !config.apiKey || !config.projectId) {
+    const sdkOk = await this.ensureSdk();
+    if (!sdkOk || typeof firebase === "undefined") {
+      console.info("[Firebase] SDK no disponible. Sync canónico: Supabase / CloudDataSync.");
       return false;
     }
 

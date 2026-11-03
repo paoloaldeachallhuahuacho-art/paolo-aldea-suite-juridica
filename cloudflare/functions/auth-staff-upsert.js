@@ -1,7 +1,6 @@
 /**
  * POST — Upsert colaborador en staff_directory (tras crear/editar Personal).
- * Requiere Origin permitido. Protegido por secreto de sesión local opcional:
- * body.passwordHash obligatorio para el registro.
+ * Requiere Origin + syncToken (admin/socio/super_admin). Origin solo NO basta.
  */
 const {
   corsHeaders,
@@ -10,6 +9,10 @@ const {
   jsonError,
   isValidPasswordHash
 } = require("./_supabaseAdmin");
+const { verifySyncToken, normalizeBranch } = require("./_syncToken");
+
+const STAFF_ADMIN_ROLES = new Set(["super_admin", "socio", "admin"]);
+const PRIVILEGED_ROLES = new Set(["super_admin", "socio"]);
 
 function parseBody(event) {
   try {
@@ -17,6 +20,17 @@ function parseBody(event) {
   } catch (_) {
     return null;
   }
+}
+
+function requireStaffAdmin(body) {
+  const token = (body && (body.syncToken || body.token)) || "";
+  const claims = verifySyncToken(token);
+  if (!STAFF_ADMIN_ROLES.has(String(claims.role || ""))) {
+    const err = new Error("Se requiere rol admin/socio/super_admin para gestionar personal.");
+    err.status = 403;
+    throw err;
+  }
+  return claims;
 }
 
 exports.handler = async (event) => {
@@ -28,7 +42,7 @@ exports.handler = async (event) => {
       headers: {
         ...headers,
         "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type"
+        "Access-Control-Allow-Headers": "Content-Type, Authorization"
       },
       body: ""
     };
@@ -46,6 +60,10 @@ exports.handler = async (event) => {
       err.status = 400;
       throw err;
     }
+
+    const claims = requireStaffAdmin(body);
+    const actorIsGlobal = PRIVILEGED_ROLES.has(claims.role) || claims.sede === "todas";
+    const actorBranch = normalizeBranch(claims.sede, claims.role);
 
     // Solo permitir upsert si el despacho ya está bootstrapped
     let bootstrapped = false;
@@ -66,7 +84,46 @@ exports.handler = async (event) => {
       throw err;
     }
 
-    const branchId = body.sede && body.sede !== "todas" ? String(body.sede) : "challhuahuacho";
+    const requestedRole = String(body.rol || body.role || "asistente_admin");
+    if (PRIVILEGED_ROLES.has(requestedRole) && !actorIsGlobal) {
+      const err = new Error("Sin permiso para asignar rol privilegiado.");
+      err.status = 403;
+      throw err;
+    }
+
+    let branchId =
+      body.sede && body.sede !== "todas" ? String(body.sede) : "challhuahuacho";
+    if (requestedRole === "super_admin" && body.sede === "todas") {
+      branchId = "challhuahuacho";
+    }
+    if (!actorIsGlobal && actorBranch && branchId !== actorBranch) {
+      const err = new Error("Sin permiso para gestionar personal de otra sede.");
+      err.status = 403;
+      throw err;
+    }
+
+    // Evitar que un admin de sede escale un registro existente a super_admin/socio
+    try {
+      const existing = await supabaseRest(
+        "staff_directory?id=eq." + encodeURIComponent(String(body.id)) + "&select=role,branch_id&limit=1"
+      );
+      const prev = Array.isArray(existing) && existing[0] ? existing[0] : null;
+      if (prev) {
+        if (PRIVILEGED_ROLES.has(prev.role) && !actorIsGlobal) {
+          const err = new Error("Sin permiso para modificar un usuario privilegiado.");
+          err.status = 403;
+          throw err;
+        }
+        if (!actorIsGlobal && actorBranch && prev.branch_id && prev.branch_id !== actorBranch) {
+          const err = new Error("Sin permiso para modificar personal de otra sede.");
+          err.status = 403;
+          throw err;
+        }
+      }
+    } catch (e) {
+      if (e && e.status) throw e;
+    }
+
     const row = {
       id: String(body.id),
       usuario: String(body.usuario).trim().toLowerCase(),
@@ -74,7 +131,7 @@ exports.handler = async (event) => {
       dni: body.dni ? String(body.dni).trim() : null,
       full_name: String(body.nombre || body.full_name || body.usuario),
       cargo: body.cargo || "",
-      role: body.rol || body.role || "asistente_admin",
+      role: requestedRole,
       branch_id: branchId,
       activo: body.activo !== false,
       permisos: body.permisos || null,
@@ -86,7 +143,9 @@ exports.handler = async (event) => {
     // Si no hay hash nuevo, conservar el existente con merge parcial vía GET+POST
     if (!passwordHash) {
       try {
-        const existing = await supabaseRest("staff_directory?id=eq." + encodeURIComponent(row.id) + "&select=password_hash,pin_hash");
+        const existing = await supabaseRest(
+          "staff_directory?id=eq." + encodeURIComponent(row.id) + "&select=password_hash,pin_hash"
+        );
         if (existing && existing[0]) {
           row.password_hash = existing[0].password_hash;
           if (!row.pin_hash) row.pin_hash = existing[0].pin_hash;

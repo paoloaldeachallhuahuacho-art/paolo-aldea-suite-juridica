@@ -12,8 +12,11 @@
       .replace(/'/g, "&#039;");
   }
 
+  /** Para literales JS dentro de atributos HTML onclick="..." */
   function jsStr(val) {
-    return JSON.stringify(String(val ?? ""));
+    return JSON.stringify(String(val ?? ""))
+      .replace(/&/g, "&amp;")
+      .replace(/"/g, "&quot;");
   }
 
   function sanitizeHtml(dirty) {
@@ -30,5 +33,6 @@
 
   global.PaoloSanitize = { escapeHtml, jsStr, sanitizeHtml };
   if (!global.escapeHtml) global.escapeHtml = escapeHtml;
-  if (!global.jsStr) global.jsStr = jsStr;
+  // Siempre sobrescribe: evita que un app.js cacheado viejo deje jsStr sin &quot;.
+  global.jsStr = jsStr;
 })(typeof window !== "undefined" ? window : globalThis);

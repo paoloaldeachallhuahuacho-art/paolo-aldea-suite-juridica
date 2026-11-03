@@ -100,6 +100,39 @@ const AttendanceModule = (function () {
     return Math.round(R * c);
   }
 
+  /** Radio efectivo = geocerca + buffer de precisión GPS (tope 80 m). */
+  function effectiveGeofenceRadius(radio, accuracyM) {
+    const base = typeof radio === "number" && radio > 0 ? radio : 100;
+    const acc = Math.min(Math.max(Number(accuracyM) || 0, 0), 80);
+    return base + acc;
+  }
+
+  function isMobileUa() {
+    return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || "");
+  }
+
+  function gpsPositionOptions(kind) {
+    if (kind === "quick") {
+      return { enableHighAccuracy: true, timeout: isMobileUa() ? 20000 : 10000, maximumAge: 15000 };
+    }
+    return { enableHighAccuracy: true, timeout: isMobileUa() ? 25000 : 12000, maximumAge: 0 };
+  }
+
+  function persistSedeGeo(sedeId, { lat, lon, radio, nombre }) {
+    if (!window.SEDES_CONFIG || !window.SEDES_CONFIG[sedeId]) return;
+    const patch = {};
+    if (typeof lat === "number") patch.lat = lat;
+    if (typeof lon === "number") patch.lon = lon;
+    if (typeof radio === "number") patch.radio = radio;
+    if (nombre) patch.nombre = nombre;
+    window.SEDES_CONFIG[sedeId] = { ...window.SEDES_CONFIG[sedeId], ...patch };
+    try {
+      const custom = JSON.parse(localStorage.getItem("PAOLO_ALDEA_SEDES_CUSTOM") || "{}");
+      custom[sedeId] = { ...(custom[sedeId] || {}), ...patch };
+      localStorage.setItem("PAOLO_ALDEA_SEDES_CUSTOM", JSON.stringify(custom));
+    } catch (_) {}
+  }
+
   let selectedCityOverride = null;
   let manualStationOverride = false;
   let gpsWatchId = null;
@@ -120,7 +153,7 @@ const AttendanceModule = (function () {
         const cfg = window.SEDES_CONFIG[key];
         if (cfg && typeof cfg.lat === "number" && typeof cfg.lon === "number") {
           const d = calculateHaversineDistance(lat, lon, cfg.lat, cfg.lon);
-          const rad = typeof cfg.radio === "number" ? cfg.radio : 100;
+          const rad = typeof cfg.radio === "number" ? cfg.radio : 300;
           if (d <= rad && d < minDistance) {
             minDistance = d;
             bestOffice = {
@@ -195,7 +228,7 @@ const AttendanceModule = (function () {
     const detected = detectNearestOfficeFromCoords(lat, lon);
     const office = detected.office;
     const dist = detected.distance;
-    const isNearOffice = dist <= office.radio;
+    const isNearOffice = dist <= effectiveGeofenceRadius(office.radio, acc);
 
     liveGps.lat = lat;
     liveGps.lon = lon;
@@ -207,6 +240,7 @@ const AttendanceModule = (function () {
     liveGps.distance = dist;
     liveGps.insideGeofence = isNearOffice;
     liveGps.targetSedeNombre = office.nombre;
+    liveGps.detectedOffice = office;
 
     // Si detecta que está cerca (dentro de la geocerca de la oficina), activa automáticamente el botón En Oficina
     // Si detecta que está lejos (fuera de la geocerca), cambia automáticamente a Tiempo Real (GPS Móvil)
@@ -357,15 +391,38 @@ const AttendanceModule = (function () {
 
     const branchCfg = (window.SEDES_CONFIG && window.SEDES_CONFIG[effectiveSede]) ? window.SEDES_CONFIG[effectiveSede] : null;
     const settings = window.db ? window.db.getSettings() : {};
+    const bySede = settings.geofenceBySede && settings.geofenceBySede[effectiveSede]
+      ? settings.geofenceBySede[effectiveSede]
+      : null;
+
+    let lat = branchCfg && typeof branchCfg.lat === "number" ? branchCfg.lat : -14.116667;
+    let lon = branchCfg && typeof branchCfg.lon === "number" ? branchCfg.lon : -72.245000;
+    let radio = branchCfg && typeof branchCfg.radio === "number" ? branchCfg.radio : 300;
+    let nombre = (branchCfg && branchCfg.nombre) || "Sede Challhuahuacho";
+
+    // Overrides guardados (antes se ignoraban si existía SEDES_CONFIG → bug de calibración).
+    if (bySede) {
+      if (typeof bySede.lat === "number") lat = bySede.lat;
+      if (typeof bySede.lon === "number") lon = bySede.lon;
+      if (typeof bySede.radio === "number") radio = bySede.radio;
+      if (bySede.nombre) nombre = bySede.nombre;
+    } else if (effectiveSede === "challhuahuacho") {
+      if (typeof settings.oficinaLat === "number") lat = settings.oficinaLat;
+      if (typeof settings.oficinaLon === "number") lon = settings.oficinaLon;
+      if (typeof settings.oficinaRadioMetros === "number") radio = settings.oficinaRadioMetros;
+      if (settings.oficinaNombre) nombre = settings.oficinaNombre;
+      // Migración: radio legado 100 m era insuficiente vs pin aproximado (~200–250 m).
+      if (radio === 100) radio = 300;
+    }
 
     if (branchCfg) {
       return {
         id: branchCfg.id,
         codigo: branchCfg.codigo || "CHL",
-        lat: typeof branchCfg.lat === "number" ? branchCfg.lat : -14.116667,
-        lon: typeof branchCfg.lon === "number" ? branchCfg.lon : -72.245000,
-        radio: typeof branchCfg.radio === "number" ? branchCfg.radio : (typeof settings.oficinaRadioMetros === "number" ? settings.oficinaRadioMetros : 100),
-        nombre: branchCfg.nombre || "Sede Challhuahuacho",
+        lat,
+        lon,
+        radio,
+        nombre,
         nombreCorto: branchCfg.nombreCorto || "Challhuahuacho",
         direccion: branchCfg.direccion || "",
         ciudad: branchCfg.region || branchCfg.ciudad || ""
@@ -375,10 +432,10 @@ const AttendanceModule = (function () {
     return {
       id: "challhuahuacho",
       codigo: "CHL",
-      lat: typeof settings.oficinaLat === "number" ? settings.oficinaLat : -14.116667,
-      lon: typeof settings.oficinaLon === "number" ? settings.oficinaLon : -72.245000,
-      radio: typeof settings.oficinaRadioMetros === "number" ? settings.oficinaRadioMetros : 100,
-      nombre: settings.oficinaNombre || "Sede Central Challhuahuacho",
+      lat,
+      lon,
+      radio,
+      nombre: nombre || "Sede Central Challhuahuacho",
       nombreCorto: "Challhuahuacho",
       direccion: "Av. Los Mineros Mz. D Lt. 4, Challhuahuacho, Cotabambas",
       ciudad: "Cotabambas, Apurímac"
@@ -465,7 +522,7 @@ const AttendanceModule = (function () {
       if (navigator.geolocation && !liveGps.mode.includes("sim_")) {
         try {
           const currentPos = await new Promise((res, rej) => {
-            navigator.geolocation.getCurrentPosition(res, rej, { enableHighAccuracy: true, timeout: 3500, maximumAge: 5000 });
+            navigator.geolocation.getCurrentPosition(res, rej, gpsPositionOptions("quick"));
           });
           const distReal = calculateHaversineDistance(currentPos.coords.latitude, currentPos.coords.longitude, office.lat, office.lon);
           liveGps.lat = currentPos.coords.latitude;
@@ -473,7 +530,7 @@ const AttendanceModule = (function () {
           liveGps.accuracy = currentPos.coords.accuracy || 10;
           liveGps.timestamp = currentPos.timestamp || Date.now();
           liveGps.distance = distReal;
-          liveGps.insideGeofence = (distReal <= (office.radio || 100));
+          liveGps.insideGeofence = distReal <= effectiveGeofenceRadius(office.radio || 300, liveGps.accuracy);
           liveGps.loading = false;
           liveGps.isComision = false;
           liveGps.targetSedeNombre = office.nombre;
@@ -530,24 +587,35 @@ const AttendanceModule = (function () {
 
     try {
       const pos = await new Promise((resolve, reject) => {
-        navigator.geolocation.getCurrentPosition(resolve, reject, {
-          enableHighAccuracy: true,
-          timeout: 10000,
-          maximumAge: 0
-        });
+        navigator.geolocation.getCurrentPosition(resolve, reject, gpsPositionOptions("precise"));
       });
 
       applyRealGpsCoordinates(pos.coords, pos.timestamp);
+      // Segunda lectura en móvil para mejorar precisión tras el primer fix.
+      if (isMobileUa() && (pos.coords.accuracy || 999) > 40) {
+        try {
+          const refined = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, gpsPositionOptions("precise"));
+          });
+          if ((refined.coords.accuracy || 999) <= (pos.coords.accuracy || 999)) {
+            applyRealGpsCoordinates(refined.coords, refined.timestamp);
+          }
+        } catch (_) {}
+      }
       return liveGps;
     } catch (err) {
       liveGps.loading = false;
       let msg = "Error al obtener GPS.";
-      if (err.code === 1) msg = "Permiso de ubicación denegado por el usuario.";
-      else if (err.code === 2) msg = "Señal de GPS no disponible.";
-      else if (err.code === 3) msg = "Tiempo de espera agotado al conectar GPS.";
+      if (err.code === 1) {
+        msg = isMobileUa()
+          ? "Active Ubicación del teléfono y permita acceso a este sitio (HTTPS)."
+          : "Permiso de ubicación denegado por el usuario.";
+      } else if (err.code === 2) msg = "Señal de GPS no disponible. Salga a zona abierta o active GPS de alta precisión.";
+      else if (err.code === 3) msg = "GPS tardó demasiado. En celular: active GPS y reintente al aire libre.";
       liveGps.error = msg;
       liveGps.distance = 999999;
       liveGps.insideGeofence = false;
+      liveGps.detectedOffice = null;
       syncModeButtonsVisualState("gps_real");
     }
 
@@ -559,6 +627,164 @@ const AttendanceModule = (function () {
    * Actualiza el widget visual de estado de GPS / Geocerca
    * Adaptado automáticamente a cada Sede y con Alto Contraste y Colores Nítidos
    */
+  function canAnchorOffice() {
+    return canManageAttendanceRecords();
+  }
+
+  function updateAnchorOfficeVisibility() {
+    const btn = document.getElementById("btnAnclarOficinaAqui");
+    const hint = document.getElementById("hintAnclarOficina");
+    const allow = canAnchorOffice();
+    if (btn) {
+      if (allow) btn.classList.remove("hidden");
+      else btn.classList.add("hidden");
+    }
+    if (hint) hint.classList.add("hidden");
+  }
+
+  let paintedHeroSedeId = "challhuahuacho";
+
+  function readSedeHeroPhotos() {
+    const settings = window.db && typeof window.db.getSettings === "function" ? window.db.getSettings() : {};
+    return settings.sedeHeroPhotos && typeof settings.sedeHeroPhotos === "object" ? settings.sedeHeroPhotos : {};
+  }
+
+  function saveSedeHeroPhoto(sedeId, dataUrl) {
+    if (!window.db || typeof window.db.getSettings !== "function" || typeof window.db.saveSettings !== "function") return false;
+    const settings = window.db.getSettings();
+    if (!settings.sedeHeroPhotos || typeof settings.sedeHeroPhotos !== "object") settings.sedeHeroPhotos = {};
+    if (dataUrl) settings.sedeHeroPhotos[sedeId] = dataUrl;
+    else delete settings.sedeHeroPhotos[sedeId];
+    return window.db.saveSettings(settings);
+  }
+
+  function applySedeHeroPhoto(hero, sedeId) {
+    if (!hero) return;
+    const custom = readSedeHeroPhotos()[sedeId];
+    if (custom && String(custom).indexOf("data:image/") === 0) {
+      hero.style.backgroundImage = 'url("' + custom + '")';
+    } else {
+      hero.style.backgroundImage = "";
+    }
+  }
+
+  const HERO_TILES = ["challhuahuacho", "cusco", "miraflores", "abancay", "huaraz"];
+
+  function isConsolidadoNacional(office) {
+    const active = window.db && typeof window.db.getActiveSede === "function" ? window.db.getActiveSede() : "";
+    return active === "todas" || (office && office.id === "todas");
+  }
+
+  function consolidadoHeroOffice() {
+    return {
+      id: "todas",
+      nombre: "PAOLO ALDEA & ABOGADOS",
+      nombreCorto: "Consolidado Nacional",
+      ciudad: "CONSOLIDADO NACIONAL"
+    };
+  }
+
+  function paintSedeMosaic(show) {
+    const mosaic = document.getElementById("asistencia-sede-hero-mosaic");
+    const hero = document.getElementById("asistencia-sede-hero");
+    if (hero) hero.classList.toggle("is-mosaic", !!show);
+    if (!mosaic) return;
+    mosaic.classList.toggle("hidden", !show);
+    if (!show) return;
+    const photos = readSedeHeroPhotos();
+    HERO_TILES.forEach((id) => {
+      const tile = mosaic.querySelector('[data-tile="' + id + '"]');
+      if (!tile) return;
+      const custom = photos[id];
+      if (custom && String(custom).indexOf("data:image/") === 0) {
+        tile.style.backgroundImage = 'url("' + custom + '")';
+      } else {
+        tile.style.backgroundImage = "";
+      }
+    });
+  }
+
+  function paintSedeHero(office) {
+    if (!office) return;
+    const consolidado = isConsolidadoNacional(office);
+    const source = consolidado ? consolidadoHeroOffice() : office;
+    const known = {
+      challhuahuacho: true,
+      cusco: true,
+      abancay: true,
+      miraflores: true,
+      huaraz: true,
+      todas: true
+    };
+    const sedeId = known[source.id] ? source.id : "challhuahuacho";
+    paintedHeroSedeId = sedeId;
+    const hero = document.getElementById("asistencia-sede-hero");
+    const heroNombre = document.getElementById("asistencia-sede-hero-nombre");
+    const heroRegion = document.getElementById("asistencia-sede-hero-region");
+    const heroKicker = document.getElementById("asistencia-sede-hero-kicker");
+    const subTitleEl = document.getElementById("asistencia-radar-sede-sub");
+    const editor = document.getElementById("asistencia-sede-hero-editor");
+    const editorSede = document.getElementById("asistencia-sede-hero-editor-sede");
+    const region = source.ciudad || source.region || "";
+    if (hero) hero.setAttribute("data-sede", sedeId);
+    paintSedeMosaic(consolidado);
+    if (!consolidado) applySedeHeroPhoto(hero, sedeId);
+    else if (hero) hero.style.backgroundImage = "none";
+    if (heroKicker) {
+      heroKicker.innerHTML = consolidado
+        ? '<i class="fa-solid fa-building-columns"></i> Red nacional'
+        : '<i class="fa-solid fa-location-dot"></i> Sede detectada';
+    }
+    if (heroNombre) heroNombre.textContent = source.nombre || "Sede";
+    if (heroRegion) {
+      heroRegion.textContent = region;
+      heroRegion.classList.toggle("hidden", !region);
+    }
+    if (subTitleEl) subTitleEl.textContent = consolidado ? "Consolidado Nacional" : (region || source.nombreCorto || source.nombre || "");
+    if (editor) editor.classList.toggle("hidden", consolidado || !canManageAttendanceRecords());
+    if (editorSede) editorSede.textContent = source.nombreCorto || source.nombre || sedeId;
+  }
+
+  function onSedeHeroPhotoSelected(event) {
+    const input = event && event.target;
+    const file = input && input.files && input.files[0];
+    if (input) input.value = "";
+    if (!file) return;
+    if (!canManageAttendanceRecords()) {
+      if (window.showToast) window.showToast("Solo Super Admin, Socio o Admin de sede puede cambiar la foto.", "error");
+      return;
+    }
+    if (!file.type || file.type.indexOf("image/") !== 0) {
+      if (window.showToast) window.showToast("Seleccione una imagen JPG, PNG o WEBP.", "error");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const raw = reader.result;
+        const compressed = window.app && typeof window.app.compressImageDataUrl === "function"
+          ? await window.app.compressImageDataUrl(raw, 1400, 0.72)
+          : raw;
+        saveSedeHeroPhoto(paintedHeroSedeId || "challhuahuacho", compressed);
+        updateGpsUi();
+        if (window.showToast) window.showToast("Foto de la sede actualizada.", "success");
+      } catch (_) {
+        if (window.showToast) window.showToast("No se pudo procesar la imagen.", "error");
+      }
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function resetSedeHeroPhoto() {
+    if (!canManageAttendanceRecords()) {
+      if (window.showToast) window.showToast("Solo Super Admin, Socio o Admin de sede puede restaurar la foto.", "error");
+      return;
+    }
+    saveSedeHeroPhoto(paintedHeroSedeId || "challhuahuacho", null);
+    updateGpsUi();
+    if (window.showToast) window.showToast("Se restauró la foto original de la sede.", "success");
+  }
+
   function updateGpsUi() {
     const radar = document.getElementById("asistencia-gps-radar");
     const badge = document.getElementById("asistencia-gps-badge");
@@ -570,11 +796,22 @@ const AttendanceModule = (function () {
     const btnNormalIngreso = document.getElementById("btn-asistencia-marcar-ingreso");
     const btnNormalSalida = document.getElementById("btn-asistencia-marcar-salida");
 
-    const office = getOfficeConfig();
-    if (toleranceEl) toleranceEl.textContent = `${office.radio} metros`;
+    updateAnchorOfficeVisibility();
 
-    const subTitleEl = document.getElementById("asistencia-radar-sede-sub");
-    if (subTitleEl) subTitleEl.textContent = `${office.nombre}`;
+    const office = getOfficeConfig();
+    const eff = effectiveGeofenceRadius(office.radio, liveGps.accuracy);
+    if (toleranceEl) {
+      toleranceEl.textContent =
+        liveGps.accuracy > 5
+          ? `${office.radio} m (+${Math.min(liveGps.accuracy, 80)} m GPS ≈ ${eff} m)`
+          : `${office.radio} metros`;
+    }
+
+    const detected = liveGps.detectedOffice;
+    const displayOffice = isConsolidadoNacional()
+      ? consolidadoHeroOffice()
+      : ((detected && detected.id && detected.id !== office.id) ? detected : office);
+    paintSedeHero(displayOffice);
 
     const labelDistancia = document.getElementById("asistencia-label-distancia");
     if (labelDistancia) {
@@ -652,7 +889,8 @@ const AttendanceModule = (function () {
   function getWorkers() {
     if (!window.db) return [];
     const list = window.db.get("workers");
-    return Array.isArray(list) ? list : [];
+    if (!Array.isArray(list)) return [];
+    return list.filter((w) => w && w.activo !== false && w.activo !== "false");
   }
 
   /**
@@ -702,10 +940,14 @@ const AttendanceModule = (function () {
       record.sunafilVerified = true;
       record.auditTimestamp = new Date().toISOString();
     }
+    record.updatedAt = new Date().toISOString();
+    delete record.server_ts;
     const rawList = window.db.getRaw ? window.db.getRaw("attendance") : window.db.get("attendance", true);
     const existingIdx = rawList.findIndex(r => r.id === record.id);
     if (existingIdx !== -1) {
       rawList[existingIdx] = { ...rawList[existingIdx], ...record };
+      delete rawList[existingIdx].server_ts;
+      rawList[existingIdx].updatedAt = record.updatedAt;
     } else {
       rawList.unshift(record);
     }
@@ -729,6 +971,8 @@ const AttendanceModule = (function () {
         const i2 = list2.findIndex((r) => r.id === record.id);
         if (i2 >= 0) {
           list2[i2] = { ...list2[i2], ...record };
+          list2[i2].updatedAt = new Date().toISOString();
+          delete list2[i2].server_ts;
           window.db.save("attendance", list2);
         }
       }).catch((err) => {
@@ -739,9 +983,9 @@ const AttendanceModule = (function () {
       });
     }
 
-    // Push instantáneo a hub / nube legacy
-    if (window.app && typeof window.app.sincronizarConNube === "function") {
-      setTimeout(() => { window.app.sincronizarConNube(true); }, 150);
+    // Solo push del marcaje (sin pull inmediato que pueda pisarlo).
+    if (window.PaoloCloudDataSync && typeof window.PaoloCloudDataSync.schedulePush === "function") {
+      window.PaoloCloudDataSync.schedulePush("attendance");
     }
     return res;
   }
@@ -985,7 +1229,7 @@ const AttendanceModule = (function () {
     }
 
     const currentLoggedIn = (window.db && typeof window.db.getCurrentUser === "function") ? window.db.getCurrentUser() : null;
-    if (currentLoggedIn && currentLoggedIn.rol !== "super_admin" && currentLoggedIn.rol !== "admin" && currentLoggedIn.dni && selectedWorker.dni !== currentLoggedIn.dni) {
+    if (currentLoggedIn && !canManageAttendanceRecords() && currentLoggedIn.dni && selectedWorker.dni !== currentLoggedIn.dni) {
       if (window.showToast) window.showToast("Acceso restringido: Solo puede registrar su propia asistencia (" + currentLoggedIn.nombre + ").", "error");
       return;
     }
@@ -1020,7 +1264,10 @@ const AttendanceModule = (function () {
       }
     } catch (_) {}
     const nowDate = new Date(nowIso);
-    const todayStr = nowIso.slice(0, 10);
+    // Fecha civil local (Perú UTC-5): no usar slice UTC o tras 19:00 cae en el día siguiente
+    const todayStr = (typeof getRelativeDateOnlyStr === "function")
+      ? getRelativeDateOnlyStr(0)
+      : nowDate.toLocaleDateString("en-CA", { timeZone: "America/Lima" });
     const horaActualStr = nowDate.toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" });
     let record = getTodayRecordForWorker(selectedWorker.id);
 
@@ -1327,7 +1574,7 @@ const AttendanceModule = (function () {
             <div class="text-xs text-slate-400 flex items-center gap-3">
               <span><i class="fas fa-sign-in-alt text-emerald-400 mr-1"></i>Ingreso: <strong>${horaIngreso}</strong></span>
               <span><i class="fas fa-sign-out-alt text-amber-400 mr-1"></i>Salida: <strong>${horaSalida}</strong></span>
-              <span><i class="fas fa-map-marker-alt text-cyan-400 mr-1"></i>Distancia: <strong>${r.distanciaMetros} m</strong></span>
+              <span><i class="fas fa-map-marker-alt text-cyan-400 mr-1"></i>Distancia: <strong>${formatDistanceMeters(r.distanciaMetros)} m</strong></span>
             </div>
             ${r.motivoExterno ? `<div class="text-xs text-amber-300/90 bg-amber-950/30 p-1.5 rounded border border-amber-500/20 mt-1"><strong>Diligencia:</strong> ${esc(r.motivoExterno)} <br><span class="text-slate-400 text-[11px]">${esc(r.justificacion || "")}</span></div>` : ""}
           </div>
@@ -1338,14 +1585,59 @@ const AttendanceModule = (function () {
     container.innerHTML = html;
   }
 
+  function isPrivilegedSupervisionRole(role) {
+    const normalized = window.db && typeof window.db.normalizeRole === "function"
+      ? window.db.normalizeRole(role)
+      : String(role || "").toLowerCase().trim();
+    return ["super_admin", "socio", "admin"].includes(normalized);
+  }
+
+  function getCurrentNormalizedRole() {
+    const currentUser =
+      window.db && typeof window.db.getCurrentUser === "function" ? window.db.getCurrentUser() : null;
+    if (!currentUser) return "";
+    if (window.db && typeof window.db.getUserRole === "function") {
+      return window.db.getUserRole(currentUser);
+    }
+    return String(currentUser.rol || currentUser.role || "");
+  }
+
+  /** Super Admin, Socio Principal y Admin de sede pueden gestionar registros de asistencia. */
+  function canManageAttendanceRecords() {
+    return isPrivilegedSupervisionRole(getCurrentNormalizedRole());
+  }
+
+  function formatDistanceMeters(value) {
+    if (value == null || value === "" || Number.isNaN(Number(value))) return "—";
+    return String(Math.round(Number(value)));
+  }
+
   /**
-   * Solicita acceso al panel de supervisión de jefatura mediante modal de clave
+   * Activa supervisión automáticamente para roles privilegiados (sin clave extra ni sync manual).
+   */
+  function ensurePrivilegedSupervision(openAdminView = false) {
+    if (!canManageAttendanceRecords()) return false;
+    adminAuthenticated = true;
+    if (openAdminView || currentRole === "admin") {
+      setRoleView("admin");
+    }
+    return true;
+  }
+
+  /**
+   * Solicita acceso al panel de supervisión de jefatura.
+   * Super Admin / Socio / Admin de sede ya autenticados entran directo (sin 2.ª clave ni sync manual).
    */
   function requestAdminAccess() {
     if (adminAuthenticated) {
       setRoleView("admin");
       return;
     }
+    if (ensurePrivilegedSupervision(true)) {
+      showToast("Supervisión de Jefatura activada con su sesión actual.", "success");
+      return;
+    }
+
     const modal = document.getElementById("modal-asistencia-auth-admin");
     const inputKey = document.getElementById("input-asistencia-admin-key");
     const errorMsg = document.getElementById("asistencia-auth-error-msg");
@@ -1405,13 +1697,39 @@ const AttendanceModule = (function () {
 
     const settings = window.db ? window.db.getSettings() : {};
 
-    // Validación estricta criptográfica: sin contraseñas cableadas en texto plano
+    // Validación estricta criptográfica: settings + hashes de roles privilegiados en workers
     let isMatch = false;
-    for (const h of [settings.bossPasswordHash, settings.adminPasswordHash, settings.masterPasswordHash]) {
-      if (h && await window.verifySecret(key, h)) { isMatch = true; break; }
+    const hashCandidates = [
+      settings.bossPasswordHash,
+      settings.adminPasswordHash,
+      settings.masterPasswordHash
+    ];
+    try {
+      const workers = (window.db && window.db.getRaw ? window.db.getRaw("workers") : []) || [];
+      workers.forEach((w) => {
+        if (!w || w.activo === false) return;
+        if (!isPrivilegedSupervisionRole(w.rol || w.role)) return;
+        if (w.passwordHash) hashCandidates.push(w.passwordHash);
+        if (w.pinHash) hashCandidates.push(w.pinHash);
+      });
+    } catch (_) {}
+
+    for (const h of hashCandidates) {
+      if (h && typeof window.verifySecret === "function" && (await window.verifySecret(key, h))) {
+        isMatch = true;
+        break;
+      }
     }
 
     if (isMatch) {
+      // Persistencia local de clave de jefatura para próximos ingresos en este equipo
+      try {
+        if (!settings.bossPasswordHash && !settings.adminPasswordHash && typeof window.hashSecret === "function") {
+          settings.adminPasswordHash = await window.hashSecret(key);
+          settings.bossPasswordHash = settings.adminPasswordHash;
+          window.db.saveSettings(settings);
+        }
+      } catch (_) {}
       adminAuthenticated = true;
       closeAdminAuthModal();
       setRoleView("admin");
@@ -1607,15 +1925,15 @@ const AttendanceModule = (function () {
             <p class="text-slate-400 text-[11px] italic mb-1.5">"${r.justificacion || "Sin justificación detallada"}"</p>
             <div class="flex items-center justify-between text-[11px] text-slate-400 border-t border-slate-800/80 pt-1">
               <span>Hora: <strong>${horaIngreso}</strong></span>
-              <span>Distancia: <strong class="text-rose-400">${r.distanciaMetros} m</strong></span>
+              <span>Distancia: <strong class="text-rose-400">${formatDistanceMeters(r.distanciaMetros)} m</strong></span>
               <span>Fecha: <strong>${r.fecha}</strong></span>
             </div>
           </div>
           <div class="flex items-center gap-2 pt-1">
-            <button onclick="AttendanceModule.approveRecord('${r.id}')" class="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1 shadow">
+            <button onclick="AttendanceModule.approveRecord(${window.jsStr(r.id)})" class="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1 shadow">
               <i class="fas fa-check"></i> Aprobar
             </button>
-            <button onclick="AttendanceModule.openRejectModal('${r.id}')" class="flex-1 py-1.5 px-3 bg-rose-600/80 hover:bg-rose-600 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1 shadow">
+            <button onclick="AttendanceModule.openRejectModal(${window.jsStr(r.id)})" class="flex-1 py-1.5 px-3 bg-rose-600/80 hover:bg-rose-600 text-white font-bold text-xs rounded-lg transition-all flex items-center justify-center gap-1 shadow">
               <i class="fas fa-times"></i> Rechazar
             </button>
           </div>
@@ -1631,11 +1949,9 @@ const AttendanceModule = (function () {
    * Aprueba una marcación de diligencia
    */
   function approveRecord(id) {
-    const currentUser = window.db ? window.db.getCurrentUser() : null;
-    const userRole = window.db ? window.db.getUserRole(currentUser) : "asistente";
-    if (userRole !== "admin") {
+    if (!canManageAttendanceRecords()) {
       if (window.showToast) {
-        window.showToast("Permiso denegado: Solo el Administrador o Socio Principal posee atribución para autorizar diligencias externas.", "error");
+        window.showToast("Permiso denegado: Solo Super Administrador, Socio Principal o Administrador puede autorizar diligencias externas.", "error");
       }
       return;
     }
@@ -1650,6 +1966,8 @@ const AttendanceModule = (function () {
     rec.estadoAprobacion = "aprobado";
     rec.aprobadoPor = approverName;
     rec.fechaAprobacion = new Date().toISOString();
+    rec.updatedAt = rec.fechaAprobacion;
+    delete rec.server_ts;
     rec.notasAdmin = (rec.notasAdmin ? rec.notasAdmin + " | " : "") + `Aprobado por ${approverName} el ${new Date().toLocaleString("es-PE")}.`;
 
     window.db.save("attendance", rawList);
@@ -1679,11 +1997,9 @@ const AttendanceModule = (function () {
    * Confirma rechazo de diligencia
    */
   function confirmRejectRecord() {
-    const currentUser = window.db ? window.db.getCurrentUser() : null;
-    const userRole = window.db ? window.db.getUserRole(currentUser) : "asistente";
-    if (userRole !== "admin") {
+    if (!canManageAttendanceRecords()) {
       if (window.showToast) {
-        window.showToast("Permiso denegado: Solo el Administrador o Socio Principal posee atribución para rechazar diligencias.", "error");
+        window.showToast("Permiso denegado: Solo Super Administrador, Socio Principal o Administrador puede rechazar diligencias.", "error");
       }
       return;
     }
@@ -1704,6 +2020,8 @@ const AttendanceModule = (function () {
     rec.estadoAprobacion = "rechazado";
     rec.aprobadoPor = approverName;
     rec.fechaAprobacion = new Date().toISOString();
+    rec.updatedAt = rec.fechaAprobacion;
+    delete rec.server_ts;
     rec.notasAdmin = `Rechazado por ${approverName}: ${reason || "Diligencia no justificada"}`;
 
     window.db.save("attendance", rawList);
@@ -1792,9 +2110,10 @@ const AttendanceModule = (function () {
       const horaIngreso = r.ingreso ? new Date(r.ingreso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : "--:--";
       const horaSalida = r.salida ? new Date(r.salida).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }) : '<span class="text-slate-500 italic">En labores</span>';
 
+      const distLabel = formatDistanceMeters(r.distanciaMetros);
       let geoBadge = r.enGeocerca
-        ? `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded"><i class="fas fa-check"></i> ${r.distanciaMetros}m (Oficina)</span>`
-        : `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded"><i class="fas fa-external-link-alt"></i> ${r.distanciaMetros}m (Externa)</span>`;
+        ? `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-400 bg-emerald-950/60 border border-emerald-500/30 px-2 py-0.5 rounded"><i class="fas fa-check"></i> ${distLabel}m (Oficina)</span>`
+        : `<span class="inline-flex items-center gap-1 text-[11px] font-semibold text-amber-400 bg-amber-950/60 border border-amber-500/30 px-2 py-0.5 rounded"><i class="fas fa-external-link-alt"></i> ${distLabel}m (Externa)</span>`;
 
       let statusBadge = "";
       if (r.estadoAprobacion === "aprobado") {
@@ -1907,7 +2226,7 @@ const AttendanceModule = (function () {
           <div><span class="text-slate-400">Hora Ingreso:</span> <strong class="text-emerald-400 block">${rec.ingreso ? esc(new Date(rec.ingreso).toLocaleString("es-PE")) : "No registrado"}</strong></div>
           <div><span class="text-slate-400">Hora Salida:</span> <strong class="text-amber-400 block">${rec.salida ? esc(new Date(rec.salida).toLocaleString("es-PE")) : "No registrado"}</strong></div>
           <div><span class="text-slate-400">Coordenadas:</span> <strong class="text-cyan-400 block">${esc(rec.latitud)}, ${esc(rec.longitud)}</strong></div>
-          <div><span class="text-slate-400">Distancia a Sede Central:</span> <strong class="text-slate-200 block">${esc(rec.distanciaMetros)} metros</strong></div>
+          <div><span class="text-slate-400">Distancia a Sede Central:</span> <strong class="text-slate-200 block">${formatDistanceMeters(rec.distanciaMetros)} metros</strong></div>
         </div>
         ${rec.motivoExterno ? `
           <div class="bg-amber-950/40 p-3 rounded-lg border border-amber-500/30">
@@ -1932,19 +2251,22 @@ const AttendanceModule = (function () {
    * Elimina un registro de asistencia (sólo Admin)
    */
   function deleteRecord(id) {
-    const currentUser = window.db ? window.db.getCurrentUser() : null;
-    const userRole = window.db ? window.db.getUserRole(currentUser) : "asistente";
-    if (userRole !== "admin") {
+    if (!canManageAttendanceRecords()) {
       if (window.showToast) {
-        window.showToast("Permiso denegado: Solo el Administrador puede eliminar registros de asistencia.", "error");
+        window.showToast("Permiso denegado: Solo Super Administrador, Socio Principal o Administrador puede eliminar registros de asistencia.", "error");
       }
       return;
     }
 
     if (!confirm("¿Está seguro de eliminar este registro de asistencia?")) return;
-    const rawList = window.db && window.db.getRaw ? window.db.getRaw("attendance") : getAttendanceRecords();
-    const filtered = rawList.filter(r => r.id !== id);
-    window.db.save("attendance", filtered);
+    // Usar delete() para tombstone + push; un simple filter revive el registro en el próximo pull.
+    if (window.db && typeof window.db.delete === "function") {
+      window.db.delete("attendance", id);
+    } else {
+      const rawList = window.db && window.db.getRaw ? window.db.getRaw("attendance") : getAttendanceRecords();
+      const filtered = rawList.filter(r => r.id !== id);
+      window.db.save("attendance", filtered);
+    }
     updatePendingBadge();
     renderAdminKpis();
     renderAdminAttendanceTable();
@@ -1967,7 +2289,9 @@ const AttendanceModule = (function () {
   function renderWorkersList() {
     const tbody = document.getElementById("tbody-asistencia-gestion-trabajadores");
     if (!tbody) return;
-    const workers = (window.db && typeof window.db.getRaw === "function") ? window.db.getRaw("workers") : getWorkers();
+    const raw = (window.db && typeof window.db.getRaw === "function") ? window.db.getRaw("workers") : getWorkers();
+    // Solo activos: los dados de baja no deben reaparecer en el panel de asistencia.
+    const workers = (raw || []).filter((w) => w && w.activo !== false && w.activo !== "false");
 
     let html = "";
     workers.forEach(w => {
@@ -1975,25 +2299,29 @@ const AttendanceModule = (function () {
         ? window.db.normalizeRole(w.rol)
         : (w.rol || "abogado");
       const isAdminLike = ["super_admin", "socio", "admin"].includes(normalizedRol);
+      const safeId = typeof window.jsStr === "function" ? window.jsStr(w.id) : JSON.stringify(String(w.id || ""));
       html += `
         <tr class="border-b border-slate-800 hover:bg-slate-800/40">
-          <td class="py-2 px-3 font-bold text-slate-200 text-xs">${w.dni || "-"}</td>
-          <td class="py-2 px-3 text-xs text-slate-300">${w.nombre || "-"}</td>
-          <td class="py-2 px-3 text-xs text-slate-400">${w.cargo || "-"}</td>
+          <td class="py-2 px-3 font-bold text-slate-200 text-xs">${esc(w.dni || "-")}</td>
+          <td class="py-2 px-3 text-xs text-slate-300">${esc(w.nombre || "-")}</td>
+          <td class="py-2 px-3 text-xs text-slate-400">${esc(w.cargo || "-")}</td>
           <td class="py-2 px-3 text-xs">
             <span class="px-2 py-0.5 rounded text-[11px] font-semibold ${isAdminLike ? "bg-amber-500/20 text-amber-300" : "bg-cyan-500/20 text-cyan-300"}">
               ${isAdminLike ? "Admin" : "Colaborador"}
             </span>
           </td>
-          <td class="py-2 px-3 text-right">
-            <button onclick="AttendanceModule.deleteWorker('${w.id}')" title="Eliminar colaborador" class="p-1 text-slate-400 hover:text-rose-400">
+          <td class="py-2 px-3 text-right whitespace-nowrap">
+            <button type="button" onclick="window.app && window.app.openPersonalModal(${safeId})" title="Editar colaborador" class="p-1.5 text-slate-400 hover:text-cyan-300">
+              <i class="fas fa-pen-to-square text-xs"></i>
+            </button>
+            <button type="button" onclick="AttendanceModule.deleteWorker(${safeId})" title="Eliminar colaborador" class="p-1.5 text-slate-400 hover:text-rose-400">
               <i class="fas fa-trash-alt text-xs"></i>
             </button>
           </td>
         </tr>
       `;
     });
-    tbody.innerHTML = html;
+    tbody.innerHTML = html || `<tr><td colspan="5" class="py-4 text-center text-slate-500 text-xs">No hay colaboradores activos.</td></tr>`;
   }
 
   /**
@@ -2069,6 +2397,30 @@ const AttendanceModule = (function () {
     window.db.save("workers", rawWorkers);
     alert(`Credenciales iniciales de ${defaultUser}\nContrasena temporal: ${_tempPass}\nPIN: ${_tempPin}\n\nEntreguelas en privado; no se volveran a mostrar.`);
 
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && window.__CLOUD_AUTH_BOOTSTRAPPED__) {
+      try {
+        await window.PaoloAuthService.upsertStaffCloud({
+          id: newWorker.id,
+          usuario: newWorker.usuario,
+          email: newWorker.email,
+          dni: newWorker.dni,
+          nombre: newWorker.nombre,
+          cargo: newWorker.cargo,
+          rol: newWorker.rol,
+          sede: newWorker.sede,
+          passwordHash: newWorker.passwordHash,
+          pinHash: newWorker.pinHash,
+          activo: newWorker.activo,
+          permisos: newWorker.permisos
+        });
+      } catch (cloudStaffErr) {
+        console.warn("[Asistencia] Sync nube colaborador:", cloudStaffErr && cloudStaffErr.message);
+        if (window.showToast) {
+          window.showToast("Guardado local OK. Sync nube pendiente: " + ((cloudStaffErr && cloudStaffErr.message) || "error"), "warning");
+        }
+      }
+    }
+
     // Limpiar formulario
     document.getElementById("input-nuevo-trabajador-dni").value = "";
     document.getElementById("input-nuevo-trabajador-nombre").value = "";
@@ -2089,23 +2441,83 @@ const AttendanceModule = (function () {
   }
 
   /**
-   * Elimina un trabajador
+   * Elimina (baja) un trabajador de forma persistente en local + nube.
+   * Antes solo se filtraba en memoria y el sync lo resuscitaba.
    */
-  function deleteWorker(id) {
+  async function deleteWorker(id) {
     if (id === "WRK-000") {
       if (window.showToast) window.showToast("La cuenta de Super Administrador Principal está protegida.", "warning");
       return;
     }
-    if (!confirm("¿Está seguro de eliminar a este colaborador del padrón?")) return;
     const rawWorkers = window.db && window.db.getRaw ? window.db.getRaw("workers") : getWorkers();
-    const updated = rawWorkers.filter(w => w.id !== id);
-    window.db.save("workers", updated);
+    const worker = (rawWorkers || []).find((w) => String(w.id) === String(id));
+    if (!worker) {
+      if (window.showToast) window.showToast("Colaborador no encontrado.", "warning");
+      return;
+    }
+    if (worker.rol === "super_admin") {
+      if (window.showToast) window.showToast("No se puede eliminar un Super Administrador desde Asistencia.", "warning");
+      return;
+    }
+    if (!confirm("¿Eliminar a " + (worker.nombre || id) + " del padrón? No volverá a aparecer tras sincronizar.")) return;
+
+    // 1) Baja en nube (staff_directory) ANTES del pull automático
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && typeof window.PaoloAuthService.upsertStaffCloud === "function") {
+      try {
+        await window.PaoloAuthService.upsertStaffCloud({
+          id: worker.id,
+          usuario: worker.usuario || worker.username || ("user_" + (worker.dni || worker.id)),
+          email: worker.email || "",
+          dni: worker.dni || "",
+          nombre: worker.nombre || "",
+          cargo: worker.cargo || "",
+          rol: worker.rol || "asistente_admin",
+          sede: worker.sede || "challhuahuacho",
+          passwordHash: worker.passwordHash || "",
+          pinHash: worker.pinHash || "",
+          activo: false,
+          permisos: worker.permisos || null
+        });
+      } catch (cloudErr) {
+        console.warn("[Asistencia] Baja nube:", cloudErr && cloudErr.message);
+        if (window.showToast) {
+          window.showToast("No se pudo dar de baja en la nube: " + ((cloudErr && cloudErr.message) || "error"), "error");
+        }
+        return;
+      }
+    }
+
+    // 2) Tombstone + delete local (para que pull/LWW no lo traiga de vuelta)
+    if (window.db && typeof window.db.delete === "function") {
+      const ok = window.db.delete("workers", id);
+      if (!ok) {
+        // Fallback: soft-delete si RBAC bloquea hard-delete
+        window.db.update("workers", id, { activo: false, updatedAt: new Date().toISOString() });
+        if (window.db._recordTombstone) window.db._recordTombstone("workers", id);
+      }
+    } else {
+      const updated = rawWorkers.filter((w) => String(w.id) !== String(id));
+      window.db.save("workers", updated);
+    }
+
+    // 3) Empujar tombstone a app_records de inmediato
+    if (window.PaoloCloudDataSync && typeof window.PaoloCloudDataSync.pushCollection === "function") {
+      try {
+        await window.PaoloCloudDataSync.pushCollection("workers");
+      } catch (pushErr) {
+        console.warn("[Asistencia] push workers:", pushErr && pushErr.message);
+      }
+    }
+
     renderWorkersList();
     renderWorkerSelectorDropdown();
     if (window.app && typeof window.app.renderPersonal === "function") {
       window.app.renderPersonal();
     }
-    if (window.showToast) window.showToast("Colaborador eliminado.", "info");
+    if (selectedWorker && String(selectedWorker.id) === String(id)) {
+      selectedWorker = null;
+    }
+    if (window.showToast) window.showToast("Colaborador eliminado y sincronizado.", "info");
   }
 
   /**
@@ -2148,18 +2560,22 @@ const AttendanceModule = (function () {
       return;
     }
 
+    const office = getOfficeConfig();
+    const sedeId = office.id || "challhuahuacho";
     const settings = window.db ? window.db.getSettings() : {};
     settings.oficinaLat = lat;
     settings.oficinaLon = lon;
     settings.oficinaRadioMetros = radio;
     if (nombre) settings.oficinaNombre = nombre;
-
-    window.db.saveSettings(settings);
+    if (!settings.geofenceBySede) settings.geofenceBySede = {};
+    settings.geofenceBySede[sedeId] = { lat, lon, radio, nombre: nombre || office.nombre };
+    if (window.db) window.db.saveSettings(settings);
+    persistSedeGeo(sedeId, { lat, lon, radio, nombre });
 
     const modal = document.getElementById("modal-asistencia-config-geocerca");
     if (modal) modal.classList.add("hidden");
 
-    refreshGpsPosition();
+    refreshGpsPosition("gps_real");
     if (window.showToast) {
       window.showToast("Parámetros de Geocerca actualizados con éxito.", "success");
     }
@@ -2170,13 +2586,78 @@ const AttendanceModule = (function () {
    */
   async function captureCurrentAsCentralOffice() {
     if (!confirm("¿Desea capturar la posición actual del GPS como la nueva coordenada de la Sede Central?")) return;
-    await refreshGpsPosition("real");
+    await refreshGpsPosition("gps_real");
     const inputLat = document.getElementById("input-config-oficina-lat");
     const inputLon = document.getElementById("input-config-oficina-lon");
     if (inputLat && inputLon) {
       inputLat.value = liveGps.lat;
       inputLon.value = liveGps.lon;
       if (window.showToast) window.showToast(`Coordenadas capturadas: ${liveGps.lat}, ${liveGps.lon}`, "info");
+    }
+  }
+
+  /**
+   * Ancla el punto oficial de la sede a la posición GPS actual (admin/super_admin).
+   * Corrige el desfase típico (~200 m) del pin aproximado de Challhuahuacho.
+   */
+  async function anchorOfficeHere() {
+    if (!canAnchorOffice()) {
+      showToast("Solo Super Administrador, Socio Principal o Administrador de sede pueden anclar la oficina.", "error");
+      return;
+    }
+    if (!navigator.geolocation) {
+      showToast("Este dispositivo no soporta GPS.", "error");
+      return;
+    }
+    if (!confirm("¿Anclar el punto oficial de esta sede a su ubicación GPS actual? Hágalo estando dentro de la oficina.")) {
+      return;
+    }
+
+    showToast("Capturando GPS de alta precisión…", "info");
+    liveGps.loading = true;
+    updateGpsUi();
+    try {
+      const pos = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, gpsPositionOptions("precise"));
+      });
+      const lat = pos.coords.latitude;
+      const lon = pos.coords.longitude;
+      const acc = Math.round(pos.coords.accuracy || 25);
+      const office = getOfficeConfig();
+      const sedeId = office.id || "challhuahuacho";
+      const radio = Math.max(office.radio || 300, 150);
+
+      const settings = window.db.getSettings();
+      settings.oficinaLat = lat;
+      settings.oficinaLon = lon;
+      settings.oficinaRadioMetros = radio;
+      if (!settings.geofenceBySede) settings.geofenceBySede = {};
+      settings.geofenceBySede[sedeId] = { lat, lon, radio, nombre: office.nombre, calibratedAt: new Date().toISOString(), accuracy: acc };
+      window.db.saveSettings(settings);
+      persistSedeGeo(sedeId, { lat, lon, radio });
+
+      liveGps.lat = lat;
+      liveGps.lon = lon;
+      liveGps.accuracy = acc;
+      liveGps.distance = 0;
+      liveGps.insideGeofence = true;
+      liveGps.error = null;
+      liveGps.loading = false;
+      attendanceMode = "oficina_sede";
+      liveGps.mode = "gps_auto_oficina";
+      updateGpsUi();
+      showToast(
+        "Sede anclada: " + lat.toFixed(6) + ", " + lon.toFixed(6) + " (±" + acc + " m). Radio " + radio + " m. En Supabase ejecute el SQL de sync de branches.",
+        "success"
+      );
+    } catch (err) {
+      liveGps.loading = false;
+      updateGpsUi();
+      const msg =
+        err && err.code === 1
+          ? "Permita ubicación en el navegador/celular."
+          : "No se pudo capturar GPS. Active ubicación de alta precisión.";
+      showToast(msg, "error");
     }
   }
 
@@ -2250,6 +2731,7 @@ const AttendanceModule = (function () {
     startClock();
     updateLocationValidationOptions();
     manualStationOverride = false;
+    updateAnchorOfficeVisibility();
     refreshGpsPosition("gps_real");
     startAutoGeofenceTracking();
     updatePendingBadge();
@@ -2264,6 +2746,15 @@ const AttendanceModule = (function () {
         selectWorker(workers[0].dni);
       }
     }
+
+    // Roles privilegiados: mantener supervisión lista sin sync manual.
+    if (canManageAttendanceRecords()) {
+      adminAuthenticated = true;
+      if (currentRole === "admin") {
+        renderAdminKpis();
+        renderAdminAttendanceTable();
+      }
+    }
   }
 
   return {
@@ -2271,6 +2762,9 @@ const AttendanceModule = (function () {
     startAutoGeofenceTracking,
     calculateHaversineDistance,
     getOfficeConfig,
+    paintSedeHero,
+    onSedeHeroPhotoSelected,
+    resetSedeHeroPhoto,
     refreshGpsPosition,
     updateLocationValidationOptions,
     onSedeCityChange,
@@ -2279,6 +2773,8 @@ const AttendanceModule = (function () {
     performExternalDiligencePunch,
     setRoleView,
     requestAdminAccess,
+    ensurePrivilegedSupervision,
+    canManageAttendanceRecords,
     closeAdminAuthModal,
     toggleKeyVisibility,
     submitAdminKey,
@@ -2296,12 +2792,16 @@ const AttendanceModule = (function () {
     openGeofenceConfigModal,
     saveGeofenceConfig,
     captureCurrentAsCentralOffice,
+    anchorOfficeHere,
+    updateAnchorOfficeVisibility,
+    canAnchorOffice,
     renderAdminAttendanceTable,
     renderAdminKpis,
     refreshOfficeConfig,
     setAttendanceMode,
     onComisionSedeChange,
     renderWorkerSelectorDropdown,
+    renderWorkersList,
     initWorkerSelector: renderWorkerSelectorDropdown
   };
 })();

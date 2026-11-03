@@ -213,10 +213,10 @@ class DraftAutosaveManager {
         </div>
       </div>
       <div class="flex items-center gap-2 shrink-0">
-        <button type="button" onclick="window.draftAutosave.restoreDraft('${modalId}')" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs shadow-sm transition flex items-center gap-1">
+        <button type="button" onclick="window.draftAutosave.restoreDraft(${window.jsStr(modalId)})" class="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold rounded-lg text-xs shadow-sm transition flex items-center gap-1">
           <i class="fa-solid fa-arrow-rotate-left"></i> Restaurar
         </button>
-        <button type="button" onclick="window.draftAutosave.clearDraft('${modalId}')" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-lg text-xs transition" title="Descartar borrador">
+        <button type="button" onclick="window.draftAutosave.clearDraft(${window.jsStr(modalId)})" class="px-2.5 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold rounded-lg text-xs transition" title="Descartar borrador">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>

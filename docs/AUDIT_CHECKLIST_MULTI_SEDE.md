@@ -2,6 +2,8 @@
 
 Validar que las 5 sedes (Miraflores, Abancay, Cusco, Huaraz, Challhuahuacho) sincronizan sin carreras y con aislamiento RLS.
 
+> Go-live operativo (PASS/WARN/PENDING en producción): ver [`ENTERPRISE_CHECKLIST.md`](ENTERPRISE_CHECKLIST.md).
+
 ## 0. Prerrequisitos
 - [ ] Migración aplicada: `supabase/migrations/20261102_enterprise_zero_trust.sql`
 - [ ] Netlify env: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALLOWED_ORIGIN`, `FIREBASE_API_KEY`
@@ -46,7 +48,7 @@ Validar que las 5 sedes (Miraflores, Abancay, Cusco, Huaraz, Challhuahuacho) sin
 - [ ] `notas_confidenciales` ocultas a `asistente_admin` (vista `cases_safe`)
 
 ## 7. Netlify / CSP
-- [ ] `GET /.netlify/functions/public-config` no expone service role
+- [ ] `GET /.cloudflare/functions/public-config` no expone service role
 - [ ] `POST attendance-validate` sin Bearer → 401 (no escribe filas)
 - [ ] `POST petty-cash-transition` sin Bearer → 401
 - [ ] Origin distinto de `ALLOWED_ORIGIN` → 401

@@ -19,6 +19,14 @@
     return window.app;
   };
 
+  window.ejecutarResetSuperAdmin = async function (event) {
+    if (event) event.preventDefault();
+    const app = await window._ensureLegalApp();
+    if (app && typeof app.resetSuperAdminAccess === "function") {
+      await app.resetSuperAdminAccess(event);
+    }
+  };
+
   window.ejecutarAccesoDespacho = async function (event) {
     if (event) event.preventDefault();
     if (submitLock) return;
@@ -80,11 +88,13 @@
   }
 
   function registerServiceWorker() {
+    if (window.PaoloAppUpdate && typeof window.PaoloAppUpdate.start === "function") {
+      window.PaoloAppUpdate.start();
+      return;
+    }
     if (!("serviceWorker" in navigator)) return;
     if (window.location.protocol !== "http:" && window.location.protocol !== "https:") return;
-    navigator.serviceWorker.register("sw.js").then(function (reg) {
-      reg.update();
-    }).catch(function (err) {
+    navigator.serviceWorker.register("sw.js").catch(function (err) {
       console.warn("SW registration skipped:", err);
     });
   }

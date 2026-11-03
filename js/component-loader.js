@@ -80,31 +80,63 @@ class ComponentLoader {
   }
 
   /**
-   * Inyecta todos los modales desde views/view-modals.html (una sola vez).
+   * Modales críticos: si falta alguno, hay que reinyectar (p. ej. SW cache parcial o DOM limpio).
+   */
+  _criticalModalsPresent() {
+    return !!(
+      document.getElementById("modalMasterAuth") &&
+      document.getElementById("modalCajaChica") &&
+      document.getElementById("modalFlujoCajaChica") &&
+      document.getElementById("modalCaso") &&
+      document.getElementById("modalPersonal")
+    );
+  }
+
+  /**
+   * Inyecta todos los modales desde views/view-modals.html (una sola vez, con auto-reparación).
    */
   async ensureModalsLoaded() {
-    if (this._modalsLoaded || document.getElementById("modalMasterAuth")) {
+    if (this._criticalModalsPresent()) {
       this._modalsLoaded = true;
       return true;
     }
+    // Faltan modales críticos: invalidar caché en memoria y volver a inyectar.
+    this._modalsLoaded = false;
     if (this._modalsPromise) return this._modalsPromise;
 
     this._modalsPromise = (async () => {
       try {
-        const resp = await fetch("views/view-modals.html");
+        const resp = await fetch("views/view-modals.html?v=20261103_despacho_admin", { cache: "no-store" });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const html = await resp.text();
         const wrap = document.createElement("div");
         wrap.innerHTML = html.trim();
+
+        // Solo agregar nodos cuyo id aún no exista (evita duplicar al reparar).
         const frag = document.createDocumentFragment();
-        while (wrap.firstChild) frag.appendChild(wrap.firstChild);
-        document.body.appendChild(frag);
-        this._modalsLoaded = true;
-        return true;
+        let added = 0;
+        while (wrap.firstChild) {
+          const node = wrap.firstChild;
+          wrap.removeChild(node);
+          if (node.nodeType === 1 && node.id && document.getElementById(node.id)) {
+            continue;
+          }
+          frag.appendChild(node);
+          added += 1;
+        }
+        if (added) document.body.appendChild(frag);
+        this._modalsLoaded = this._criticalModalsPresent();
+        if (!this._modalsLoaded) {
+          console.warn("[ComponentLoader] Modales críticos aún incompletos tras la inyección.");
+        }
+        return this._modalsLoaded;
       } catch (err) {
         console.warn("[ComponentLoader] No se pudieron cargar modales externos:", err);
         this._modalsPromise = null;
         return false;
+      } finally {
+        // Permitir reintento si falló la reparación.
+        if (!this._modalsLoaded) this._modalsPromise = null;
       }
     })();
 

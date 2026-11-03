@@ -130,33 +130,57 @@
                   </span>
                 </div>
 
-                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs">
-                  <div class="flex flex-wrap items-center justify-between gap-1">
-                    <span class="text-slate-300 font-semibold text-[11px] sm:text-xs flex items-center gap-1.5">
-                      <i class="fa-solid fa-location-crosshairs text-cyan-400 text-xs"></i> Coordenadas Actuales:
-                    </span>
-                    <span id="asistencia-gps-coords" class="font-mono text-cyan-300 font-bold text-[11px] sm:text-xs bg-slate-900 px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap">--.------, --.------</span>
+                <div class="space-y-2.5">
+                  <div id="asistencia-sede-hero" class="asistencia-sede-hero" data-sede="challhuahuacho">
+                    <div id="asistencia-sede-hero-mosaic" class="asistencia-sede-hero__mosaic hidden" aria-hidden="true">
+                      <span class="asistencia-sede-hero__tile asistencia-sede-hero__tile--lead" data-tile="challhuahuacho"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="cusco"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="miraflores"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="abancay"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="huaraz"></span>
+                    </div>
+                    <div class="asistencia-sede-hero__shade" aria-hidden="true"></div>
+                    <div class="asistencia-sede-hero__copy">
+                      <p id="asistencia-sede-hero-kicker" class="asistencia-sede-hero__kicker"><i class="fa-solid fa-location-dot"></i> Sede detectada</p>
+                      <h4 id="asistencia-sede-hero-nombre" class="asistencia-sede-hero__name">Sede Challhuahuacho</h4>
+                      <p id="asistencia-sede-hero-region" class="asistencia-sede-hero__region">Cotabambas, Apurímac</p>
+                    </div>
                   </div>
 
-                  <div class="flex flex-wrap items-center justify-between gap-1">
-                    <span id="asistencia-label-distancia" class="text-slate-300 font-semibold text-[11px] sm:text-xs flex items-center gap-1.5">
-                      <i class="fa-solid fa-route text-amber-400 text-xs"></i> Distancia a Sede:
-                    </span>
-                    <span id="asistencia-gps-distance" class="font-mono text-amber-300 font-extrabold text-[11px] sm:text-xs bg-slate-900 px-2 py-0.5 rounded border border-amber-500/30 whitespace-nowrap">Calculando...</span>
+                  <div id="asistencia-sede-hero-editor" class="hidden rounded-xl border border-amber-500/35 bg-slate-950 p-3 space-y-2">
+                    <div class="flex items-center justify-between gap-2">
+                      <p class="text-[11px] font-bold text-amber-200 flex items-center gap-1.5">
+                        <i class="fa-solid fa-image"></i> Editar foto de la sede
+                      </p>
+                      <span id="asistencia-sede-hero-editor-sede" class="text-[10px] font-semibold text-slate-400 truncate">Challhuahuacho</span>
+                    </div>
+                    <p class="text-[10px] text-slate-400 leading-snug">Reemplace el fondo del nombre de la sede. La foto se guarda para esta sede y la ven todos al marcar asistencia.</p>
+                    <div class="flex flex-col sm:flex-row gap-2">
+                      <button type="button" onclick="document.getElementById('asistencia-sede-hero-file').click()" class="w-full sm:flex-1 min-h-[40px] px-3 py-2 rounded-xl text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 inline-flex items-center justify-center gap-1.5">
+                        <i class="fa-solid fa-upload"></i> Cambiar foto
+                      </button>
+                      <input id="asistencia-sede-hero-file" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="AttendanceModule.onSedeHeroPhotoSelected(event)">
+                      <button type="button" onclick="AttendanceModule.resetSedeHeroPhoto()" class="w-full sm:w-auto min-h-[40px] px-3 py-2 rounded-xl text-[11px] font-bold bg-slate-900 text-slate-200 border border-slate-600">
+                        Restaurar original
+                      </button>
+                    </div>
                   </div>
 
-                  <div class="flex flex-wrap items-center justify-between gap-1 border-t border-slate-800 pt-2 text-[11px]">
-                    <span class="text-slate-300 font-semibold flex items-center gap-1.5">
-                      <i class="fa-solid fa-circle-notch text-emerald-400 text-xs"></i> Radio de Tolerancia:
-                    </span>
-                    <span id="asistencia-gps-tolerance" class="text-emerald-300 font-bold text-xs whitespace-nowrap">100 metros</span>
+                  <div class="hidden" aria-hidden="true">
+                    <span id="asistencia-label-distancia"></span>
+                    <span id="asistencia-gps-coords">--.------, --.------</span>
+                    <span id="asistencia-gps-distance">Calculando...</span>
+                    <span id="asistencia-gps-tolerance">300 metros</span>
+                    <span id="asistencia-sede-oficial-coords">-14.116667, -72.245000</span>
                   </div>
 
-                  <div class="flex flex-wrap items-center justify-between gap-1 border-t border-slate-800/80 pt-1.5 text-[10px]">
-                    <span class="text-slate-400 flex items-center gap-1">
-                      <i class="fa-solid fa-building text-slate-500"></i> Punto Oficial de Sede:
-                    </span>
-                    <span id="asistencia-sede-oficial-coords" class="font-mono text-slate-300 font-semibold whitespace-nowrap">-14.116667, -72.245000</span>
+                  <div class="flex flex-col gap-2">
+                    <button type="button" onclick="AttendanceModule.refreshGpsPosition('gps_real')" class="w-full min-h-[44px] px-3 py-2 rounded-xl text-[11px] font-bold bg-cyan-950 text-cyan-200 border border-cyan-500/40 active:scale-[0.98] touch-manipulation">
+                      <i class="fa-solid fa-satellite-dish mr-1"></i> Actualizar GPS (celular)
+                    </button>
+                    <button type="button" id="btnAnclarOficinaAqui" onclick="AttendanceModule.anchorOfficeHere()" class="hidden w-full min-h-[44px] px-3 py-2 rounded-xl text-[11px] font-bold bg-amber-950 text-amber-200 border border-amber-500/40 active:scale-[0.98] touch-manipulation" title="Solo Super Admin, Socio o Admin de sede">
+                      <i class="fa-solid fa-map-pin mr-1"></i> Anclar oficina aquí
+                    </button>
                   </div>
                 </div>
 
@@ -265,45 +289,45 @@
                 <!-- 4 Botones Secuenciales de Marcaje Blindado (Jornada y Almuerzo) -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
                   <!-- 1. INGRESO JORNADA -->
-                  <button id="btn-asistencia-marcar-ingreso" onclick="AttendanceModule.performRegularPunch('ingreso')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold shadow-lg shadow-emerald-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-ingreso" onclick="AttendanceModule.performRegularPunch('ingreso')" class="asistencia-punch asistencia-punch--ingreso group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-right-to-bracket"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">1. Jornada</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">1. Jornada</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Marcar Ingreso</div>
                     </div>
                   </button>
 
                   <!-- 2. SALIDA A ALMUERZO -->
-                  <button id="btn-asistencia-marcar-salida-almuerzo" onclick="AttendanceModule.performRegularPunch('salida_almuerzo')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold shadow-lg shadow-amber-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-salida-almuerzo" onclick="AttendanceModule.performRegularPunch('salida_almuerzo')" class="asistencia-punch asistencia-punch--almuerzo group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-black/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-utensils"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-amber-200 font-bold">2. Almuerzo</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">2. Almuerzo</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Salida Almuerzo</div>
                     </div>
                   </button>
 
                   <!-- 3. RETORNO DE ALMUERZO -->
-                  <button id="btn-asistencia-marcar-retorno-almuerzo" onclick="AttendanceModule.performRegularPunch('retorno_almuerzo')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold shadow-lg shadow-blue-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-retorno-almuerzo" onclick="AttendanceModule.performRegularPunch('retorno_almuerzo')" class="asistencia-punch asistencia-punch--retorno group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-mug-hot"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-cyan-200 font-bold">3. Almuerzo</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">3. Almuerzo</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Retorno Almuerzo</div>
                     </div>
                   </button>
 
                   <!-- 4. SALIDA FINAL -->
-                  <button id="btn-asistencia-marcar-salida" onclick="AttendanceModule.performRegularPunch('salida')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold shadow-lg shadow-rose-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-salida" onclick="AttendanceModule.performRegularPunch('salida')" class="asistencia-punch asistencia-punch--salida group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-right-from-bracket"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-rose-200 font-bold">4. Jornada</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">4. Jornada</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Salida Final</div>
                     </div>
                   </button>

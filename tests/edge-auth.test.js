@@ -4,9 +4,9 @@
 const path = require("path");
 
 const root = path.join(__dirname, "..");
-const admin = require(path.join(root, "netlify/functions/_supabaseAdmin.js"));
-const attendance = require(path.join(root, "netlify/functions/attendance-validate.js"));
-const petty = require(path.join(root, "netlify/functions/petty-cash-transition.js"));
+const admin = require(path.join(root, "cloudflare/functions/_supabaseAdmin.js"));
+const attendance = require(path.join(root, "cloudflare/functions/attendance-validate.js"));
+const petty = require(path.join(root, "cloudflare/functions/petty-cash-transition.js"));
 
 let fails = 0;
 const ok = (name, cond, extra) => {
@@ -89,7 +89,7 @@ process.env.SUPABASE_ANON_KEY = "anon-test-key";
     httpMethod: "POST",
     headers: {
       Origin: "https://app.example.test",
-      Authorization: "Bearer bad.jwt"
+      Authorization: "Bearer bad.jwt.token"
     },
     body: JSON.stringify({
       id: "ATT-2",
@@ -157,7 +157,10 @@ process.env.SUPABASE_ANON_KEY = "anon-test-key";
       return {
         ok: true,
         status: 200,
-        json: async () => ({ id: "11111111-1111-1111-1111-111111111111" })
+        json: async () => ({
+          id: "11111111-1111-1111-1111-111111111111",
+          app_metadata: { role: "admin", branch_id: "challhuahuacho" }
+        })
       };
     }
     if (u.includes("/rest/v1/rpc/transition_petty_cash")) {
@@ -181,14 +184,38 @@ process.env.SUPABASE_ANON_KEY = "anon-test-key";
   ok("petty JWT OK → 200", res.statusCode === 200, res.body);
   ok("petty RPC Bearer usuario", rpcAuth === "Bearer user.access.token", rpcAuth);
 
+  global.fetch = async (url) => {
+    const u = String(url);
+    if (u.includes("/auth/v1/user")) {
+      return {
+        ok: true,
+        status: 200,
+        json: async () => ({
+          id: "11111111-1111-1111-1111-111111111111",
+          app_metadata: { role: "abogado", branch_id: "challhuahuacho" }
+        })
+      };
+    }
+    throw new Error("fetch inesperado: " + u);
+  };
+  res = await petty.handler({
+    httpMethod: "POST",
+    headers: {
+      Origin: "https://app.example.test",
+      Authorization: "Bearer user.access.token"
+    },
+    body: JSON.stringify({ entry_id: "E1", new_state: "disbursed" })
+  });
+  ok("petty JWT abogado no desembolsa → 403", res.statusCode === 403, res.body);
+
   // CORS: origen no permitido no refleja ACAO
   const cors = admin.corsHeaders({ headers: { Origin: "https://evil.example" } });
   ok("cors no refleja origen ajeno", cors["Access-Control-Allow-Origin"] == null);
 
   // Sync token HMAC + sync-pull sin token
   process.env.SYNC_TOKEN_SECRET = "test-sync-secret-for-unit";
-  const syncTok = require(path.join(root, "netlify/functions/_syncToken.js"));
-  const syncPull = require(path.join(root, "netlify/functions/sync-pull.js"));
+  const syncTok = require(path.join(root, "cloudflare/functions/_syncToken.js"));
+  const syncPull = require(path.join(root, "cloudflare/functions/sync-pull.js"));
   const issued = syncTok.issueSyncToken({ uid: "WRK-1", role: "super_admin", sede: "todas" });
   const claims = syncTok.verifySyncToken(issued);
   ok("syncToken roundtrip uid", claims.uid === "WRK-1");

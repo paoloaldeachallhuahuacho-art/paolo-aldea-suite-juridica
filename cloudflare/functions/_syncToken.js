@@ -23,7 +23,9 @@ function signingSecret() {
     process.env.SYNC_TOKEN_SECRET ||
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
     "";
-  if (!raw) throw Object.assign(new Error("SYNC_TOKEN_SECRET / SERVICE_ROLE no configurado"), { status: 503 });
+  if (!raw) {
+    throw Object.assign(new Error("SYNC_TOKEN_SECRET / SERVICE_ROLE no configurado"), { status: 401 });
+  }
   return crypto.createHash("sha256").update(String(raw)).digest();
 }
 
@@ -82,6 +84,29 @@ const SYNC_COLLECTIONS = [
   "workers"
 ];
 
+const SENSITIVE_RECORD_KEYS = [
+  "password",
+  "pin",
+  "passwordHash",
+  "pinHash",
+  "password_hash",
+  "pin_hash"
+];
+
+const STAFF_WRITE_ROLES = new Set(["super_admin", "socio", "admin"]);
+
+function stripSensitiveRecord(rec) {
+  if (!rec || typeof rec !== "object") return rec;
+  const copy = { ...rec };
+  for (const key of SENSITIVE_RECORD_KEYS) delete copy[key];
+  return copy;
+}
+
+/** El padrón no viaja por el bus genérico salvo admin/socio/super_admin. */
+function canWriteStaffCollection(claims) {
+  return STAFF_WRITE_ROLES.has(String((claims && claims.role) || ""));
+}
+
 function normalizeBranch(sede, role) {
   if (role === "super_admin" || role === "socio" || sede === "todas") return null; // null = todas
   return sede && sede !== "todas" ? sede : "challhuahuacho";
@@ -91,5 +116,9 @@ module.exports = {
   issueSyncToken,
   verifySyncToken,
   SYNC_COLLECTIONS,
-  normalizeBranch
+  normalizeBranch,
+  stripSensitiveRecord,
+  canWriteStaffCollection,
+  SENSITIVE_RECORD_KEYS,
+  STAFF_WRITE_ROLES
 };

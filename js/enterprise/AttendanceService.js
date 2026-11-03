@@ -1,7 +1,13 @@
 /**
- * AttendanceService — GPS client + validación Edge (no confiar Haversine local).
+ * AttendanceService — GPS client + validación Edge (syncToken o JWT).
  */
 (function (global) {
+  function edgeUrl(name) {
+    return (global.PaoloEnterpriseConfig && global.PaoloEnterpriseConfig.edgeUrl)
+      ? global.PaoloEnterpriseConfig.edgeUrl(name)
+      : "/api/" + name;
+  }
+
   function getPosition() {
     return new Promise((resolve, reject) => {
       if (!navigator.geolocation) return reject(new Error("Geolocalización no disponible"));
@@ -13,11 +19,24 @@
     });
   }
 
+  function authHeaders() {
+    const headers = { "Content-Type": "application/json" };
+    const jwt = global.PaoloAuthService && global.PaoloAuthService.getAccessToken
+      ? global.PaoloAuthService.getAccessToken()
+      : null;
+    const sync =
+      global.PaoloCloudDataSync && typeof global.PaoloCloudDataSync.getToken === "function"
+        ? global.PaoloCloudDataSync.getToken()
+        : "";
+    if (jwt) headers.Authorization = "Bearer " + jwt;
+    else if (sync) headers.Authorization = "Bearer " + sync;
+    return { headers, syncToken: sync || null, hasAuth: !!(jwt || sync) };
+  }
+
   async function punch({ branchId, eventType, workerCode }) {
     const pos = await getPosition();
     const coords = pos.coords;
     const spoof = !!(coords && (coords.mocked === true || coords.isMocked === true));
-    const accessToken = global.PaoloAuthService ? global.PaoloAuthService.getAccessToken() : null;
     const payload = {
       id: "ATT-" + Date.now() + "-" + Math.random().toString(36).slice(2, 7),
       branch_id: branchId,
@@ -34,18 +53,17 @@
       return { ok: true, offline: true, localOnly: true, payload };
     }
 
-    if (!accessToken) {
-      throw new Error("Sesión Supabase requerida para marcar asistencia en la nube.");
+    const auth = authHeaders();
+    if (!auth.hasAuth) {
+      throw new Error("Sesión requerida para marcar asistencia en la nube. Vuelva a iniciar sesión.");
+    }
+    if (auth.syncToken && !auth.headers.Authorization.includes("eyJ")) {
+      payload.syncToken = auth.syncToken;
     }
 
-    const headers = {
-      "Content-Type": "application/json",
-      Authorization: "Bearer " + accessToken
-    };
-
-    const res = await fetch("/.netlify/functions/attendance-validate", {
+    const res = await fetch(edgeUrl("attendance-validate"), {
       method: "POST",
-      headers,
+      headers: auth.headers,
       credentials: "same-origin",
       body: JSON.stringify(payload)
     });

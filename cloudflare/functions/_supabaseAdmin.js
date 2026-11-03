@@ -209,8 +209,16 @@ function assertAllowedOrigin(event) {
 
 function clientMeta(event) {
   const h = event.headers || {};
+  const xff = h["x-forwarded-for"] || h["X-Forwarded-For"] || "";
+  const firstXff = String(xff).split(",")[0].trim();
   return {
-    ip: h["x-nf-client-connection-ip"] || h["x-forwarded-for"] || h["client-ip"] || "",
+    ip:
+      h["cf-connecting-ip"] ||
+      h["CF-Connecting-IP"] ||
+      h["x-nf-client-connection-ip"] ||
+      firstXff ||
+      h["client-ip"] ||
+      "",
     ua: h["user-agent"] || h["User-Agent"] || ""
   };
 }
