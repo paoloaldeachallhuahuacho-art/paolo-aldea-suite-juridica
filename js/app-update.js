@@ -5,7 +5,7 @@
  * Poll de version.json + banner institucional resumido.
  */
 (function (global) {
-  var APP_RELEASE = "2026.11.16";
+  var APP_RELEASE = "2026.11.17";
   var DISMISS_KEY = "PA_UPDATE_DISMISSED";
   var APPLY_KEY = "PA_APPLY_UPDATE";
   var DISMISS_VERSION_KEY = "PA_UPDATE_DISMISS_VER";

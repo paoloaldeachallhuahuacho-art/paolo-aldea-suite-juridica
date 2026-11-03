@@ -1,10 +1,10 @@
 {
   "name": "paolo-aldea-suite-juridica",
-  "version": "2026.11.16",
+  "version": "2026.11.17",
   "channel": "production",
   "releasedAt": "2026-11-03",
   "notes": [
-    "Tipografía institucional del despacho",
-    "Interfaz y reportes más claros"
+    "Tipografía institucional activada",
+    "Fuente del despacho visible en toda la suite"
   ]
 }

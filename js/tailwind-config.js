@@ -29,7 +29,9 @@ tailwind.config = {
 (function () {
   var fonts = document.getElementById("paoloFonts");
   if (!fonts) return;
-  var activate = function () { fonts.media = "all"; };
-  if (fonts.sheet) activate();
-  else fonts.addEventListener("load", activate);
+  // Nunca dejar en media=print: algunos navegadores no descargan y la fuente no aplica.
+  fonts.media = "all";
+  try {
+    document.documentElement.classList.add("fonts-legal-ready");
+  } catch (_) {}
 })();
