@@ -8,24 +8,40 @@ class LegalExcelExporter {
   constructor() {
     this.fontFamily = "Segoe UI";
     this.colors = {
-      headerNavy: "0B132B",      // Azul marino institucional oscuro de prestigio
-      headerNavyMid: "1C2541",   // Azul marino medio
-      goldAccent: "C5A059",      // Oro champagne legal
-      goldLight: "FEF3C7",       // Fondo ámbar / oro tenue contable
-      goldDarkText: "78350F",    // Texto dorado oscuro para totales
-      zebraLight: "F8FAFC",      // Blanco grisáceo alterno para filas de datos
-      borderGray: "CBD5E1",      // Bordes delgados nítidos
-      textWhite: "FFFFFF",
-      textDark: "0F172A",
-      incomeGreen: "D1FAE5",     // Fondo verde ingresos
-      incomeText: "065F46",      // Texto verde ingresos
-      expenseRed: "FEE2E2",      // Fondo rojo egresos
-      expenseText: "991B1B",     // Texto rojo egresos
-      urgentBg: "FEE2E2",
-      urgentText: "991B1B",
-      successBg: "D1FAE5",
-      successText: "065F46"
+      headerNavy: "FF0B132B",
+      headerNavyMid: "FF1C2541",
+      goldAccent: "FFC5A059",
+      goldLight: "FFFEF3C7",
+      goldDarkText: "FF78350F",
+      zebraLight: "FFF8FAFC",
+      zebraSoft: "FFF1F5F9",
+      borderGray: "FFCBD5E1",
+      textWhite: "FFFFFFFF",
+      textDark: "FF0F172A",
+      incomeGreen: "FFD1FAE5",
+      incomeText: "FF065F46",
+      expenseRed: "FFFEE2E2",
+      expenseText: "FF991B1B",
+      urgentBg: "FFFEE2E2",
+      urgentText: "FF991B1B",
+      successBg: "FFD1FAE5",
+      successText: "FF065F46"
     };
+  }
+
+  /** Normaliza color ExcelJS a AARRGGBB válido (nunca "-" / vacío → negro ilegible). */
+  toArgb(value, fallback = "FFFFFFFF") {
+    const raw = String(value == null ? "" : value).trim().replace(/^#/, "");
+    if (!raw || raw === "-" || raw.toLowerCase() === "none") return fallback;
+    const hex = raw.replace(/[^0-9A-Fa-f]/g, "");
+    if (hex.length === 8) return hex.toUpperCase();
+    if (hex.length === 6) return ("FF" + hex).toUpperCase();
+    return fallback;
+  }
+
+  /** Fondo de fila de datos: blanco / zebra legible. */
+  rowBgArgb(isZebra) {
+    return this.toArgb(isZebra ? this.colors.zebraSoft : this.colors.textWhite, "FFFFFFFF");
   }
 
   // Sanitización de celdas contra Formula Injection / CSV Injection (CWE-1236)
@@ -550,7 +566,7 @@ class LegalExcelExporter {
 
       const row = sheet.getRow(currentRowIdx);
       const isZebra = index % 2 === 1;
-      const bgArgb = isZebra ? this.colors.zebraLight : "FFFFFF";
+      const bgArgb = this.rowBgArgb(isZebra);
       const solicitante = item.solicitante?.nombre || item.solicitante || "-";
 
       row.values = [
@@ -733,13 +749,12 @@ class LegalExcelExporter {
       totalHonorarios += honorarios;
 
       const isZebra = index % 2 === 1;
-      const bgArgb = isZebra ? this.colors.zebraLight : "-";
+      const bgArgbSafe = this.rowBgArgb(isZebra);
       const row = sheet.getRow(currentRowIdx);
 
       const pdfMeta = c.pdfMeta || {};
       const hasExp = !!(pdfMeta.expediente?.hasPdf || pdfMeta.hasExpediente);
       const hasRes = !!(pdfMeta.resolucion?.hasPdf || (pdfMeta.hasPdf && !pdfMeta.expediente));
-      const bgArgbSafe = bgArgb === "-" ? "FFFFFF" : bgArgb;
 
       row.values = [
         c.id || "-",
@@ -872,7 +887,7 @@ class LegalExcelExporter {
 
     items.forEach((item, index) => {
       const isZebra = index % 2 === 1;
-      const bgArgb = isZebra ? this.colors.zebraLight : "FFFFFF";
+      const bgArgb = this.rowBgArgb(isZebra);
       const row = sheet.getRow(currentRowIdx);
       const docsReq = Array.isArray(item.documentosRequeridos)
         ? item.documentosRequeridos.join(", ")
@@ -966,7 +981,7 @@ class LegalExcelExporter {
       totalValorInventario += valorTotal;
 
       const isZebra = index % 2 === 1;
-      const bgArgb = isZebra ? this.colors.zebraLight : "-";
+      const bgArgb = this.rowBgArgb(isZebra);
       const row = sheet.getRow(currentRowIdx);
 
       row.values = [
@@ -1109,7 +1124,7 @@ class LegalExcelExporter {
 
     items.forEach((item, index) => {
       const isZebra = index % 2 === 1;
-      const bgArgb = isZebra ? this.colors.zebraLight : "-";
+      const bgArgb = this.rowBgArgb(isZebra);
       const row = sheet.getRow(currentRowIdx);
 
       row.values = [
@@ -1244,7 +1259,7 @@ class LegalExcelExporter {
     let totalEjecutado = 0;
     items.forEach((item, idx) => {
       const row = sheet.getRow(currentRowIdx);
-      const bgArgb = idx % 2 === 1 ? this.colors.zebraLight : this.colors.textWhite;
+      const bgArgb = this.rowBgArgb(idx % 2 === 1);
       const presupuestado = Number(item.subtotal || item.montoPresupuestado || 0);
       const ejecutado = (item.montoEjecutado !== undefined && item.montoEjecutado !== null)
         ? Number(item.montoEjecutado)
@@ -1501,12 +1516,17 @@ class LegalExcelExporter {
     headers.forEach((h, idx) => {
       const cell = headerRow.getCell(idx + 1);
       cell.value = h;
-      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.headerNavyMid } };
-      cell.font = { name: this.fontFamily, size: 9, bold: true, color: { argb: this.colors.textWhite } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.toArgb(this.colors.headerNavy) } };
+      cell.font = { name: this.fontFamily, size: 9, bold: true, color: { argb: this.toArgb(this.colors.textWhite) } };
       cell.alignment = { horizontal: 'center', vertical: 'middle', wrapText: true };
-      cell.border = this.thinBorder;
+      cell.border = {
+        top: { style: 'thin', color: { argb: this.toArgb(this.colors.headerNavy) } },
+        left: { style: 'thin', color: { argb: this.toArgb(this.colors.headerNavy) } },
+        bottom: { style: 'medium', color: { argb: this.toArgb(this.colors.goldAccent) } },
+        right: { style: 'thin', color: { argb: this.toArgb(this.colors.headerNavy) } }
+      };
     });
-    headerRow.height = 28;
+    headerRow.height = 30;
 
     const workers = window.db.get("workers");
     let currentRowIdx = 7;
@@ -1514,7 +1534,7 @@ class LegalExcelExporter {
     workers.forEach((w, index) => {
       const row = sheet.getRow(currentRowIdx);
       const isZebra = (index % 2 === 1);
-      const bgArgb = isZebra ? this.colors.zebraLight : "-";
+      const bgArgb = this.rowBgArgb(isZebra);
 
       const sedeCfg = window.SEDES_CONFIG ? window.SEDES_CONFIG[w.sede] : null;
       const sedeLabel = sedeCfg ? sedeCfg.nombreCorto : (w.sede === "todas" ? "Consolidado Nacional" : w.sede);
@@ -1542,14 +1562,14 @@ class LegalExcelExporter {
         (w.activo !== false) ? "ACTIVO" : "INACTIVO",
         w.fechaIngreso || "-"
       ];
-      row.height = 22;
+      row.height = 24;
 
       for (let c = 1; c <= 13; c++) {
         const cell = row.getCell(c);
-        cell.font = { name: this.fontFamily, size: 8.5, color: { argb: this.colors.textDark } };
+        cell.font = { name: this.fontFamily, size: 9, color: { argb: this.toArgb(this.colors.textDark) } };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } };
         cell.border = this.thinBorder;
-        cell.alignment = { vertical: 'middle' };
+        cell.alignment = { vertical: 'middle', wrapText: true };
       }
 
       // Columnas centradas
@@ -1557,6 +1577,7 @@ class LegalExcelExporter {
       row.getCell(2).alignment = { horizontal: 'center', vertical: 'middle' };
       row.getCell(3).alignment = { horizontal: 'center', vertical: 'middle' };
       row.getCell(4).alignment = { horizontal: 'center', vertical: 'middle' };
+      row.getCell(5).font = { name: this.fontFamily, size: 9, bold: true, color: { argb: this.toArgb(this.colors.textDark) } };
       row.getCell(7).alignment = { horizontal: 'center', vertical: 'middle' };
       row.getCell(8).alignment = { horizontal: 'center', vertical: 'middle' };
       row.getCell(9).alignment = { horizontal: 'center', vertical: 'middle' };
@@ -1565,11 +1586,11 @@ class LegalExcelExporter {
 
       const statusCell = row.getCell(12);
       if (w.activo !== false) {
-        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: "D1FAE5" } };
-        statusCell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: "065F46" } };
+        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.toArgb(this.colors.successBg) } };
+        statusCell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: this.toArgb(this.colors.successText) } };
       } else {
-        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: "FEE2E2" } };
-        statusCell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: "991B1B" } };
+        statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.toArgb(this.colors.expenseRed) } };
+        statusCell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: this.toArgb(this.colors.expenseText) } };
       }
 
       currentRowIdx++;
