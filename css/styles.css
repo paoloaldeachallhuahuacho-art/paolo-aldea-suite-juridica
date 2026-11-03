@@ -648,6 +648,22 @@ html.dark #globalSedeSelect {
   color: #F8FAFC !important;
 }
 
+/* Confirmación institucional (reemplaza window.confirm) */
+#modalAppConfirm.flex .app-confirm-sheet {
+  animation: appConfirmIn 0.26s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes appConfirmIn {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
 /* Selector de sede institucional (bottom sheet / modal) */
 .sr-only {
   position: absolute;

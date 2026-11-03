@@ -2280,7 +2280,7 @@ const AttendanceModule = (function () {
   /**
    * Elimina un registro de asistencia (sólo Admin)
    */
-  function deleteRecord(id) {
+  async function deleteRecord(id) {
     if (!canManageAttendanceRecords()) {
       if (window.showToast) {
         window.showToast("Permiso denegado: Solo Super Administrador, Socio Principal o Administrador puede eliminar registros de asistencia.", "error");
@@ -2288,7 +2288,35 @@ const AttendanceModule = (function () {
       return;
     }
 
-    if (!confirm("¿Está seguro de eliminar este registro de asistencia?")) return;
+    const rec = getAttendanceRecords().find((r) => r && r.id === id) || null;
+    const detailParts = [];
+    if (rec) {
+      if (rec.nombre) detailParts.push(rec.nombre);
+      if (rec.dni) detailParts.push("DNI " + rec.dni);
+      if (rec.fecha) detailParts.push(rec.fecha);
+      if (rec.ingreso) {
+        try {
+          detailParts.push("Ingreso " + new Date(rec.ingreso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }));
+        } catch (_) {}
+      }
+    }
+
+    let ok = false;
+    if (window.app && typeof window.app.confirmAction === "function") {
+      ok = await window.app.confirmAction({
+        title: "Eliminar marcaje de asistencia",
+        message: "Se eliminará este registro del panel de supervisión y de los KPIs semanales/mensuales. La acción queda auditada en la nube y no se puede deshacer desde aquí.",
+        detail: detailParts.length ? detailParts.join(" · ") : "Registro de asistencia seleccionado",
+        confirmLabel: "Sí, eliminar marcaje",
+        cancelLabel: "Conservar registro",
+        danger: true,
+        icon: "fa-trash-can"
+      });
+    } else {
+      ok = window.confirm("¿Está seguro de eliminar este registro de asistencia?");
+    }
+    if (!ok) return;
+
     // Usar delete() para tombstone + push; un simple filter revive el registro en el próximo pull.
     if (window.db && typeof window.db.delete === "function") {
       window.db.delete("attendance", id);

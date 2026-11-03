@@ -6362,28 +6362,29 @@ ${callToAction}
     modal.className = "modal-container hidden fixed inset-0 z-[10060] items-center justify-center p-4";
     modal.setAttribute("role", "dialog");
     modal.setAttribute("aria-modal", "true");
-    modal.style.background = "rgba(15, 23, 42, 0.72)";
-    modal.style.backdropFilter = "blur(6px)";
+    modal.style.background = "rgba(8, 12, 24, 0.82)";
+    modal.style.backdropFilter = "blur(10px)";
     modal.innerHTML = `
-      <div class="w-full max-w-md rounded-2xl border border-amber-500/50 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
-        <div class="px-4 py-3.5 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/50 flex items-start gap-3">
-          <span id="modalAppConfirmIcon" class="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0"><i class="fa-solid fa-user-xmark"></i></span>
+      <div class="app-confirm-sheet relative w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
+        <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-600 via-rose-500 to-amber-600"></div>
+        <div class="px-5 pt-5 pb-3.5 border-b border-slate-800/90 bg-gradient-to-r from-slate-950 via-slate-900 to-rose-950/30 flex items-start gap-3">
+          <span id="modalAppConfirmIcon" class="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0 shadow-inner text-lg"><i class="fa-solid fa-trash-can"></i></span>
           <div class="min-w-0 flex-1 pt-0.5">
-            <h3 id="modalAppConfirmTitle" class="text-sm font-extrabold tracking-wide text-white">Confirmar acción</h3>
-            <p id="modalAppConfirmSubtitle" class="text-[10px] text-amber-300/90 font-semibold mt-0.5">Paolo Aldea &amp; Abogados · Control seguro</p>
+            <p id="modalAppConfirmSubtitle" class="text-[10px] uppercase tracking-[0.16em] text-amber-400/90 font-bold">Paolo Aldea &amp; Abogados · Control seguro</p>
+            <h3 id="modalAppConfirmTitle" class="text-base font-extrabold tracking-wide text-white mt-0.5">Confirmar acción</h3>
           </div>
-          <button type="button" id="btnAppConfirmClose" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+          <button type="button" id="btnAppConfirmClose" class="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
         </div>
-        <div class="px-4 py-4 space-y-3">
-          <p id="modalAppConfirmMessage" class="text-xs leading-relaxed text-slate-300"></p>
-          <div id="modalAppConfirmDetail" class="hidden rounded-xl border border-amber-500/40 bg-slate-900 px-3 py-2.5">
-            <p class="text-[10px] uppercase tracking-wider text-amber-400/90 font-bold mb-0.5">Registro</p>
+        <div class="px-5 py-4 space-y-3">
+          <p id="modalAppConfirmMessage" class="text-xs sm:text-sm leading-relaxed text-slate-300"></p>
+          <div id="modalAppConfirmDetail" class="hidden rounded-xl border border-amber-500/35 bg-gradient-to-br from-slate-900 to-slate-950 px-3.5 py-3">
+            <p class="text-[10px] uppercase tracking-wider text-amber-400/90 font-bold mb-1">Registro afectado</p>
             <p id="modalAppConfirmDetailText" class="text-xs font-semibold text-slate-100 break-words"></p>
           </div>
         </div>
-        <div class="px-4 py-3 border-t border-slate-800 bg-slate-950 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-          <button type="button" id="btnAppConfirmCancel" class="min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">Cancelar</button>
-          <button type="button" id="btnAppConfirmOk" class="min-h-[44px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition">Sí, eliminar</button>
+        <div class="px-5 py-3.5 border-t border-slate-800 bg-slate-950/95 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <button type="button" id="btnAppConfirmCancel" class="min-h-[46px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">Cancelar</button>
+          <button type="button" id="btnAppConfirmOk" class="min-h-[46px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition inline-flex items-center justify-center gap-2"><i class="fa-solid fa-trash-can text-[11px]"></i><span>Sí, eliminar</span></button>
         </div>
       </div>`;
     document.body.appendChild(modal);
@@ -6419,20 +6420,27 @@ ${callToAction}
           detailText.textContent = "";
         }
       }
-      okBtn.textContent = opts.confirmLabel || "Confirmar";
       cancelBtn.textContent = opts.cancelLabel || "Cancelar";
       const danger = opts.danger !== false;
+      const iconName = String(opts.icon || (danger ? "fa-trash-can" : "fa-triangle-exclamation")).replace(/[^a-z0-9-]/gi, "");
       if (iconWrap) {
         iconWrap.className = danger
-          ? "w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0"
-          : "w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0";
-        iconWrap.innerHTML = danger
-          ? '<i class="fa-solid fa-user-xmark"></i>'
-          : '<i class="fa-solid fa-triangle-exclamation"></i>';
+          ? "w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0 shadow-inner text-lg"
+          : "w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0 shadow-inner text-lg";
+        iconWrap.innerHTML = '<i class="fa-solid ' + iconName + '"></i>';
       }
+      const subtitleEl = document.getElementById("modalAppConfirmSubtitle");
+      if (subtitleEl) {
+        subtitleEl.textContent = opts.subtitle || "Paolo Aldea & Abogados · Control seguro";
+      }
+      const confirmLabel = opts.confirmLabel || (danger ? "Sí, eliminar" : "Confirmar");
+      okBtn.innerHTML = danger
+        ? '<i class="fa-solid fa-trash-can text-[11px]"></i><span>' + confirmLabel + "</span>"
+        : "<span>" + confirmLabel + "</span>";
       okBtn.className = danger
-        ? "min-h-[44px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition"
-        : "min-h-[44px] px-4 py-2 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 shadow-md transition";
+        ? "min-h-[46px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition inline-flex items-center justify-center gap-2"
+        : "min-h-[46px] px-4 py-2 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 shadow-md transition inline-flex items-center justify-center gap-2";
+      cancelBtn.className = "min-h-[46px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition";
 
       const finish = (value) => {
         modal.classList.add("hidden");

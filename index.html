@@ -38,7 +38,7 @@
   <script src="js/lib-loader.js?v=20261101_week3_perf"></script>
 
   <!-- Estilos Personalizados del Estudio Jurídico -->
-  <link rel="stylesheet" href="css/styles.css?v=20261103_sede_picker">
+  <link rel="stylesheet" href="css/styles.css?v=20261103_confirm_del">
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased flex h-screen overflow-hidden">
 
@@ -102,33 +102,35 @@
   </div>
 
   <!-- Confirmación institucional (siempre en DOM; no depende de view-modals) -->
-  <div id="modalAppConfirm" class="modal-container hidden fixed inset-0 z-[10060] items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modalAppConfirmTitle" style="display:none;background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(6px);">
-    <div class="w-full max-w-md rounded-2xl border border-amber-500/50 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
-      <div class="px-4 py-3.5 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/50 flex items-start gap-3">
-        <span id="modalAppConfirmIcon" class="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0">
-          <i class="fa-solid fa-user-xmark"></i>
+  <div id="modalAppConfirm" class="modal-container hidden fixed inset-0 z-[10060] items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modalAppConfirmTitle" style="display:none;background: rgba(8, 12, 24, 0.82); backdrop-filter: blur(10px);">
+    <div class="app-confirm-sheet relative w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
+      <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-600 via-rose-500 to-amber-600"></div>
+      <div class="px-5 pt-5 pb-3.5 border-b border-slate-800/90 bg-gradient-to-r from-slate-950 via-slate-900 to-rose-950/30 flex items-start gap-3">
+        <span id="modalAppConfirmIcon" class="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0 shadow-inner text-lg">
+          <i class="fa-solid fa-trash-can"></i>
         </span>
         <div class="min-w-0 flex-1 pt-0.5">
-          <h3 id="modalAppConfirmTitle" class="text-sm font-extrabold tracking-wide text-white">Confirmar acción</h3>
-          <p id="modalAppConfirmSubtitle" class="text-[10px] text-amber-300/90 font-semibold mt-0.5">Paolo Aldea &amp; Abogados · Control seguro</p>
+          <p id="modalAppConfirmSubtitle" class="text-[10px] uppercase tracking-[0.16em] text-amber-400/90 font-bold">Paolo Aldea &amp; Abogados · Control seguro</p>
+          <h3 id="modalAppConfirmTitle" class="text-base font-extrabold tracking-wide text-white mt-0.5">Confirmar acción</h3>
         </div>
-        <button type="button" id="btnAppConfirmClose" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition" aria-label="Cerrar">
+        <button type="button" id="btnAppConfirmClose" class="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition" aria-label="Cerrar">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
-      <div class="px-4 py-4 space-y-3">
-        <p id="modalAppConfirmMessage" class="text-xs leading-relaxed text-slate-300"></p>
-        <div id="modalAppConfirmDetail" class="hidden rounded-xl border border-amber-500/40 bg-slate-900 px-3 py-2.5">
-          <p class="text-[10px] uppercase tracking-wider text-amber-400/90 font-bold mb-0.5">Registro</p>
+      <div class="px-5 py-4 space-y-3">
+        <p id="modalAppConfirmMessage" class="text-xs sm:text-sm leading-relaxed text-slate-300"></p>
+        <div id="modalAppConfirmDetail" class="hidden rounded-xl border border-amber-500/35 bg-gradient-to-br from-slate-900 to-slate-950 px-3.5 py-3">
+          <p class="text-[10px] uppercase tracking-wider text-amber-400/90 font-bold mb-1">Registro afectado</p>
           <p id="modalAppConfirmDetailText" class="text-xs font-semibold text-slate-100 break-words"></p>
         </div>
       </div>
-      <div class="px-4 py-3 border-t border-slate-800 bg-slate-950 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
-        <button type="button" id="btnAppConfirmCancel" class="min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">
+      <div class="px-5 py-3.5 border-t border-slate-800 bg-slate-950/95 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <button type="button" id="btnAppConfirmCancel" class="min-h-[46px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">
           Cancelar
         </button>
-        <button type="button" id="btnAppConfirmOk" class="min-h-[44px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition">
-          Sí, eliminar
+        <button type="button" id="btnAppConfirmOk" class="min-h-[46px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition inline-flex items-center justify-center gap-2">
+          <i class="fa-solid fa-trash-can text-[11px]"></i>
+          <span>Sí, eliminar</span>
         </button>
       </div>
     </div>
@@ -1690,7 +1692,7 @@
   <script src="js/data.js?v=20261115_auth_sig_hardening"></script>
   <script src="js/alerts.js?v=20261114_confirm_modal"></script>
   <script src="js/charts.js?v=20261101_week3_perf"></script>
-  <script src="js/attendance.js?v=20261103_att_kpis_fix"></script>
+  <script src="js/attendance.js?v=20261103_confirm_del"></script>
   <script src="js/attendance-kpis.js?v=20261103_att_kpis_fix"></script>
   <script src="js/draft-autosave.js?v=20261102_jsstr_all"></script>
   <!-- Controllers: carga diferida por pestaña (Semana 4) -->
@@ -1715,7 +1717,7 @@
   <script src="js/enterprise/BudgetAnalytics.js?v=20261102_zt"></script>
   <script src="js/enterprise/bootstrap.js?v=20261102_mode_badge2"></script>
   <script src="js/app-update.js?v=20261115_prod_hardening"></script>
-  <script src="js/app.js?v=20261103_att_kpis_fix"></script>
+  <script src="js/app.js?v=20261103_confirm_del"></script>
   <script src="js/auth-bridge.js?v=20261103_release"></script>
 </body>
 </html>
