@@ -252,6 +252,14 @@
     } catch (e) {
       console.warn("[CloudDataSync] pull:", e && e.message);
     }
+    // Web Push: re-registrar subscription si el usuario ya hizo opt-in
+    try {
+      if (global.PaoloPushService && typeof global.PaoloPushService.ensureAfterLogin === "function") {
+        setTimeout(() => {
+          global.PaoloPushService.ensureAfterLogin().catch(() => {});
+        }, 800);
+      }
+    } catch (_) {}
     // En modo rápido: subir el resto en segundo plano (no retrasa la UI)
     if (quick) {
       setTimeout(() => {

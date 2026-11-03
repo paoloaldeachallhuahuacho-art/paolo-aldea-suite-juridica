@@ -143,13 +143,18 @@ class LegalPdfExporter {
       .replace(/'/g, "&#39;");
   }
 
-  // Sanitización de HTML para reporte aislado
+  // Sanitización de HTML para reporte aislado (PaoloSanitize / DOMPurify si disponible)
   sanitizeHtmlString(html) {
     if (!html || typeof html !== "string") return "";
-    return html
-      .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
-      .replace(/on\w+\s*=\s*(["']).*?\1/gi, "")
-      .replace(/javascript:/gi, "");
+    if (typeof window !== "undefined" && window.PaoloSanitize && typeof window.PaoloSanitize.sanitizeHtml === "function") {
+      return window.PaoloSanitize.sanitizeHtml(html);
+    }
+    return String(html)
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
   }
 
   getBranchInfo() {
@@ -316,48 +321,59 @@ class LegalPdfExporter {
       reportSubtitle = `Control Financiero y Rendici\u00F3n de Fondos en ${sedeDisplay}`;
       latinMotto = "Fides et integritas in omnibus rebus: La transparencia en la administración de los recursos es la piedra angular del patrocinio.";
 
-      const items = window.db.get("caja_chica");
-      const totIng = items.filter(i => i.tipo === "Ingreso").reduce((s, i) => s + Number(i.monto || 0), 0);
-      const totEg = items.filter(i => i.tipo === "Egreso").reduce((s, i) => s + Number(i.monto || 0), 0);
+      const items = (window.db.get("caja_chica") || []).slice().sort((a, b) => String(a.fecha || "").localeCompare(String(b.fecha || "")));
+      const totIng = items.filter(i => /^ingreso$/i.test(String(i.tipo || ""))).reduce((s, i) => s + Number(i.monto || 0), 0);
+      const totEg = items.filter(i => !/^ingreso$/i.test(String(i.tipo || ""))).reduce((s, i) => s + Number(i.monto || 0), 0);
       const saldo = totIng - totEg;
 
-      let rows = items.map((i, idx) => `
-        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 8.5px;">
-          <td style="padding: 6px; text-align: center; font-weight: bold;">${i.fecha}</td>
-          <td style="padding: 6px; text-align: center; font-weight: bold; color: ${i.tipo === 'Ingreso' ? '#065F46' : '#991B1B'};">${i.tipo}</td>
-          <td style="padding: 6px;">${i.centroCosto || 'General'}</td>
-          <td style="padding: 6px;">${i.categoria}</td>
-          <td style="padding: 6px;">${i.concepto}</td>
-          <td style="padding: 6px; font-family: monospace; text-align: center;">${i.expediente || '-'}</td>
-          <td style="padding: 6px; text-align: center;">${i.comprobante || '-'}</td>
-          <td style="padding: 6px; text-align: right; font-weight: bold; color: ${i.tipo === 'Ingreso' ? '#065F46' : '#991B1B'};">
-            ${i.tipo === 'Ingreso' ? '+' : '-'}${curr} ${Number(i.monto).toFixed(2)}
+      let rows = items.map((i, idx) => {
+        const isIng = /^ingreso$/i.test(String(i.tipo || ""));
+        const solicitante = i.solicitante?.nombre || i.solicitante || "-";
+        return `
+        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 7.5px; page-break-inside: avoid;">
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(i.sede || i.sedeId || "-")}</td>
+          <td style="padding: 5px; text-align: center; font-weight: bold;">${this.escapeHtml(i.fecha || "-")}</td>
+          <td style="padding: 5px; text-align: center; font-weight: bold; color: ${isIng ? '#065F46' : '#991B1B'};">${this.escapeHtml(String(i.tipo || "Egreso"))}</td>
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(i.estadoFlujo || i.estado || "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(i.centroCosto || "General")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(i.categoria || "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(i.concepto || "-")}</td>
+          <td style="padding: 5px; font-family: monospace; text-align: center;">${this.escapeHtml(i.expediente || "-")}</td>
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(i.comprobante || "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(i.responsable || "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(String(solicitante))}</td>
+          <td style="padding: 5px; text-align: right; font-weight: bold; color: ${isIng ? '#065F46' : '#991B1B'};">
+            ${isIng ? "+" : "-"}${curr} ${Number(i.monto || 0).toFixed(2)}
           </td>
-        </tr>
-      `).join("");
+        </tr>`;
+      }).join("");
 
       if (items.length === 0) {
-        rows = `<tr><td colspan="8" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No se registran movimientos en la caja chica. Sistema listo en blanco para nuevos registros.</td></tr>`;
+        rows = `<tr><td colspan="12" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No se registran movimientos en la caja chica. Sistema listo en blanco para nuevos registros.</td></tr>`;
       }
 
       contentHtml = `
         <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
           <thead>
-            <tr style="background: #1C2541; color: #FFFFFF; font-size: 8.5px; text-align: center;">
-              <th style="padding: 7px;">FECHA</th>
-              <th style="padding: 7px;">TIPO</th>
-              <th style="padding: 7px;">CENTRO DE COSTO</th>
-              <th style="padding: 7px;">CATEGORÍA</th>
-              <th style="padding: 7px; text-align: left;">CONCEPTO</th>
-              <th style="padding: 7px;">EXPEDIENTE</th>
-              <th style="padding: 7px;">COMPROBANTE</th>
-              <th style="padding: 7px; text-align: right;">MONTO (S/)</th>
+            <tr style="background: #1C2541; color: #FFFFFF; font-size: 7.5px; text-align: center;">
+              <th style="padding: 6px;">SEDE</th>
+              <th style="padding: 6px;">FECHA</th>
+              <th style="padding: 6px;">TIPO</th>
+              <th style="padding: 6px;">FLUJO</th>
+              <th style="padding: 6px;">CENTRO COSTO</th>
+              <th style="padding: 6px;">CATEGORÍA</th>
+              <th style="padding: 6px; text-align: left;">CONCEPTO</th>
+              <th style="padding: 6px;">EXPEDIENTE</th>
+              <th style="padding: 6px;">COMPROB.</th>
+              <th style="padding: 6px;">RESPONSABLE</th>
+              <th style="padding: 6px;">SOLICITANTE</th>
+              <th style="padding: 6px; text-align: right;">MONTO</th>
             </tr>
           </thead>
           <tbody>
             ${rows}
-            <tr style="background: #FEF3C7; font-weight: bold; font-size: 9px; border-top: 2px solid #0B132B;">
-              <td colspan="7" style="padding: 8px; text-align: center;">TOTALES LIQUIDADOS (SALDO DISPONIBLE EN CAJA)</td>
+            <tr style="background: #FEF3C7; font-weight: bold; font-size: 9px; border-top: 2px solid #0B132B; page-break-inside: avoid;">
+              <td colspan="11" style="padding: 8px; text-align: center;">TOTALES LIQUIDADOS (SALDO DISPONIBLE EN CAJA) — ${items.length} movimientos</td>
               <td style="padding: 8px; text-align: right; color: #1E3A8A;">${curr} ${saldo.toFixed(2)}</td>
             </tr>
           </tbody>
@@ -374,42 +390,53 @@ class LegalPdfExporter {
       reportSubtitle = "Causas Judiciales en Juzgados de Cotabambas, Tambobamba y Abancay";
       latinMotto = "Iura novit curia • Vigilantibus iura scripta sunt: El juez conoce el derecho, pero las leyes protegen a quien vigila sus plazos.";
 
-      const items = window.db.get("casos");
-      let rows = items.map((c, idx) => `
-        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 8px;">
-          <td style="padding: 6px; font-family: monospace; font-weight: bold; text-align: center;">${this.escapeHtml(c.expediente)}</td>
-          <td style="padding: 6px; font-weight: bold;">${this.escapeHtml(c.caratula)}</td>
-          <td style="padding: 6px; text-align: center;">${this.escapeHtml(c.materia)}</td>
-          <td style="padding: 6px;">${this.escapeHtml(c.cliente)}</td>
-          <td style="padding: 6px;">${this.escapeHtml(c.juzgado)}</td>
-          <td style="padding: 6px; text-align: center; font-weight: bold; color: ${c.prioridad === 'Urgente' ? '#DC2626' : '#1E293B'};">
-            ${c.vencimiento || '-'}
+      const items = window.db.get("casos") || [];
+      let rows = items.map((c, idx) => {
+        const pdfMeta = c.pdfMeta || {};
+        const hasExp = !!(pdfMeta.expediente?.hasPdf || pdfMeta.hasExpediente);
+        const hasRes = !!(pdfMeta.resolucion?.hasPdf || (pdfMeta.hasPdf && !pdfMeta.expediente));
+        return `
+        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 7.5px; page-break-inside: avoid;">
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(c.sede || c.sedeId || "-")}</td>
+          <td style="padding: 5px; font-family: monospace; font-weight: bold; text-align: center;">${this.escapeHtml(c.expediente || "-")}</td>
+          <td style="padding: 5px; font-weight: bold;">${this.escapeHtml(c.caratula || "-")}</td>
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(c.materia || "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(c.cliente || "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(c.juzgado || "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(c.abogadoAsignado || c.abogado || "-")}</td>
+          <td style="padding: 5px; text-align: center; font-weight: bold; color: ${c.prioridad === 'Urgente' ? '#DC2626' : '#1E293B'};">
+            ${this.escapeHtml(c.vencimiento || "-")}
           </td>
-          <td style="padding: 6px; text-align: center;">${c.etapa || c.estado}</td>
-          <td style="padding: 6px; text-align: right; font-weight: bold; color: #1E3A8A;">${curr} ${Number(c.honorarios || 0).toLocaleString()}</td>
-        </tr>
-      `).join("");
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(c.etapa || c.estado || "-")}</td>
+          <td style="padding: 5px; text-align: center;">${hasExp ? "SÍ" : "NO"} / ${hasRes ? "SÍ" : "NO"}</td>
+          <td style="padding: 5px; text-align: right; font-weight: bold; color: #1E3A8A;">${curr} ${Number(c.honorarios || 0).toLocaleString("es-PE", { minimumFractionDigits: 2 })}</td>
+        </tr>`;
+      }).join("");
 
       if (items.length === 0) {
-        rows = `<tr><td colspan="8" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No hay causas o expedientes registrados. Despacho listo para nuevos litigios.</td></tr>`;
+        rows = `<tr><td colspan="11" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No hay causas o expedientes registrados. Despacho listo para nuevos litigios.</td></tr>`;
       }
 
       contentHtml = `
         <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
           <thead>
-            <tr style="background: #1C2541; color: #FFFFFF; font-size: 8.5px; text-align: center;">
-              <th style="padding: 7px;">EXPEDIENTE</th>
-              <th style="padding: 7px; text-align: left;">CARÁTULA / CAUSA</th>
-              <th style="padding: 7px;">MATERIA</th>
-              <th style="padding: 7px; text-align: left;">PATROCINADO</th>
-              <th style="padding: 7px; text-align: left;">JUZGADO</th>
-              <th style="padding: 7px;">VENCIMIENTO</th>
-              <th style="padding: 7px;">ETAPA</th>
-              <th style="padding: 7px; text-align: right;">HONORARIOS</th>
+            <tr style="background: #1C2541; color: #FFFFFF; font-size: 7.5px; text-align: center;">
+              <th style="padding: 6px;">SEDE</th>
+              <th style="padding: 6px;">EXPEDIENTE</th>
+              <th style="padding: 6px; text-align: left;">CARÁTULA / CAUSA</th>
+              <th style="padding: 6px;">MATERIA</th>
+              <th style="padding: 6px; text-align: left;">PATROCINADO</th>
+              <th style="padding: 6px; text-align: left;">JUZGADO</th>
+              <th style="padding: 6px;">ABOGADO</th>
+              <th style="padding: 6px;">VENCIMIENTO</th>
+              <th style="padding: 6px;">ETAPA</th>
+              <th style="padding: 6px;">PDF EXP/RES</th>
+              <th style="padding: 6px; text-align: right;">HONORARIOS</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
+        <div style="margin-top: 8px; font-size: 8px; color: #64748B;">Total expedientes exportados: ${items.length}</div>
       `;
 
     } else if (moduleName === "citas") {
@@ -417,38 +444,49 @@ class LegalPdfExporter {
       reportSubtitle = `Programaci\u00F3n Legal en ${sedeDisplay} y Videoconferencias`;
       latinMotto = "Audiatur et altera pars • Pacta sunt servanda: Escúchese a la contraparte y cúmplanse rigurosamente los acuerdos.";
 
-      const items = window.db.get("citas");
-      let rows = items.map((c, idx) => `
-        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 8.5px;">
-          <td style="padding: 6px; font-weight: bold;">${c.cliente}</td>
-          <td style="padding: 6px; text-align: center;">${c.telefono || '-'}</td>
-          <td style="padding: 6px;">${c.motivo}</td>
-          <td style="padding: 6px; text-align: center; font-weight: bold;">${c.fechaHora ? c.fechaHora.replace('T', ' ') : '-'}</td>
-          <td style="padding: 6px;">${c.modalidad}</td>
-          <td style="padding: 6px; text-align: center;">${c.abogado}</td>
-          <td style="padding: 6px; text-align: center; font-weight: bold;">${c.estado}</td>
-        </tr>
-      `).join("");
+      const items = window.db.get("citas") || [];
+      let rows = items.map((c, idx) => {
+        const docsReq = Array.isArray(c.documentosRequeridos)
+          ? c.documentosRequeridos.join(", ")
+          : (c.documentosRequeridos || "-");
+        return `
+        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 7.5px; page-break-inside: avoid;">
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(c.sede || c.sedeId || "-")}</td>
+          <td style="padding: 5px; font-weight: bold;">${this.escapeHtml(c.cliente || "-")}</td>
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(c.telefono || "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(c.motivo || "-")}</td>
+          <td style="padding: 5px; text-align: center; font-weight: bold;">${this.escapeHtml(c.fechaHora ? String(c.fechaHora).replace("T", " ") : "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(c.modalidad || "-")}</td>
+          <td style="padding: 5px; font-size: 7px;">${this.escapeHtml(c.linkMeet || c.link || "-")}</td>
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(c.abogado || "-")}</td>
+          <td style="padding: 5px; text-align: center; font-weight: bold;">${this.escapeHtml(c.estado || "-")}</td>
+          <td style="padding: 5px;">${this.escapeHtml(docsReq)}</td>
+        </tr>`;
+      }).join("");
 
       if (items.length === 0) {
-        rows = `<tr><td colspan="7" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No hay citas o audiencias registradas. Agenda despejada.</td></tr>`;
+        rows = `<tr><td colspan="10" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No hay citas o audiencias registradas. Agenda despejada.</td></tr>`;
       }
 
       contentHtml = `
         <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
           <thead>
-            <tr style="background: #1C2541; color: #FFFFFF; font-size: 8.5px; text-align: center;">
-              <th style="padding: 7px; text-align: left;">PATROCINADO / CONTACTO</th>
-              <th style="padding: 7px;">TELÉFONO</th>
-              <th style="padding: 7px; text-align: left;">MOTIVO DE LA CONSULTA</th>
-              <th style="padding: 7px;">FECHA Y HORA</th>
-              <th style="padding: 7px; text-align: left;">MODALIDAD</th>
-              <th style="padding: 7px;">ABOGADO</th>
-              <th style="padding: 7px;">ESTADO</th>
+            <tr style="background: #1C2541; color: #FFFFFF; font-size: 7.5px; text-align: center;">
+              <th style="padding: 6px;">SEDE</th>
+              <th style="padding: 6px; text-align: left;">PATROCINADO</th>
+              <th style="padding: 6px;">TELÉFONO</th>
+              <th style="padding: 6px; text-align: left;">MOTIVO</th>
+              <th style="padding: 6px;">FECHA Y HORA</th>
+              <th style="padding: 6px;">MODALIDAD</th>
+              <th style="padding: 6px;">LINK MEET</th>
+              <th style="padding: 6px;">ABOGADO</th>
+              <th style="padding: 6px;">ESTADO</th>
+              <th style="padding: 6px;">DOCS REQ.</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
+        <div style="margin-top: 8px; font-size: 8px; color: #64748B;">Total citas exportadas: ${items.length}</div>
       `;
 
     } else if (moduleName === "presupuestos") {
@@ -456,36 +494,45 @@ class LegalPdfExporter {
       reportSubtitle = "Evaluación de Inversión Inicial (CAPEX), Gasto Operativo (OPEX), Contingencia y Caja Chica";
       latinMotto = "Ratio pecuniae in iustitia: La prudente provisión de recursos económicos sostiene la firmeza de la defensa técnica.";
 
-      const items = window.db.get("presupuestos");
+      const items = window.db.get("presupuestos") || [];
       const capex = items.filter(i => i.tipo === "CAPEX").reduce((s, i) => s + Number(i.subtotal || 0), 0);
       const opex = items.filter(i => i.tipo === "OPEX").reduce((s, i) => s + Number(i.subtotal || 0), 0);
       const contingencia = items.filter(i => i.tipo === "Contingencia" || i.categoria === "Fondo de Contingencia").reduce((s, i) => s + Number(i.subtotal || 0), 0);
       const cajaChica = items.filter(i => i.tipo === "Caja Chica" || i.categoria === "Asignación de Caja Chica").reduce((s, i) => s + Number(i.subtotal || 0), 0);
       const granTotal = capex + opex + contingencia + cajaChica;
+      let totalEjecutado = 0;
 
-      let rows = items.map((i, idx) => `
-        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 8.5px;">
-          <td style="padding: 5px; font-family: monospace; text-align: center; font-weight: bold;">${i.id}</td>
-          <td style="padding: 5px; font-weight: 600; color: #1E293B;">${i.categoria}</td>
-          <td style="padding: 5px; font-weight: bold; color: #0F172A;">
-            ${i.concepto}
-            ${i.notas ? `<div style="font-size: 7.5px; color: #64748B; font-style: italic;">• ${i.notas}</div>` : ''}
+      let rows = items.map((i, idx) => {
+        const presupuestado = Number(i.subtotal || i.montoPresupuestado || 0);
+        const ejecutado = (i.montoEjecutado !== undefined && i.montoEjecutado !== null)
+          ? Number(i.montoEjecutado)
+          : (i.estado === "Ejecutado" ? presupuestado : 0);
+        totalEjecutado += ejecutado;
+        const saldoPartida = presupuestado - ejecutado;
+        return `
+        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 7.5px; page-break-inside: avoid;">
+          <td style="padding: 4px; font-family: monospace; text-align: center; font-weight: bold;">${this.escapeHtml(i.id || "-")}</td>
+          <td style="padding: 4px; text-align: center;">${this.escapeHtml(i.sede || i.sedeId || "-")}</td>
+          <td style="padding: 4px;">${this.escapeHtml(i.centroCosto || "-")}</td>
+          <td style="padding: 4px; font-weight: 600; color: #1E293B;">${this.escapeHtml(i.categoria || "-")}</td>
+          <td style="padding: 4px; font-weight: bold; color: #0F172A;">
+            ${this.escapeHtml(i.concepto || "-")}
+            ${i.notas ? `<div style="font-size: 7px; color: #64748B; font-style: italic;">• ${this.escapeHtml(i.notas)}</div>` : ""}
           </td>
-          <td style="padding: 5px; text-align: center; font-weight: bold; color: ${i.tipo === 'CAPEX' ? '#1E40AF' : (i.tipo === 'OPEX' ? '#065F46' : '#92400E')};">${i.tipo}</td>
-          <td style="padding: 5px; text-align: center;">${i.frecuencia}${i.diasEventual ? ` (${i.diasEventual} d)` : ''}</td>
-          <td style="padding: 5px; text-align: center; font-family: monospace;">${i.cantidad} ${i.unidad || ''}</td>
-          <td style="padding: 5px; text-align: right; font-family: monospace;">${curr} ${Number(i.costoUnitario).toFixed(2)}</td>
-          <td style="padding: 5px; text-align: right; font-weight: bold; font-family: monospace; color: #0F172A;">${curr} ${Number(i.subtotal).toFixed(2)}</td>
-          <td style="padding: 5px; text-align: center; font-size: 7.5px;">${i.estado}</td>
-        </tr>
-      `).join("");
+          <td style="padding: 4px; text-align: center; font-weight: bold; color: ${i.tipo === "CAPEX" ? "#1E40AF" : (i.tipo === "OPEX" ? "#065F46" : "#92400E")};">${this.escapeHtml(i.tipo || "-")}</td>
+          <td style="padding: 4px; text-align: center;">${this.escapeHtml(String(i.frecuencia || "-"))}${i.diasEventual ? ` (${i.diasEventual} d)` : ""}</td>
+          <td style="padding: 4px; text-align: right; font-family: monospace;">${curr} ${presupuestado.toFixed(2)}</td>
+          <td style="padding: 4px; text-align: right; font-family: monospace;">${curr} ${ejecutado.toFixed(2)}</td>
+          <td style="padding: 4px; text-align: right; font-family: monospace; font-weight: bold;">${curr} ${saldoPartida.toFixed(2)}</td>
+          <td style="padding: 4px; text-align: center; font-size: 7px;">${this.escapeHtml(i.estado || "-")}</td>
+        </tr>`;
+      }).join("");
 
       if (items.length === 0) {
-        rows = `<tr><td colspan="9" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No se registran partidas presupuestarias.</td></tr>`;
+        rows = `<tr><td colspan="11" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No se registran partidas presupuestarias.</td></tr>`;
       }
 
       contentHtml = `
-        <!-- Resumen de 4 Tarjetas Financieras -->
         <div style="display: flex; gap: 8px; margin-bottom: 12px;">
           <div style="flex: 1; background: #EFF6FF; border: 1px solid #BFDBFE; border-radius: 6px; padding: 8px; text-align: center;">
             <div style="font-size: 8px; font-weight: bold; color: #1E40AF; text-transform: uppercase;">Inversión Inicial (CAPEX)</div>
@@ -507,26 +554,30 @@ class LegalPdfExporter {
 
         <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif;">
           <thead>
-            <tr style="background: #1C2541; color: #FFFFFF; font-size: 8px; text-align: center;">
-              <th style="padding: 6px;">CÓDIGO</th>
-              <th style="padding: 6px; text-align: left;">CATEGORÍA</th>
-              <th style="padding: 6px; text-align: left;">CONCEPTO / RUBRO</th>
-              <th style="padding: 6px;">TIPO</th>
-              <th style="padding: 6px;">FRECUENCIA</th>
-              <th style="padding: 6px;">CANT.</th>
-              <th style="padding: 6px; text-align: right;">COSTO UNIT.</th>
-              <th style="padding: 6px; text-align: right;">SUBTOTAL</th>
-              <th style="padding: 6px;">ESTADO</th>
+            <tr style="background: #1C2541; color: #FFFFFF; font-size: 7.5px; text-align: center;">
+              <th style="padding: 5px;">CÓDIGO</th>
+              <th style="padding: 5px;">SEDE</th>
+              <th style="padding: 5px;">C. COSTO</th>
+              <th style="padding: 5px; text-align: left;">CATEGORÍA</th>
+              <th style="padding: 5px; text-align: left;">CONCEPTO</th>
+              <th style="padding: 5px;">TIPO</th>
+              <th style="padding: 5px;">FRECUENCIA</th>
+              <th style="padding: 5px; text-align: right;">PRESUP.</th>
+              <th style="padding: 5px; text-align: right;">EJECUTADO</th>
+              <th style="padding: 5px; text-align: right;">SALDO</th>
+              <th style="padding: 5px;">ESTADO</th>
             </tr>
           </thead>
           <tbody>
             ${rows}
           </tbody>
           <tfoot>
-            <tr style="background: #FEF3C7; font-size: 9px; font-weight: bold; border-top: 2px solid #0B132B;">
-              <td colspan="7" style="padding: 8px; text-align: right; color: #78350F;">TOTAL GENERAL PROYECTADO ${this.escapeHtml((bInfo.branchName || sedeDisplay || "").toUpperCase())}:</td>
-              <td style="padding: 8px; text-align: right; color: #78350F; font-family: monospace; font-size: 11px;">${curr} ${granTotal.toFixed(2)}</td>
-              <td style="padding: 8px; text-align: center; color: #78350F;">${items.length} partidas</td>
+            <tr style="background: #FEF3C7; font-size: 9px; font-weight: bold; border-top: 2px solid #0B132B; page-break-inside: avoid;">
+              <td colspan="7" style="padding: 8px; text-align: right; color: #78350F;">TOTAL ${this.escapeHtml((bInfo.branchName || sedeDisplay || "").toUpperCase())}:</td>
+              <td style="padding: 8px; text-align: right; color: #78350F; font-family: monospace;">${curr} ${granTotal.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #78350F; font-family: monospace;">${curr} ${totalEjecutado.toFixed(2)}</td>
+              <td style="padding: 8px; text-align: right; color: #78350F; font-family: monospace;">${curr} ${(granTotal - totalEjecutado).toFixed(2)}</td>
+              <td style="padding: 8px; text-align: center; color: #78350F;">${items.length}</td>
             </tr>
           </tfoot>
         </table>
@@ -675,45 +726,56 @@ class LegalPdfExporter {
       reportSubtitle = "Reporte de Asistencia Diaria y Diligencias Externas";
       latinMotto = "Officium et disciplina: La puntualidad y fidelidad en el ejercicio del mandato judicial garantizan la victoria procesal.";
 
-      const items = window.db ? window.db.get("attendance") : [];
-      let rows = items.map((i, idx) => {
-        const horaIng = i.ingreso ? new Date(i.ingreso).toLocaleTimeString("es-PE") : "--:--";
-        const horaSal = i.salida ? new Date(i.salida).toLocaleTimeString("es-PE") : "Sin salida";
-        return `
-        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 8.5px;">
-          <td style="padding: 6px; font-weight: bold; color: #0B132B;">${i.nombre}<br><span style="font-size: 7.5px; color: #64748B;">DNI: ${i.dni} | ${i.cargo}</span></td>
-          <td style="padding: 6px; text-align: center;">${i.fecha}</td>
-          <td style="padding: 6px; text-align: center; color: #065F46; font-weight: bold;">${horaIng}</td>
-          <td style="padding: 6px; text-align: center; color: #B45309; font-weight: bold;">${horaSal}</td>
-          <td style="padding: 6px; text-align: center; font-weight: bold; color: ${i.enGeocerca ? '#065F46' : '#B45309'};">
-            ${i.enGeocerca ? 'En Geocerca' : 'Externa (' + i.distanciaMetros + 'm)'}
+      const items = window.db ? (window.db.get("attendance") || []) : [];
+      const fmtHora = (iso, empty = "--:--") => {
+        if (!iso) return empty;
+        try { return new Date(iso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit" }); }
+        catch (_) { return String(iso); }
+      };
+      let rows = items.map((i, idx) => `
+        <tr style="background: ${idx % 2 === 1 ? '#F8FAFC' : '#FFFFFF'}; border-bottom: 1px solid #E2E8F0; font-size: 7.5px; page-break-inside: avoid;">
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(i.sede || i.sedeId || "-")}</td>
+          <td style="padding: 5px; font-weight: bold; color: #0B132B;">${this.escapeHtml(i.nombre || "-")}<br><span style="font-size: 7px; color: #64748B;">DNI: ${this.escapeHtml(i.dni || "-")} | ${this.escapeHtml(i.cargo || "-")}</span></td>
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(i.fecha || "-")}</td>
+          <td style="padding: 5px; text-align: center; color: #065F46; font-weight: bold;">${fmtHora(i.ingreso)}</td>
+          <td style="padding: 5px; text-align: center;">${fmtHora(i.salidaAlmuerzo)}</td>
+          <td style="padding: 5px; text-align: center;">${fmtHora(i.retornoAlmuerzo)}</td>
+          <td style="padding: 5px; text-align: center; color: #B45309; font-weight: bold;">${fmtHora(i.salida, "Sin salida")}</td>
+          <td style="padding: 5px; text-align: center;">${this.escapeHtml(i.tipoMarcacion || "-")}</td>
+          <td style="padding: 5px; text-align: center; font-weight: bold; color: ${i.enGeocerca ? "#065F46" : "#B45309"};">
+            ${i.enGeocerca ? "En Geocerca" : ("Externa (" + (i.distanciaMetros != null ? i.distanciaMetros : "?") + "m)")}
           </td>
-          <td style="padding: 6px;">${i.motivoExterno || 'Sede Central'}<br><span style="font-size: 7.5px; color: #64748B;">${i.justificacion || ''}</span></td>
-          <td style="padding: 6px; text-align: center; font-weight: bold; color: ${i.estadoAprobacion === 'aprobado' ? '#065F46' : (i.estadoAprobacion === 'pendiente' ? '#B45309' : '#991B1B')};">
-            ${(i.estadoAprobacion || 'aprobado').toUpperCase()}
+          <td style="padding: 5px;">${this.escapeHtml(i.motivoExterno || "Sede")}<br><span style="font-size: 7px; color: #64748B;">${this.escapeHtml(i.justificacion || "")}</span></td>
+          <td style="padding: 5px; text-align: center; font-weight: bold; color: ${i.estadoAprobacion === "aprobado" || !i.estadoAprobacion ? "#065F46" : (i.estadoAprobacion === "pendiente" ? "#B45309" : "#991B1B")};">
+            ${this.escapeHtml(String(i.estadoAprobacion || "aprobado").toUpperCase())}
           </td>
         </tr>
-      `;}).join("");
+      `).join("");
 
       if (items.length === 0) {
-        rows = `<tr><td colspan="7" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No se registran marcas de asistencia en la base de datos.</td></tr>`;
+        rows = `<tr><td colspan="11" style="text-align: center; padding: 25px; color: #64748B; font-style: italic;">No se registran marcas de asistencia en la base de datos.</td></tr>`;
       }
 
       contentHtml = `
         <table style="width: 100%; border-collapse: collapse; font-family: 'Plus Jakarta Sans', Arial, sans-serif; margin-top: 8px;">
           <thead>
-            <tr style="background: #0B132B; color: #FFFFFF; font-size: 8.5px;">
-              <th style="padding: 6px; text-align: left;">Colaborador</th>
-              <th style="padding: 6px; text-align: center;">Fecha</th>
-              <th style="padding: 6px; text-align: center;">Ingreso</th>
-              <th style="padding: 6px; text-align: center;">Salida</th>
-              <th style="padding: 6px; text-align: center;">Ubicación / Geocerca</th>
-              <th style="padding: 6px; text-align: left;">Diligencia / Sustento</th>
-              <th style="padding: 6px; text-align: center;">Estado</th>
+            <tr style="background: #0B132B; color: #FFFFFF; font-size: 7.5px;">
+              <th style="padding: 5px; text-align: center;">Sede</th>
+              <th style="padding: 5px; text-align: left;">Colaborador</th>
+              <th style="padding: 5px; text-align: center;">Fecha</th>
+              <th style="padding: 5px; text-align: center;">Ingreso</th>
+              <th style="padding: 5px; text-align: center;">Sal. Alm.</th>
+              <th style="padding: 5px; text-align: center;">Ret. Alm.</th>
+              <th style="padding: 5px; text-align: center;">Salida</th>
+              <th style="padding: 5px; text-align: center;">Tipo</th>
+              <th style="padding: 5px; text-align: center;">Geocerca</th>
+              <th style="padding: 5px; text-align: left;">Diligencia</th>
+              <th style="padding: 5px; text-align: center;">Estado</th>
             </tr>
           </thead>
           <tbody>${rows}</tbody>
         </table>
+        <div style="margin-top: 8px; font-size: 8px; color: #64748B;">Total marcajes exportados: ${items.length}</div>
       `;
     } else if (moduleName === "personal") {
       reportTitle = "Directorio General de Personal & Padrón de Colaboradores";
@@ -784,12 +846,29 @@ class LegalPdfExporter {
     const logoDataUrl = await this.ensureLogoDataUrl();
     const seal = this.buildDigitalSealPng();
 
+    const isLandscape =
+      moduleName === "casos" ||
+      moduleName === "resoluciones" ||
+      moduleName === "caja_chica" ||
+      moduleName === "asistencia" ||
+      moduleName === "personal" ||
+      moduleName === "presupuestos" ||
+      moduleName === "citas" ||
+      moduleName === "inventario" ||
+      moduleName === "documentos";
+
     const printContainer = document.createElement("div");
     printContainer.id = "printReportContainer";
     printContainer.style.padding = "20px";
     printContainer.style.background = "#FFFFFF";
     printContainer.style.color = "#0F172A";
-    printContainer.style.width = "794px"; // ~A4 @ 96dpi para captura estable
+    // Ancho acorde a orientación para que html2canvas capture TODAS las filas
+    printContainer.style.width = isLandscape ? "1123px" : "794px";
+    printContainer.style.maxWidth = "none";
+    printContainer.style.overflow = "visible";
+    printContainer.style.position = "absolute";
+    printContainer.style.left = "-10000px";
+    printContainer.style.top = "0";
     printContainer.innerHTML = `
       ${this.buildPdfHeaderHtml(reportTitle, reportSubtitle, latinMotto, logoDataUrl)}
       ${contentHtml}
@@ -812,6 +891,10 @@ class LegalPdfExporter {
       )
     );
 
+    // Forzar layout completo antes de medir altura (evita PDF truncado)
+    await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+    const fullHeight = Math.max(printContainer.scrollHeight, printContainer.offsetHeight, 1);
+
     const opt = {
       margin: [8, 8, 8, 10],
       filename: `PAOLO_ALDEA_Reporte_${moduleName.toUpperCase()}_${bInfo.branchSlug}_${(typeof getRelativeDateOnlyStr === "function" ? getRelativeDateOnlyStr(0) : "HOY")}.pdf`,
@@ -823,19 +906,16 @@ class LegalPdfExporter {
         logging: false,
         backgroundColor: "#FFFFFF",
         scrollX: 0,
-        scrollY: 0
+        scrollY: -window.scrollY,
+        windowWidth: printContainer.scrollWidth,
+        windowHeight: fullHeight,
+        height: fullHeight
       },
-      pagebreak: { mode: ["css", "legacy"] },
+      pagebreak: { mode: ["avoid-all", "css", "legacy"] },
       jsPDF: {
         unit: "mm",
         format: "a4",
-        orientation:
-          moduleName === "casos" ||
-          moduleName === "caja_chica" ||
-          moduleName === "asistencia" ||
-          moduleName === "personal"
-            ? "landscape"
-            : "portrait"
+        orientation: isLandscape ? "landscape" : "portrait"
       }
     };
 

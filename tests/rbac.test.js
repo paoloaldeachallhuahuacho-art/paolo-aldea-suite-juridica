@@ -25,6 +25,7 @@ JSDOM.fromURL("http://localhost:" + port() + "/index.html", {
 }).then(dom => setTimeout(() => {
   const w = dom.window, db = w.db;
   let current = null;
+  const realGetCurrentUser = db.getCurrentUser.bind(db);
   db.getCurrentUser = () => current;
   w.app.showToast = () => {};
 
@@ -87,6 +88,36 @@ JSDOM.fromURL("http://localhost:" + port() + "/index.html", {
   const raw = db.getRaw("workers").map(x => x.id === "WRK-ABG" ? { ...x, rol: "super_admin" } : x);
   db.save("workers", raw);
   check("abogado no puede auto-promoverse via save()", db.getRaw("workers").find(x => x.id === "WRK-ABG").rol === "abogado");
+
+  // Anti-escalada vía manipulación de AUTH_USER_OBJ.permisos (DevTools) con AUTH_SIG válida
+  current = sa;
+  db.add("workers", {
+    id: "WRK-ASIS",
+    nombre: "Asistente",
+    rol: "asistente_admin",
+    sede: "challhuahuacho",
+    usuario: "asis",
+    activo: true,
+    permisos: null
+  });
+  const asis = mk("asistente_admin", "WRK-ASIS");
+  asis.permisos = null;
+  db.setCurrentUser(asis);
+  const forgedPerms = db.getDefaultPermissionsForRole("super_admin");
+  const forgedObj = { ...asis, permisos: forgedPerms };
+  w.localStorage.setItem("PAOLO ALDEA_AUTH_USER_OBJ", JSON.stringify(forgedObj));
+  w.sessionStorage.setItem("PAOLO ALDEA_AUTH_USER_OBJ", JSON.stringify(forgedObj));
+  w.localStorage.setItem("PAOLO ALDEA_AUTH_LOGGED_IN", "true");
+  w.sessionStorage.setItem("PAOLO ALDEA_AUTH_LOGGED_IN", "true");
+  const resolved = realGetCurrentUser();
+  check("DevTools permisos no escalan: getCurrentUser ignora candidate.permisos", !!(resolved && resolved.permisos == null));
+  check(
+    "DevTools permisos no escalan: canDo delete casos sigue denegado",
+    db.canDo(resolved, "delete", "casos") === false
+  );
+  current = ab;
+  db.getCurrentUser = () => current;
+
   check("isSuperAdmin: usuario llamado 'admin' sin rol NO es super admin", db.isSuperAdmin({ id: "X1", rol: "abogado", usuario: "admin", nombre: "admin", dni: "admin" }) === false);
   check("isSuperAdmin: socio NO es super admin", db.isSuperAdmin({ id: "X2", rol: "socio" }) === false);
   check("isSuperAdmin: WRK-000 si", db.isSuperAdmin({ id: "WRK-000", rol: "super_admin" }) === true);

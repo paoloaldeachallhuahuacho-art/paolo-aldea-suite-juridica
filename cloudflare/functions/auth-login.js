@@ -334,17 +334,16 @@ exports.handler = async (event) => {
 
     const worker = toWorker(row);
 
-    // Hidratar directorio: hashes solo para el propio usuario o roles admin (offline local).
-    // Nunca devolver password_hash/pin_hash de terceros a roles no administrativos.
-    const canSeeAllHashes =
-      worker.rol === "super_admin" || worker.rol === "socio" || worker.rol === "admin";
+    // Hidratar directorio sin hashes de terceros (ni para admin/socio).
+    // Solo el propio usuario recibe passwordHash/pinHash para re-auth offline.
+    // Cambios de credenciales de terceros: auth-staff-upsert (service_role).
     let directory = [];
     try {
       const all = await supabaseRest("staff_directory?select=*&activo=eq.true");
       directory = Array.isArray(all)
         ? all.map((r) => {
             const w = toWorker(r);
-            if (canSeeAllHashes || w.id === worker.id) return w;
+            if (w.id === worker.id) return w;
             return { ...w, passwordHash: "", pinHash: "" };
           })
         : [worker];

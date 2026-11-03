@@ -51,6 +51,10 @@ exports.handler = async (event) => {
     }
   }
 
+  // Solo clave pública VAPID — nunca la privada.
+  const vapidPublicKey = process.env.VAPID_PUBLIC_KEY || "";
+  const webPushReady = !!(vapidPublicKey && process.env.VAPID_PRIVATE_KEY);
+
   return {
     statusCode: 200,
     headers,
@@ -59,7 +63,9 @@ exports.handler = async (event) => {
       supabaseUrl: enterpriseEnabled ? supabaseUrl : null,
       supabaseAnonKey: enterpriseEnabled ? supabaseAnonKey : null,
       firebaseConfigured: !!(process.env.FIREBASE_API_KEY || process.env.FIREBASE_PROJECT_ID),
-      authBootstrapped
+      authBootstrapped,
+      vapidPublicKey: vapidPublicKey || null,
+      webPushReady
     })
   };
 };

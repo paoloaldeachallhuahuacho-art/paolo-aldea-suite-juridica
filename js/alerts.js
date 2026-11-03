@@ -124,60 +124,60 @@ class AlertEngine {
   }
 
   // =========================================================================
-  // SISTEMA DE NOTIFICACIONES PUSH A CELULAR (ANDROID / IOS) Y PC / LAPTOP
-  // Funciona incluso con la página web o la aplicación completamente cerrada
+  // WEB PUSH (VAPID) — segundo plano, sin ntfy público
+  // Payload remoto siempre genérico (secreto profesional / Ley 29733)
   // =========================================================================
-  getPushTopic() {
+  _remotePushEnabled(isManual) {
     const s = window.db ? window.db.getSettings() : null;
-    return (s && s.pushTopic) ? s.pushTopic.trim() : "aldea_aldea_challhuahuacho";
+    if (isManual) return true;
+    if (!s) return false;
+    if (s.webPushOptIn !== true && !(window.PaoloPushService && window.PaoloPushService.isOptedIn())) {
+      return false;
+    }
+    return s.pushAutoSend !== false;
   }
 
-  async sendPushNotification({ title, message, priority = "default", tags = [], isManual = false }) {
+  async sendPushNotification({ title, message, priority = "default", tags = [], isManual = false, scope = "self" } = {}) {
     const s = window.db ? window.db.getSettings() : null;
-    const topic = this.getPushTopic();
 
-    // 1. Notificación local inmediata en el navegador si la pestaña está activa
-    this.sendBrowserNotification(title, message);
+    // 1. Notificación local (puede mostrar detalle; el usuario ya está autenticado en el dispositivo)
+    this.sendBrowserNotification(
+      title || "PAOLO ALDEA — Aviso",
+      message || "Hay un aviso en el despacho.",
+      "./index.html?open=alerts"
+    );
 
-    // Si las notificaciones remotas están deshabilitadas y no es prueba manual, respetar privacidad
-    if (!isManual && s && s.pushAutoSend === false) {
-      return true;
+    if (!this._remotePushEnabled(isManual)) {
+      return false;
     }
 
-    let ntfyOk = false;
+    let pushOk = false;
 
-    // 2. Envío a ntfy.sh con protección de Secreto Profesional y Ley N° 29733
-    if (topic && (isManual || (s && s.pushAutoSend !== false))) {
+    // 2. Web Push vía edge (payload genérico en servidor; sin datos de expediente)
+    if (window.PaoloPushService && typeof window.PaoloPushService.sendRemote === "function") {
       try {
-        const ntfyPriority = priority === "urgent" ? "urgent" : priority === "high" ? "high" : "default";
-        
-        // En modo anónimo, protegemos nombres de partes y cuantías en buses públicos no autenticados
-        let pushMessage = message;
-        if (s && s.pushAnonymize !== false && !isManual) {
-          pushMessage = `⚖️ [NOTIFICACIÓN CONFIDENCIAL DESPACHO]\n${title}\nPlazo o diligencia perentoria detectada. Ingrese a la Suite Segura de Challhuahuacho para ver los actuados del caso.`;
-        }
-
-        const headers = {
-          "Title": title,
-          "Priority": ntfyPriority,
-          "Tags": tags.join(",")
-        };
-
-        const res = await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
-          method: "POST",
-          body: pushMessage,
-          headers: headers
+        const remoteScope =
+          scope ||
+          (s && (s.pushScope === "branch" || s.pushScope === "firm") ? s.pushScope : "self");
+        const res = await window.PaoloPushService.sendRemote({
+          scope: remoteScope,
+          priority: priority === "urgent" ? "urgent" : "high",
+          tag: "alerta-urgente",
+          url: "./index.html?open=alerts"
         });
-        ntfyOk = res.ok;
+        pushOk = !!(res && res.ok && (res.sent > 0 || res.sent === 0));
+        if (res && res.ok && Number(res.sent) > 0) pushOk = true;
+        if (res && res.ok) pushOk = true;
       } catch (err) {
-        console.warn("No se pudo enviar push a ntfy:", err);
+        console.warn("Web Push remoto:", err);
       }
     }
 
-    // 3. Telegram SOLO vía proxy Netlify (Semana 2: sin fallback con bot token en el cliente)
-    if (s && (s.telegramEnabled !== false)) {
+    // 3. Telegram solo vía proxy edge (sin token en cliente; texto genérico)
+    if (s && s.telegramEnabled === true) {
       try {
-        const text = `⚖️ ${title}\n\n${message}`;
+        const text =
+          "⚖️ PAOLO ALDEA — Aviso urgente\n\nHay un plazo o diligencia perentoria. Abra la suite segura (sin datos del expediente en este canal).";
         const headers = { "Content-Type": "application/json" };
         const sendViaProxy = async () => {
           if (window.firebaseService && typeof window.firebaseService.getIdToken === "function") {
@@ -190,98 +190,69 @@ class AlertEngine {
             body: JSON.stringify({ text })
           });
         };
-        sendViaProxy().catch(e => console.warn("Telegram proxy:", e));
+        sendViaProxy().catch((e) => console.warn("Telegram proxy:", e));
       } catch (te) {
         console.warn("Telegram fail:", te);
       }
     }
 
-    return ntfyOk;
+    return pushOk;
   }
 
   async testPushNotification() {
-    const topic = this.getPushTopic();
+    if (window.PaoloPushService) {
+      const st = await window.PaoloPushService.status();
+      if (!st.subscribed) {
+        const sub = await window.PaoloPushService.subscribe({ forcePermission: true });
+        if (!sub.ok) {
+          return { success: false, reason: sub.reason || "subscribe_failed" };
+        }
+      }
+    }
     const ok = await this.sendPushNotification({
-      title: "⚖️ PAOLO ALDEA & ABOGADOS - Notificaciones Activas",
-      message: `¡Conexión exitosa! Su celular y PC están enlazados al canal «${topic}». Recibirá alertas de plazos fatales, audiencias y gastos fijos incluso con la app cerrada.`,
+      title: "PAOLO ALDEA — Notificaciones activas",
+      message: "Prueba de Web Push. Si ve este aviso, el dispositivo quedó enlazado.",
       priority: "high",
-      tags: ["white_check_mark", "tada", "scales"],
-      isManual: true
+      isManual: true,
+      scope: "self"
     });
-    return { success: ok, topic };
+    return { success: ok };
   }
 
   async syncAllAlertsToPhone() {
     const totalUrgent = this.alerts.urgent.length;
     const totalWarn = this.alerts.warning.length;
-
-    if (totalUrgent === 0 && totalWarn === 0) {
-      await this.sendPushNotification({
-        title: "✅ PAOLO ALDEA & ABOGADOS - Todos los Módulos al Día",
-        message: "No se registran plazos fatales, audiencias inminentes, pagos fijos vencidos ni quiebres de inventario. Toda la oficina opera al 100%.",
-        priority: "default",
-        tags: ["white_check_mark", "clipboard"]
-      });
-      return { count: 0, success: true };
-    }
-
-    // Organizar alertas por cada apartado de la página web
-    let summary = `🚨 ${totalUrgent} URGENTES | ⏳ ${totalWarn} PRÓXIMAS\n\n`;
-
-    const casosAlerts = [...this.alerts.urgent, ...this.alerts.warning].filter(a => a.source === "caso");
-    const cajaAlerts = [...this.alerts.urgent, ...this.alerts.warning].filter(a => a.source === "caja");
-    const citasAlerts = [...this.alerts.urgent, ...this.alerts.warning].filter(a => a.source === "cita");
-    const invAlerts = [...this.alerts.urgent, ...this.alerts.warning].filter(a => a.source === "inventario");
-
-    if (casosAlerts.length > 0) {
-      summary += `⚖️ CASOS & EXPEDIENTES (${casosAlerts.length}):\n`;
-      casosAlerts.slice(0, 3).forEach(a => summary += `• ${a.title.replace(/^[^\w\s]+/, '').trim()}: ${a.meta}\n`);
-      summary += `\n`;
-    }
-
-    if (cajaAlerts.length > 0) {
-      summary += `💰 CAJA CHICA & GASTOS FIJOS (${cajaAlerts.length}):\n`;
-      cajaAlerts.slice(0, 3).forEach(a => summary += `• ${a.title.replace(/^[^\w\s]+/, '').trim()}: ${a.meta}\n`);
-      summary += `\n`;
-    }
-
-    if (citasAlerts.length > 0) {
-      summary += `📅 AGENDA & CITAS (${citasAlerts.length}):\n`;
-      citasAlerts.slice(0, 3).forEach(a => summary += `• ${a.title.replace(/^[^\w\s]+/, '').trim()}: ${a.meta}\n`);
-      summary += `\n`;
-    }
-
-    if (invAlerts.length > 0) {
-      summary += `📦 INVENTARIO & ARCHIVO (${invAlerts.length}):\n`;
-      invAlerts.slice(0, 2).forEach(a => summary += `• ${a.title.replace(/^[^\w\s]+/, '').trim()}: ${a.meta}\n`);
-      summary += `\n`;
-    }
-
     const ok = await this.sendPushNotification({
-      title: `⚖️ PAOLO ALDEA & ABOGADOS: Alertas Generales de Sede`,
-      message: summary,
+      title: "PAOLO ALDEA — Resumen de alertas",
+      message:
+        totalUrgent === 0 && totalWarn === 0
+          ? "Sin alertas críticas pendientes en este dispositivo."
+          : "Hay avisos perentorios o próximos. Abra la suite para el detalle.",
       priority: totalUrgent > 0 ? "urgent" : "high",
-      tags: ["warning", "calendar", "scales", "bell"]
+      isManual: true,
+      scope: "self"
     });
-
     return { count: totalUrgent + totalWarn, success: ok };
   }
 
   async dispatchAutoPush() {
     const s = window.db ? window.db.getSettings() : null;
     if (!s || s.pushAutoSend === false) return;
+    if (s.webPushOptIn !== true && !(window.PaoloPushService && window.PaoloPushService.isOptedIn())) {
+      return;
+    }
 
-    // Despachar alertas perentorias de cualquier módulo (Casos, Caja Chica, Citas, Inventario)
     const criticals = this.alerts.urgent.slice(0, 4);
     for (const alert of criticals) {
       const key = `${alert.type}_${alert.id}_${alert.date}`;
       if (!this.pushThrottles.has(key)) {
         this.pushThrottles.add(key);
+        // Remoto: solo aviso genérico. Local: título ya se muestra vía sendBrowserNotification.
         await this.sendPushNotification({
-          title: alert.title,
-          message: `${alert.subtitle || ""}\n${alert.meta || ""}`,
+          title: "PAOLO ALDEA — Alerta urgente",
+          message: "Hay un aviso perentorio. Abra la suite segura para ver el detalle.",
           priority: "urgent",
-          tags: ["warning", "gavel", "scales", "bell"]
+          scope: (s && s.pushScope) || "self"
         });
       }
     }
@@ -958,6 +929,7 @@ class AlertEngine {
     this.renderDrawerList();
     drawer.classList.remove("translate-x-full");
     if (backdrop) backdrop.classList.remove("hidden");
+    document.body.classList.add("alerts-drawer-open");
   }
 
   closeDrawer() {
@@ -966,6 +938,7 @@ class AlertEngine {
     if (!drawer) return;
     drawer.classList.add("translate-x-full");
     if (backdrop) backdrop.classList.add("hidden");
+    document.body.classList.remove("alerts-drawer-open");
   }
 
   renderDrawerList(filter = "all") {

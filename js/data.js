@@ -458,9 +458,11 @@ const DEFAULT_SETTINGS = {
   firmPhone: "+51 943 410 215 / Central Challhuahuacho",
   currency: "S/",
   currencyName: "Soles (PEN)",
-  pushTopic: "aldea_aldea_challhuahuacho",
-  pushAutoSend: false,
+  pushTopic: "",
+  pushAutoSend: true,
   pushAnonymize: true,
+  webPushOptIn: false,
+  pushScope: "self",
   telegramToken: "",
   telegramChatId: "",
   adminUser: "",
@@ -473,7 +475,7 @@ const DEFAULT_SETTINGS = {
   oficinaLat: -14.116667,
   oficinaLon: -72.245000,
   oficinaRadioMetros: 300,
-  oficinaNombre: "Sede Central Challhuahuacho - Cotabambas",
+  oficinaNombre: "Sede Challhuahuacho - Cotabambas",
   geofenceBySede: {},
   geofenceEnabled: true,
   toleranciaMinutosTardanza: 15,
@@ -1556,6 +1558,7 @@ class DataManager {
       );
 
       // Sesión ya autenticada: no exigir hashes en workers[] (la nube a veces los omite en el directorio).
+      // NUNCA confiar en candidate.permisos (DevTools): solo nómina o matriz por rol.
       if (verified && verified.activo !== false) {
         return {
           id: verified.id,
@@ -1568,12 +1571,13 @@ class DataManager {
           usuario: verified.usuario || verified.dni,
           username: verified.usuario || verified.nombre,
           foto: candidate?.foto || verified.foto || "",
-          permisos: verified.permisos || candidate?.permisos || null
+          permisos: verified.permisos || null
         };
       }
     }
 
     // 3. Fallback de sesión firmada (workers sync incompleto / hashes vacíos)
+    // permisos: null → canDo() usa únicamente la matriz del rol firmado (anti-escalada).
     if (candidate && candidate.id && storedSig === expectedSig) {
       return {
         id: candidate.id,
@@ -1586,7 +1590,7 @@ class DataManager {
         usuario: candidate.usuario || candidate.dni || candidate.id,
         username: candidate.username || candidate.usuario || candidate.nombre,
         foto: candidate.foto || "",
-        permisos: candidate.permisos || null
+        permisos: null
       };
     }
 

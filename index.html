@@ -33,12 +33,12 @@
   <!-- Librerías 100% Locales (Funcionan sin internet en Challhuahuacho) -->
   <link rel="stylesheet" href="lib/fa/css/all.min.css">
   <script src="lib/tailwind.js"></script>
-  <script src="js/tailwind-config.js?v=20261106_asistencia_theme"></script>
+  <script src="js/tailwind-config.js?v=20261114_confirm_modal"></script>
   <!-- Chart / ExcelJS / FileSaver / html2pdf: carga diferida vía js/lib-loader.js (Semana 3) -->
   <script src="js/lib-loader.js?v=20261101_week3_perf"></script>
 
   <!-- Estilos Personalizados del Estudio Jurídico -->
-  <link rel="stylesheet" href="css/styles.css?v=20261106_asistencia_theme">
+  <link rel="stylesheet" href="css/styles.css?v=20261103_sede_picker">
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased flex h-screen overflow-hidden">
 
@@ -49,6 +49,87 @@
       <div class="flex gap-2">
         <button type="button" id="btnApplyAppUpdate" class="px-3 py-1.5 rounded-lg bg-amber-500 text-slate-950 text-[11px] font-bold">Actualizar ahora</button>
         <button type="button" id="btnDismissAppUpdate" class="px-3 py-1.5 rounded-lg border border-slate-600 text-[11px] text-slate-200">Después</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permiso de notificaciones (tarjeta tipo aviso in-app; luego dispara el permiso del sistema) -->
+  <div id="webPushPermissionBanner" class="hidden fixed bottom-24 md:bottom-4 left-1/2 -translate-x-1/2 z-[10040] w-[min(36rem,calc(100%-1.5rem))] items-start gap-3 bg-slate-950 text-white border border-amber-400/70 rounded-2xl shadow-2xl p-4" role="alertdialog" aria-labelledby="webPushPermissionTitle" aria-describedby="webPushPermissionText">
+    <span class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0">
+      <i class="fa-solid fa-bell"></i>
+    </span>
+    <div class="flex-1 space-y-2 min-w-0">
+      <p id="webPushPermissionTitle" class="text-sm font-bold text-amber-300">Activar avisos del despacho</p>
+      <p id="webPushPermissionText" class="text-xs leading-relaxed text-slate-200">Reciba alertas de plazos y diligencias en este dispositivo, incluso con la app en segundo plano. El contenido sensible solo se ve dentro de la Suite.</p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" id="btnAcceptWebPushPermission" class="px-3 py-2 min-h-[40px] rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-bold inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-check"></i> Permitir notificaciones
+        </button>
+        <button type="button" id="btnDismissWebPushPermission" class="px-3 py-2 min-h-[40px] rounded-lg border border-slate-600 text-[11px] text-slate-200 hover:bg-slate-900">
+          Ahora no
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selector de sede institucional (reemplaza el picker nativo de Android) -->
+  <div id="modalSedePicker" class="modal-container hidden fixed inset-0 z-[10050] items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="modalSedePickerTitle" style="background: rgba(8, 12, 24, 0.78); backdrop-filter: blur(8px);">
+    <button type="button" tabindex="-1" class="absolute inset-0 cursor-default" onclick="window.app.closeSedePicker()" aria-label="Cerrar selector de sede"></button>
+    <div class="sede-picker-sheet relative w-full sm:max-w-md sm:mx-4 max-h-[88vh] sm:max-h-[80vh] flex flex-col rounded-t-3xl sm:rounded-2xl border border-amber-500/35 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
+      <div class="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+        <span class="w-10 h-1 rounded-full bg-slate-600"></span>
+      </div>
+      <div class="px-4 pt-2 pb-3.5 border-b border-slate-800/90 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/40 flex items-start gap-3 shrink-0">
+        <span class="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0 shadow-inner">
+          <i class="fa-solid fa-building-columns text-lg"></i>
+        </span>
+        <div class="min-w-0 flex-1 pt-0.5">
+          <p class="text-[10px] uppercase tracking-[0.18em] text-amber-400/90 font-bold">Paolo Aldea &amp; Abogados</p>
+          <h3 id="modalSedePickerTitle" class="text-base font-extrabold tracking-wide text-white mt-0.5">Elegir sede</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">Filtra KPIs, casos y asistencia por ubicación</p>
+        </div>
+        <button type="button" onclick="window.app.closeSedePicker()" class="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="sedePickerList" class="flex-1 overflow-y-auto overscroll-contain px-3 py-3 space-y-2" role="listbox" aria-label="Sedes disponibles"></div>
+      <div class="px-4 py-3 border-t border-slate-800 bg-slate-950/95 shrink-0">
+        <button type="button" onclick="window.app.closeSedePicker()" class="w-full min-h-[44px] rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmación institucional (siempre en DOM; no depende de view-modals) -->
+  <div id="modalAppConfirm" class="modal-container hidden fixed inset-0 z-[10060] items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modalAppConfirmTitle" style="display:none;background: rgba(15, 23, 42, 0.72); backdrop-filter: blur(6px);">
+    <div class="w-full max-w-md rounded-2xl border border-amber-500/50 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
+      <div class="px-4 py-3.5 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/50 flex items-start gap-3">
+        <span id="modalAppConfirmIcon" class="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-user-xmark"></i>
+        </span>
+        <div class="min-w-0 flex-1 pt-0.5">
+          <h3 id="modalAppConfirmTitle" class="text-sm font-extrabold tracking-wide text-white">Confirmar acción</h3>
+          <p id="modalAppConfirmSubtitle" class="text-[10px] text-amber-300/90 font-semibold mt-0.5">Paolo Aldea &amp; Abogados · Control seguro</p>
+        </div>
+        <button type="button" id="btnAppConfirmClose" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="px-4 py-4 space-y-3">
+        <p id="modalAppConfirmMessage" class="text-xs leading-relaxed text-slate-300"></p>
+        <div id="modalAppConfirmDetail" class="hidden rounded-xl border border-amber-500/40 bg-slate-900 px-3 py-2.5">
+          <p class="text-[10px] uppercase tracking-wider text-amber-400/90 font-bold mb-0.5">Registro</p>
+          <p id="modalAppConfirmDetailText" class="text-xs font-semibold text-slate-100 break-words"></p>
+        </div>
+      </div>
+      <div class="px-4 py-3 border-t border-slate-800 bg-slate-950 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <button type="button" id="btnAppConfirmCancel" class="min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">
+          Cancelar
+        </button>
+        <button type="button" id="btnAppConfirmOk" class="min-h-[44px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition">
+          Sí, eliminar
+        </button>
       </div>
     </div>
   </div>
@@ -467,10 +548,16 @@
 
       <!-- Fila 2 (Móvil) / Lado Derecho (Escritorio): Selector de Sede y Herramientas Compactas -->
       <div class="flex flex-wrap sm:flex-nowrap items-center justify-between lg:justify-end gap-1 sm:gap-1.5 w-full lg:w-auto shrink-0">
-        <!-- Selector Global de Sedes -->
-        <div id="globalSedeSelectorContainer" class="h-7 sm:h-8 flex-1 sm:flex-initial min-w-[125px] max-w-full flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 text-xs shadow-2xs transition" title="Sede activa">
-          <i class="fa-solid fa-building-columns text-amber-600 text-[11px] sm:text-xs shrink-0"></i>
-          <select id="globalSedeSelect" onchange="window.app.switchSede(this.value)" class="w-full bg-transparent font-bold text-slate-800 text-[11px] sm:text-xs focus:outline-none cursor-pointer truncate">
+        <!-- Selector Global de Sedes (botón custom → modal; evita picker nativo Android) -->
+        <div id="globalSedeSelectorContainer" class="flex-1 sm:flex-initial min-w-[150px] max-w-full" title="Sede activa">
+          <button type="button" id="btnOpenSedePicker" onclick="window.app.openSedePicker()" class="sede-picker-trigger w-full h-8 sm:h-9 flex items-center gap-2 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-xl px-2.5 text-xs shadow-sm transition active:scale-[0.98]">
+            <span class="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-600 flex items-center justify-center shrink-0">
+              <i id="globalSedeSelectIcon" class="fa-solid fa-building-columns text-[11px]"></i>
+            </span>
+            <span id="globalSedeSelectLabel" class="flex-1 text-left font-bold text-slate-800 text-[11px] sm:text-xs truncate">Sede Challhuahuacho</span>
+            <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 shrink-0"></i>
+          </button>
+          <select id="globalSedeSelect" class="sr-only" tabindex="-1" aria-hidden="true" onchange="window.app.switchSede(this.value)">
             <option value="todas">Consolidado Nacional</option>
             <option value="miraflores">Sede Miraflores (Lima)</option>
             <option value="abancay">Sede Abancay</option>
@@ -529,7 +616,7 @@
           </button>
 
           <!-- Botón de Instalación PWA (Móvil / Pantalla de Inicio) -->
-          <button id="btnPwaInstall" onclick="window.app.installPwa()" class="inline-flex h-7 sm:h-8 items-center justify-center gap-1.5 px-2 sm:px-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md transition cursor-pointer shrink-0 whitespace-nowrap" title="Descargar e Instalar en Celular / Escritorio">
+          <button id="btnPwaInstall" onclick="window.app.installPwa()" class="hidden h-7 sm:h-8 items-center justify-center gap-1.5 px-2 sm:px-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md transition cursor-pointer shrink-0 whitespace-nowrap" title="Descargar e Instalar en Celular / Escritorio" aria-hidden="true">
             <i class="fa-solid fa-mobile-screen-button text-xs"></i>
             <span class="hidden sm:inline text-[11px] font-extrabold">Instalar App</span>
           </button>
@@ -864,7 +951,7 @@
             </div>
 
             <p class="text-[11px] sm:text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-building-flag text-amber-400/80 mr-1"></i>Sede Central Challhuahuacho</span>
+              <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-building-flag text-amber-400/80 mr-1"></i>Sede Challhuahuacho</span>
               <span class="text-slate-600">•</span>
               <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-location-dot text-emerald-400/80 mr-1"></i>Radio Geocerca: 300 metros</span>
               <span class="text-slate-600">•</span>
@@ -1001,25 +1088,6 @@
                     </div>
                   </div>
 
-                  <div id="asistencia-sede-hero-editor" class="hidden rounded-xl border border-amber-500/35 bg-slate-950 p-3 space-y-2">
-                    <div class="flex items-center justify-between gap-2">
-                      <p class="text-[11px] font-bold text-amber-200 flex items-center gap-1.5">
-                        <i class="fa-solid fa-image"></i> Editar foto de la sede
-                      </p>
-                      <span id="asistencia-sede-hero-editor-sede" class="text-[10px] font-semibold text-slate-400 truncate">Challhuahuacho</span>
-                    </div>
-                    <p class="text-[10px] text-slate-400 leading-snug">Reemplace el fondo del nombre de la sede. La foto se guarda para esta sede y la ven todos al marcar asistencia.</p>
-                    <div class="flex flex-col sm:flex-row gap-2">
-                      <button type="button" onclick="document.getElementById('asistencia-sede-hero-file').click()" class="w-full sm:flex-1 min-h-[40px] px-3 py-2 rounded-xl text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 inline-flex items-center justify-center gap-1.5">
-                        <i class="fa-solid fa-upload"></i> Cambiar foto
-                      </button>
-                      <input id="asistencia-sede-hero-file" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="AttendanceModule.onSedeHeroPhotoSelected(event)">
-                      <button type="button" onclick="AttendanceModule.resetSedeHeroPhoto()" class="w-full sm:w-auto min-h-[40px] px-3 py-2 rounded-xl text-[11px] font-bold bg-slate-900 text-slate-200 border border-slate-600">
-                        Restaurar original
-                      </button>
-                    </div>
-                  </div>
-
                   <div class="hidden" aria-hidden="true">
                     <span id="asistencia-label-distancia"></span>
                     <span id="asistencia-gps-coords">--.------, --.------</span>
@@ -1031,9 +1099,6 @@
                   <div class="flex flex-col gap-2">
                     <button type="button" onclick="AttendanceModule.refreshGpsPosition('gps_real')" class="w-full min-h-[44px] px-3 py-2 rounded-xl text-[11px] font-bold bg-cyan-950 text-slate-50 border border-cyan-500/40 active:scale-[0.98] touch-manipulation transition-colors duration-200">
                       <i class="fa-solid fa-satellite-dish mr-1"></i> Actualizar GPS (celular)
-                    </button>
-                    <button type="button" id="btnAnclarOficinaAqui" onclick="AttendanceModule.anchorOfficeHere()" class="hidden w-full min-h-[44px] px-3 py-2 rounded-xl text-[11px] font-bold bg-amber-950 text-slate-50 border border-amber-500/40 active:scale-[0.98] touch-manipulation transition-colors duration-200" title="Solo Super Admin, Socio o Admin de sede">
-                      <i class="fa-solid fa-map-pin mr-1"></i> Anclar oficina aquí
                     </button>
                   </div>
                 </div>
@@ -1528,16 +1593,17 @@
 
   <!-- Modales diferidos: views/view-modals.html vía ComponentLoader -->
   <!-- Scripts del Sistema -->
-  <script src="js/data.js?v=20261102_create_fix"></script>
-  <script src="js/alerts.js?v=20261102_banner_close"></script>
+  <script src="js/data.js?v=20261115_auth_sig_hardening"></script>
+  <script src="js/alerts.js?v=20261114_confirm_modal"></script>
   <script src="js/charts.js?v=20261101_week3_perf"></script>
-  <script src="js/attendance.js?v=20261103_mosaic"></script>
+  <script src="js/attendance.js?v=20261115_att_kpis"></script>
+  <script src="js/attendance-kpis.js?v=20261115_att_kpis"></script>
   <script src="js/draft-autosave.js?v=20261102_jsstr_all"></script>
   <!-- Controllers: carga diferida por pestaña (Semana 4) -->
   <script src="js/controller-loader.js?v=20261101_week4_qa"></script>
-  <script src="js/component-loader.js?v=20261103_despacho_admin"></script>
-  <script src="js/excel-export.js?v=20261103_despacho_admin"></script>
-  <script src="js/pdf-export.js?v=20261102_firma_sede"></script>
+  <script src="js/component-loader.js?v=20261114_confirm_modal"></script>
+  <script src="js/excel-export.js?v=20261115_export_complete"></script>
+  <script src="js/pdf-export.js?v=20261115_export_complete"></script>
   <!-- Supabase Cloud SDK v2 — nube canónica (Modo B). Firebase CDN retirado del arranque. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="js/firebase-auth.js?v=20261102_retire_cdn"></script>
@@ -1547,14 +1613,15 @@
   <script src="js/enterprise/config.js?v=20261102_cf_api"></script>
   <script src="js/enterprise/AuthService.js?v=20261102_create_fix"></script>
   <script src="js/enterprise/SyncManager.js?v=20261102_zt"></script>
-  <script src="js/enterprise/CloudDataSync.js?v=20261102_create_fix"></script>
+  <script src="js/enterprise/CloudDataSync.js?v=20261114_confirm_modal"></script>
+  <script src="js/enterprise/PushService.js?v=20261114_confirm_modal"></script>
   <script src="js/enterprise/AttendanceService.js?v=20261102_cf_api"></script>
   <script src="js/enterprise/CashManager.js?v=20261102_cf_api"></script>
   <script src="js/enterprise/CaseService.js?v=20261102_zt"></script>
   <script src="js/enterprise/BudgetAnalytics.js?v=20261102_zt"></script>
   <script src="js/enterprise/bootstrap.js?v=20261102_mode_badge2"></script>
-  <script src="js/app-update.js?v=20261106_asistencia_theme"></script>
-  <script src="js/app.js?v=20261106_asistencia_theme"></script>
+  <script src="js/app-update.js?v=20261115_prod_hardening"></script>
+  <script src="js/app.js?v=20261103_sede_picker"></script>
   <script src="js/auth-bridge.js?v=20261103_release"></script>
 </body>
 </html>

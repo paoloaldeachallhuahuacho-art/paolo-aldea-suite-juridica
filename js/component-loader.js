@@ -46,7 +46,7 @@ class ComponentLoader {
 
         let html = this.viewsCache.get(viewId);
         if (!html) {
-          const resp = await fetch(`views/view-${viewId}.html`);
+          const resp = await fetch(`views/view-${viewId}.html?v=20261108_webpush`);
           if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
           html = await resp.text();
           this.viewsCache.set(viewId, html);
@@ -106,7 +106,7 @@ class ComponentLoader {
 
     this._modalsPromise = (async () => {
       try {
-        const resp = await fetch("views/view-modals.html?v=20261103_despacho_admin", { cache: "no-store" });
+        const resp = await fetch("views/view-modals.html?v=20261112_confirm_sede", { cache: "no-store" });
         if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const html = await resp.text();
         const wrap = document.createElement("div");

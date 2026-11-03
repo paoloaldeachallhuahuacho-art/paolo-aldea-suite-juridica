@@ -1,5 +1,11 @@
 {
   "name": "paolo-aldea-suite-juridica",
-  "version": "2026.11.06",
-  "channel": "production"
+  "version": "2026.11.15",
+  "channel": "production",
+  "releasedAt": "2026-11-03",
+  "notes": [
+    "Blindaje AUTH_SIG: sin escalada de permisos vía DevTools",
+    "Migración SQL jwt_role + perfiles congelados + cases_safe",
+    "Login cloud ya no expone hashes de terceros"
+  ]
 }

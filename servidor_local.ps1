@@ -763,9 +763,24 @@ while ($listener.IsListening) {
 
         # Bloqueo estricto de acceso estático a archivos internos de sistema
         $reqFileName = [System.IO.Path]::GetFileName($filePath).ToLowerInvariant()
-        $blockedExts = @(".ps1", ".bat", ".vbs", ".sql", ".bak", ".tmp")
-        $blockedFiles = @(".server_token", ".server_port", ".server_pairing", "central_cloud_data.json", "alertas_locales.json", ".env", ".env.local")
-        if ($reqFileName.StartsWith(".") -or $blockedFiles -contains $reqFileName -or $blockedExts -contains [System.IO.Path]::GetExtension($filePath).ToLowerInvariant()) {
+        $blockedExts = @(".ps1", ".bat", ".vbs", ".sql", ".bak", ".tmp", ".md")
+        $blockedFiles = @(
+            ".server_token", ".server_port", ".server_pairing",
+            "central_cloud_data.json", "alertas_locales.json",
+            ".env", ".env.local",
+            "package.json", "package-lock.json", "wrangler.toml", "_worker.js",
+            "firebase.json", "firestore.rules", "firestore.indexes.json", "readme.md"
+        )
+        $relNorm = $relativeFile.Replace("\", "/").ToLowerInvariant().TrimStart("/")
+        $blockedPrefixes = @(
+            "herramientas/", "supabase/", "docs/", "tests/", "node_modules/",
+            "netlify/", "cloudflare/", "_backups/", ".git/"
+        )
+        $prefixBlocked = $false
+        foreach ($prefix in $blockedPrefixes) {
+            if ($relNorm.StartsWith($prefix)) { $prefixBlocked = $true; break }
+        }
+        if ($reqFileName.StartsWith(".") -or $blockedFiles -contains $reqFileName -or $blockedExts -contains [System.IO.Path]::GetExtension($filePath).ToLowerInvariant() -or $prefixBlocked) {
             $response.StatusCode = 403
             $forbiddenBytes = [System.Text.Encoding]::UTF8.GetBytes("Acceso denegado a recurso interno del despacho.")
             $response.ContentType = "text/plain; charset=utf-8"

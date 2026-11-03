@@ -415,6 +415,22 @@ const AttendanceModule = (function () {
       if (radio === 100) radio = 300;
     }
 
+    // Quitar "Central" del rótulo histórico de Challhuahuacho
+    if (nombre) {
+      const cleaned = String(nombre)
+        .replace(/\bSede\s+Central\s+Challhuahuacho\b/gi, "Sede Challhuahuacho")
+        .replace(/\bOficina\s+Central\s+Challhuahuacho\b/gi, "Sede Challhuahuacho");
+      if (cleaned !== nombre) {
+        nombre = cleaned;
+        try {
+          if (settings && settings.oficinaNombre && /central\s+challhuahuacho/i.test(settings.oficinaNombre)) {
+            settings.oficinaNombre = cleaned;
+            if (window.db && typeof window.db.saveSettings === "function") window.db.saveSettings(settings);
+          }
+        } catch (_) {}
+      }
+    }
+
     if (branchCfg) {
       return {
         id: branchCfg.id,
@@ -435,7 +451,7 @@ const AttendanceModule = (function () {
       lat,
       lon,
       radio,
-      nombre: nombre || "Sede Central Challhuahuacho",
+      nombre: nombre || "Sede Challhuahuacho",
       nombreCorto: "Challhuahuacho",
       direccion: "Av. Los Mineros Mz. D Lt. 4, Challhuahuacho, Cotabambas",
       ciudad: "Cotabambas, Apurímac"
@@ -741,7 +757,8 @@ const AttendanceModule = (function () {
       heroRegion.classList.toggle("hidden", !region);
     }
     if (subTitleEl) subTitleEl.textContent = consolidado ? "Consolidado Nacional" : (region || source.nombreCorto || source.nombre || "");
-    if (editor) editor.classList.toggle("hidden", consolidado || !canManageAttendanceRecords());
+    // Editor de foto vive en Supervisión → Configurar Geocerca (no en el kiosco)
+    if (editor) editor.classList.remove("hidden");
     if (editorSede) editorSede.textContent = source.nombreCorto || source.nombre || sedeId;
   }
 
@@ -1845,6 +1862,9 @@ const AttendanceModule = (function () {
       if (pillAdmin) {
         pillAdmin.className = "px-3 py-1.5 rounded-lg text-xs font-semibold text-slate-400 hover:text-slate-200 transition-all";
       }
+      if (window.AttendanceKpis && typeof window.AttendanceKpis.destroyCharts === "function") {
+        window.AttendanceKpis.destroyCharts();
+      }
     } else {
       if (kioskContainer) kioskContainer.classList.add("hidden");
       if (adminContainer) adminContainer.classList.remove("hidden");
@@ -1884,6 +1904,16 @@ const AttendanceModule = (function () {
 
     // Renderizar Bandeja de Pendientes
     renderPendingQueue();
+
+    // KPIs Power BI semanal / mensual
+    if (window.AttendanceKpis) {
+      if (typeof window.AttendanceKpis.fillSedeOptions === "function") {
+        window.AttendanceKpis.fillSedeOptions();
+      }
+      if (typeof window.AttendanceKpis.refresh === "function") {
+        window.AttendanceKpis.refresh();
+      }
+    }
   }
 
   /**
@@ -2459,7 +2489,19 @@ const AttendanceModule = (function () {
       if (window.showToast) window.showToast("No se puede eliminar un Super Administrador desde Asistencia.", "warning");
       return;
     }
-    if (!confirm("¿Eliminar a " + (worker.nombre || id) + " del padrón? No volverá a aparecer tras sincronizar.")) return;
+    if (window.app && typeof window.app.confirmAction === "function") {
+      const ok = await window.app.confirmAction({
+        title: "Eliminar del padrón",
+        message: "No volverá a aparecer tras sincronizar. Esta acción es irreversible.",
+        detail: (worker.nombre || id) + (worker.cargo ? " · " + worker.cargo : ""),
+        confirmLabel: "Sí, eliminar",
+        cancelLabel: "Cancelar",
+        danger: true
+      });
+      if (!ok) return;
+    } else if (!confirm("¿Eliminar a " + (worker.nombre || id) + " del padrón? No volverá a aparecer tras sincronizar.")) {
+      return;
+    }
 
     // 1) Baja en nube (staff_directory) ANTES del pull automático
     if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && typeof window.PaoloAuthService.upsertStaffCloud === "function") {
@@ -2532,13 +2574,22 @@ const AttendanceModule = (function () {
     const inputLon = document.getElementById("input-config-oficina-lon");
     const inputRadio = document.getElementById("input-config-oficina-radio");
     const inputNombre = document.getElementById("input-config-oficina-nombre");
+    const editor = document.getElementById("asistencia-sede-hero-editor");
+    const editorSede = document.getElementById("asistencia-sede-hero-editor-sede");
 
     if (inputLat) inputLat.value = office.lat;
     if (inputLon) inputLon.value = office.lon;
     if (inputRadio) inputRadio.value = office.radio;
     if (inputNombre) inputNombre.value = office.nombre;
+    if (editorSede) editorSede.textContent = office.nombreCorto || office.nombre || office.id || "Sede";
+    if (editor) {
+      const consolidado = isConsolidadoNacional(office);
+      editor.classList.toggle("hidden", consolidado || !canManageAttendanceRecords());
+    }
+    updateAnchorOfficeVisibility();
 
     modal.classList.remove("hidden");
+    modal.classList.add("flex");
   }
 
   /**
@@ -2573,7 +2624,10 @@ const AttendanceModule = (function () {
     persistSedeGeo(sedeId, { lat, lon, radio, nombre });
 
     const modal = document.getElementById("modal-asistencia-config-geocerca");
-    if (modal) modal.classList.add("hidden");
+    if (modal) {
+      modal.classList.add("hidden");
+      modal.classList.remove("flex");
+    }
 
     refreshGpsPosition("gps_real");
     if (window.showToast) {
@@ -2747,18 +2801,22 @@ const AttendanceModule = (function () {
       }
     }
 
-    // Roles privilegiados: mantener supervisión lista sin sync manual.
+    // Roles privilegiados: supervisión lista, pero al entrar siempre kiosco colaborador.
     if (canManageAttendanceRecords()) {
       adminAuthenticated = true;
-      if (currentRole === "admin") {
-        renderAdminKpis();
-        renderAdminAttendanceTable();
-      }
     }
+    enterKioskColaborador();
+  }
+
+  /** Pantalla de ingreso por defecto: Kiosco Colaborador (nunca abre Supervisión sola). */
+  function enterKioskColaborador() {
+    if (canManageAttendanceRecords()) adminAuthenticated = true;
+    setRoleView("colaborador");
   }
 
   return {
     init,
+    enterKioskColaborador,
     startAutoGeofenceTracking,
     calculateHaversineDistance,
     getOfficeConfig,

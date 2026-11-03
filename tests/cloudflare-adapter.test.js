@@ -24,6 +24,8 @@ function req(url, init) {
 
   assert.strictEqual(matchFunctionName("/api/public-config"), "public-config");
   assert.strictEqual(matchFunctionName("/.netlify/functions/sync-pull"), "sync-pull");
+  assert.strictEqual(matchFunctionName("/api/push-subscribe"), "push-subscribe");
+  assert.strictEqual(matchFunctionName("/api/push-send"), "push-send");
   assert.strictEqual(matchFunctionName("/js/app.js"), null);
 
   const missing = await handleRequest(req("https://paolo.pages.dev/api/no-such"), {});

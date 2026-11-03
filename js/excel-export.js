@@ -352,8 +352,10 @@ class LegalExcelExporter {
       this.buildCajaChicaSheet(workbook);
       this.buildCasosSheet(workbook);
       this.buildCitasSheet(workbook);
+      this.buildPresupuestosSheet(workbook);
       this.buildInventarioSheet(workbook);
       this.buildDocumentosSheet(workbook);
+      this.buildAsistenciaSheet(workbook);
       this.buildPersonalSheet(workbook);
 
       this.sanitizeWorkbookBeforeExport(workbook);
@@ -453,11 +455,14 @@ class LegalExcelExporter {
     sheet.getCell('A13').font = { name: this.fontFamily, size: 10.5, bold: true, color: { argb: this.colors.headerNavy } };
 
     const navGuides = [
-      ["Pesta\u00F1a 'CAJA CHICA'", "Libro contable auxiliar con imputaci\u00F3n por Centro de Costo, aranceles, log\u00EDstica de viajes y comprobantes."],
-      ["Pesta\u00F1a 'CASOS Y EXPEDIENTES'", "Control de expedientes en Cotabambas, Tambobamba y Abancay, sem\u00E1foros de plazo fatal y tiempos de ciclo."],
-      ["Pesta\u00F1a 'CITAS Y AUDIENCIAS'", "Agenda de citas presenciales en Challhuahuacho y audiencias virtuales por Google Meet."],
-      ["Pesta\u00F1a 'INVENTARIO Y ARCHIVO'", "Gesti\u00F3n de inventarios bajo M\u00E9todo ABC (activos cr\u00EDticos, tokens SINOE, Internet Claro, expedientes f\u00EDsicos y reposici\u00F3n)."],
-      ["Pesta\u00F1a 'GESTI\u00D3N DOCUMENTAL'", "Modelos y escritos jur\u00EDdicos oficiales, absoluci\u00F3n de excepciones y contratos de la firma."]
+      ["Pesta\u00F1a 'CAJA CHICA'", "Libro contable auxiliar con imputaci\u00F3n por Centro de Costo, flujo de aprobaci\u00F3n y comprobantes."],
+      ["Pesta\u00F1a 'CASOS Y EXPEDIENTES'", "Control de expedientes, plazos fatales, PDFs adjuntos y tiempos de ciclo."],
+      ["Pesta\u00F1a 'CITAS Y AUDIENCIAS'", "Agenda presencial/virtual, Meet y notas log\u00EDsticas."],
+      ["Pesta\u00F1a 'Presupuesto & Proyecciones'", "CAPEX/OPEX, ejecuci\u00F3n presupuestal y saldo por partida."],
+      ["Pesta\u00F1a 'INVENTARIO Y ARCHIVO'", "M\u00E9todo ABC, tokens SINOE, Internet Claro y reorden."],
+      ["Pesta\u00F1a 'GESTI\u00D3N DOCUMENTAL'", "Escritos judiciales, contratos y estado de firma."],
+      ["Pesta\u00F1a 'ASISTENCIA Y TAREO'", "Marcajes de jornada completa, geocerca y diligencias."],
+      ["Pesta\u00F1a 'PERSONAL Y SEDES'", "Padr\u00F3n multi-sede, roles RBAC y contacto institucional."]
     ];
 
     navGuides.forEach((g, idx) => {
@@ -495,14 +500,17 @@ class LegalExcelExporter {
 
     const headers = [
       "ID",
+      "SEDE",
       "FECHA",
       "TIPO",
+      "ESTADO FLUJO",
       "CENTRO DE COSTO",
       "CATEGORÍA JUDICIAL",
       "EXPEDIENTE ASOCIADO",
       "N° COMPROBANTE",
       "DETALLE / CONCEPTO DEL GASTO",
       "RESPONSABLE",
+      "SOLICITANTE",
       "MÉTODO DE PAGO",
       "MONTO INGRESO (S/)",
       "MONTO EGRESO (S/)",
@@ -521,14 +529,15 @@ class LegalExcelExporter {
       cell.border = this.thinBorder;
     });
 
-    const items = window.db.get("caja_chica");
+    const items = (window.db.get("caja_chica") || []).slice().sort((a, b) => String(a.fecha || "").localeCompare(String(b.fecha || "")));
     let currentRowIdx = 7;
     let runningBalance = 0;
     let totalIng = 0;
     let totalEg = 0;
 
     items.forEach((item, index) => {
-      const isIngreso = item.tipo === "Ingreso";
+      const tipoNorm = String(item.tipo || "Egreso").trim();
+      const isIngreso = /^ingreso$/i.test(tipoNorm);
       const monto = Number(item.monto || 0);
 
       if (isIngreso) {
@@ -541,18 +550,22 @@ class LegalExcelExporter {
 
       const row = sheet.getRow(currentRowIdx);
       const isZebra = index % 2 === 1;
-      const bgArgb = isZebra ? this.colors.zebraLight : "-";
+      const bgArgb = isZebra ? this.colors.zebraLight : "FFFFFF";
+      const solicitante = item.solicitante?.nombre || item.solicitante || "-";
 
       row.values = [
-        item.id,
-        item.fecha,
-        item.tipo.toUpperCase(),
+        item.id || "-",
+        item.sede || item.sedeId || "-",
+        item.fecha || "-",
+        tipoNorm.toUpperCase(),
+        item.estadoFlujo || item.estado || "-",
         item.centroCosto || "-",
-        item.categoria,
+        item.categoria || "-",
         item.expediente || "-",
         item.comprobante || "-",
-        item.concepto,
+        item.concepto || "-",
         item.responsable || "-",
+        solicitante,
         item.metodo || "-",
         isIngreso ? monto : null,
         !isIngreso ? monto : null,
@@ -566,14 +579,11 @@ class LegalExcelExporter {
         cell.border = this.thinBorder;
         cell.alignment = { vertical: 'middle' };
 
-        // 1. Columnas estrictamente CENTRADAS
-        // Col 1: ID, Col 2: Fecha, Col 3: Tipo, Col 6: Expediente, Col 7: Comprobante, Col 10: Método
-        if (colNumber === 1 || colNumber === 2 || colNumber === 6 || colNumber === 7 || colNumber === 10) {
+        if ([1, 2, 3, 4, 5, 8, 9, 13].includes(colNumber)) {
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
         }
 
-        // Columna Tipo (Col 3) - Centrado con pastilla cromática
-        if (colNumber === 3) {
+        if (colNumber === 4) {
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
           if (isIngreso) {
             cell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: this.colors.incomeText } };
@@ -584,21 +594,18 @@ class LegalExcelExporter {
           }
         }
 
-        // Columna Expediente en fuente monoespaciada
-        if (colNumber === 6) {
+        if (colNumber === 8) {
           cell.font = { name: "Consolas", size: 8.5, bold: true, color: { argb: "0F172A" } };
         }
 
-        // 2. Columnas de Texto descriptivo alineadas a la izquierda
-        if (colNumber === 4 || colNumber === 5 || colNumber === 8 || colNumber === 9) {
+        if ([6, 7, 10, 11, 12].includes(colNumber)) {
           cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
         }
 
-        // 3. Columnas numéricas / monetarias alineadas a la DERECHA
-        if (colNumber >= 11 && colNumber <= 13) {
+        if (colNumber >= 14 && colNumber <= 16) {
           cell.numFmt = `_("S/"* #,##0.00_);_("S/"* (#,##0.00);_("S/"* "-"??_);_(@_)`;
           cell.alignment = { horizontal: 'right', vertical: 'middle' };
-          if (colNumber === 13) {
+          if (colNumber === 16) {
             cell.font = { name: this.fontFamily, size: 9, bold: true, color: { argb: "1E3A8A" } };
           }
         }
@@ -618,7 +625,10 @@ class LegalExcelExporter {
       "",
       "",
       "",
-      "FONDO DE CAJA CHICA SEDE CHALLHUAHUACHO",
+      "",
+      "",
+      "FONDO DE CAJA CHICA — " + String(sedeNameCC || "").toUpperCase(),
+      "",
       "",
       "",
       totalIng,
@@ -626,7 +636,7 @@ class LegalExcelExporter {
       totalIng - totalEg
     ];
 
-    sheet.mergeCells(`A${currentRowIdx}:G${currentRowIdx}`);
+    sheet.mergeCells(`A${currentRowIdx}:I${currentRowIdx}`);
     const totLabel = totalRow.getCell(1);
     totLabel.alignment = { horizontal: 'center', vertical: 'middle' };
 
@@ -635,32 +645,33 @@ class LegalExcelExporter {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.goldLight } };
       cell.border = this.accountingTotalBorder;
 
-      if (colNumber >= 11 && colNumber <= 13) {
+      if (colNumber >= 14 && colNumber <= 16) {
         cell.numFmt = `_("S/"* #,##0.00_);_("S/"* (#,##0.00);_("S/"* "-"??_);_(@_)`;
         cell.alignment = { horizontal: 'right', vertical: 'middle' };
       }
     });
 
-    // Activar autofiltro nativo de Excel en los encabezados
-    sheet.autoFilter = { from: { row: 6, column: 1 }, to: { row: currentRowIdx - 1, column: headers.length } };
+    sheet.autoFilter = { from: { row: 6, column: 1 }, to: { row: Math.max(6, currentRowIdx - 1), column: headers.length } };
 
-    // Anchos específicos optimizados
     this.addInstitutionalSignatures(sheet, currentRowIdx, headers.length);
 
     this.autoFitColumns(sheet, {
-      1: 12, // ID
-      2: 15, // Fecha
-      3: 13, // Tipo
-      4: 26, // Centro de Costo
-      5: 25, // Categoría
-      6: 28, // Expediente
-      7: 18, // Comprobante
-      8: 42, // Concepto
-      9: 22, // Responsable
-      10: 18, // Método
-      11: 18, // Ingreso
-      12: 18, // Egreso
-      13: 20  // Saldo
+      1: 12,
+      2: 16,
+      3: 12,
+      4: 12,
+      5: 18,
+      6: 24,
+      7: 22,
+      8: 26,
+      9: 16,
+      10: 40,
+      11: 20,
+      12: 20,
+      13: 14,
+      14: 16,
+      15: 16,
+      16: 18
     });
   }
 
@@ -675,21 +686,27 @@ class LegalExcelExporter {
 
     const headers = [
       "ID",
+      "SEDE",
       "N° DE EXPEDIENTE",
       "CARÁTULA / CAUSA JUDICIAL",
       "MATERIA",
       "JUZGADO / SALA",
       "CLIENTE PATROCINADO",
       "PARTE CONTRARIA",
+      "ABOGADO ASIGNADO",
       "PLAZO FATAL (VENCIMIENTO)",
       "TRÁMITE QUE VENCE",
       "PRÓXIMA AUDIENCIA",
       "ESTADO PROCESAL",
+      "ETAPA",
       "PRIORIDAD",
       "LEAD TIME (DÍAS)",
       "NIVEL DE RIESGO",
       "CUANTÍA (S/)",
-      "HONORARIOS (S/)"
+      "HONORARIOS (S/)",
+      "PDF EXP.",
+      "PDF RES.",
+      "NOTAS"
     ];
 
     const bInfoCas = this.getBranchInfo(); const sedeNameCas = (bInfoCas.activeSede === "todas") ? "Consolidado Nacional" : bInfoCas.branchName; this.addReportHeader(sheet, "REPORTE MAESTRO DE LITIGIOS & EXPEDIENTES JUDICIALES", "Gesti\u00F3n Operativa de Expedientes Judiciales en " + sedeNameCas, headers.length, "Iustitia nemini neganda est \u2014 Rigor procesal inquebrantable en defensa de la causa.");
@@ -719,55 +736,61 @@ class LegalExcelExporter {
       const bgArgb = isZebra ? this.colors.zebraLight : "-";
       const row = sheet.getRow(currentRowIdx);
 
+      const pdfMeta = c.pdfMeta || {};
+      const hasExp = !!(pdfMeta.expediente?.hasPdf || pdfMeta.hasExpediente);
+      const hasRes = !!(pdfMeta.resolucion?.hasPdf || (pdfMeta.hasPdf && !pdfMeta.expediente));
+      const bgArgbSafe = bgArgb === "-" ? "FFFFFF" : bgArgb;
+
       row.values = [
-        c.id,
-        c.expediente,
-        c.caratula,
-        c.materia,
-        c.juzgado,
-        c.cliente,
+        c.id || "-",
+        c.sede || c.sedeId || "-",
+        c.expediente || "-",
+        c.caratula || "-",
+        c.materia || "-",
+        c.juzgado || "-",
+        c.cliente || "-",
         c.parteContraria || "-",
+        c.abogadoAsignado || c.abogado || "-",
         c.vencimiento || "-",
         c.detalleVencimiento || "-",
         c.proximaAudiencia || "-",
-        c.estado,
-        c.prioridad,
+        c.estado || "-",
+        c.etapa || "-",
+        c.prioridad || "-",
         c.tiempoCicloDias || 30,
         c.nivelRiesgo || "-",
         cuantia,
-        honorarios
+        honorarios,
+        hasExp ? "SÍ" : "NO",
+        hasRes ? "SÍ" : "NO",
+        c.notas || "-"
       ];
       row.height = 22;
 
       row.eachCell((cell, colNumber) => {
         cell.font = { name: this.fontFamily, size: 8.5, color: { argb: this.colors.textDark } };
-        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgb } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: bgArgbSafe } };
         cell.border = this.thinBorder;
         cell.alignment = { vertical: 'middle' };
 
-        // 1. Columnas CENTRADAS: ID (1), Expediente (2), Materia (4), Vencimiento (8), Audiencia (10), Estado (11), Prioridad (12), Ciclo (13), Riesgo (14)
-        if (colNumber === 1 || colNumber === 2 || colNumber === 4 || colNumber === 8 || colNumber === 10 || colNumber === 11 || colNumber === 12 || colNumber === 13 || colNumber === 14) {
+        if ([1, 2, 3, 5, 10, 12, 13, 14, 15, 16, 17, 20, 21].includes(colNumber)) {
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
         }
 
-        // N° Expediente en Consolas
-        if (colNumber === 2) {
+        if (colNumber === 3) {
           cell.font = { name: "Consolas", size: 8.5, bold: true, color: { argb: "0F172A" } };
         }
 
-        // Plazo Fatal Urgente resaltado
-        if (colNumber === 8 && c.prioridad === "Urgente") {
+        if (colNumber === 10 && c.prioridad === "Urgente") {
           cell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: this.colors.urgentText } };
           cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.urgentBg } };
         }
 
-        // 2. Columnas descriptivas a la IZQUIERDA: Carátula (3), Juzgado (5), Cliente (6), Parte Contraria (7), Trámite que vence (9)
-        if (colNumber === 3 || colNumber === 5 || colNumber === 6 || colNumber === 7 || colNumber === 9) {
+        if ([4, 6, 7, 8, 9, 11, 22].includes(colNumber)) {
           cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
         }
 
-        // 3. Columnas monetarias a la DERECHA: Cuantía (15), Honorarios (16)
-        if (colNumber === 15 || colNumber === 16) {
+        if (colNumber === 18 || colNumber === 19) {
           cell.numFmt = `_("S/"* #,##0.00_);_("S/"* (#,##0.00);_("S/"* "-"??_);_(@_)`;
           cell.alignment = { horizontal: 'right', vertical: 'middle' };
           cell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: "1E3A8A" } };
@@ -779,26 +802,12 @@ class LegalExcelExporter {
 
     const totalRow = sheet.getRow(currentRowIdx);
     totalRow.height = 25;
-    totalRow.values = [
-      "TOTAL CARTERA DE LITIGIOS",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      "",
-      totalCuantia,
-      totalHonorarios
-    ];
+    totalRow.values = Array(headers.length).fill("");
+    totalRow.values[0] = "TOTAL CARTERA DE LITIGIOS";
+    totalRow.values[17] = totalCuantia;
+    totalRow.values[18] = totalHonorarios;
 
-    sheet.mergeCells(`A${currentRowIdx}:N${currentRowIdx}`);
+    sheet.mergeCells(`A${currentRowIdx}:Q${currentRowIdx}`);
     const totLabel = totalRow.getCell(1);
     totLabel.alignment = { horizontal: 'center', vertical: 'middle' };
 
@@ -807,31 +816,18 @@ class LegalExcelExporter {
       cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.goldLight } };
       cell.border = this.accountingTotalBorder;
 
-      if (colNumber === 15 || colNumber === 16) {
+      if (colNumber === 18 || colNumber === 19) {
         cell.numFmt = `_("S/"* #,##0.00_);_("S/"* (#,##0.00);_("S/"* "-"??_);_(@_)`;
         cell.alignment = { horizontal: 'right', vertical: 'middle' };
       }
     });
 
-    sheet.autoFilter = { from: { row: 6, column: 1 }, to: { row: currentRowIdx - 1, column: headers.length } };
+    sheet.autoFilter = { from: { row: 6, column: 1 }, to: { row: Math.max(6, currentRowIdx - 1), column: headers.length } };
 
     this.autoFitColumns(sheet, {
-      1: 12, // ID
-      2: 28, // Expediente
-      3: 40, // Carátula
-      4: 20, // Materia
-      5: 28, // Juzgado
-      6: 30, // Cliente
-      7: 24, // Contraparte
-      8: 16, // Vencimiento
-      9: 34, // Detalle vencimiento
-      10: 20, // Audiencia
-      11: 18, // Estado
-      12: 14, // Prioridad
-      13: 14, // Lead Time
-      14: 20, // Riesgo
-      15: 18, // Cuantía
-      16: 18  // Honorarios
+      1: 12, 2: 14, 3: 26, 4: 36, 5: 16, 6: 24, 7: 26, 8: 22, 9: 20,
+      10: 14, 11: 28, 12: 16, 13: 14, 14: 14, 15: 12, 16: 12, 17: 14,
+      18: 14, 19: 14, 20: 10, 21: 10, 22: 30
     });
   }
 
@@ -846,13 +842,16 @@ class LegalExcelExporter {
 
     const headers = [
       "ID",
+      "SEDE",
       "CLIENTE / ENTIDAD",
       "TELÉFONO / WHATSAPP",
       "MOTIVO DE LA CONSULTA / AUDIENCIA",
       "FECHA Y HORA PROGRAMADA",
-      "MODALIDAD / SEDE",
+      "MODALIDAD",
+      "LINK MEET / URL",
       "ABOGADO ASIGNADO",
       "ESTADO",
+      "DOCUMENTOS REQUERIDOS",
       "NOTAS LOGÍSTICAS DE PREPARACIÓN"
     ];
 
@@ -868,23 +867,29 @@ class LegalExcelExporter {
       cell.border = this.thinBorder;
     });
 
-    const items = window.db.get("citas");
+    const items = window.db.get("citas") || [];
     let currentRowIdx = 7;
 
     items.forEach((item, index) => {
       const isZebra = index % 2 === 1;
-      const bgArgb = isZebra ? this.colors.zebraLight : "-";
+      const bgArgb = isZebra ? this.colors.zebraLight : "FFFFFF";
       const row = sheet.getRow(currentRowIdx);
+      const docsReq = Array.isArray(item.documentosRequeridos)
+        ? item.documentosRequeridos.join(", ")
+        : (item.documentosRequeridos || "-");
 
       row.values = [
-        item.id,
-        item.cliente,
+        item.id || "-",
+        item.sede || item.sedeId || "-",
+        item.cliente || "-",
         item.telefono || "-",
-        item.motivo,
-        item.fechaHora ? item.fechaHora.replace("T", " ") : "-",
-        item.modalidad,
-        item.abogado,
-        item.estado,
+        item.motivo || "-",
+        item.fechaHora ? String(item.fechaHora).replace("T", " ") : "-",
+        item.modalidad || "-",
+        item.linkMeet || item.link || item.urlMeet || "-",
+        item.abogado || "-",
+        item.estado || "-",
+        docsReq,
         item.notas || "-"
       ];
       row.height = 21;
@@ -895,8 +900,7 @@ class LegalExcelExporter {
         cell.border = this.thinBorder;
         cell.alignment = { vertical: 'middle' };
 
-        // Columnas centradas: ID (1), Teléfono (3), Fecha/Hora (5), Estado (8)
-        if (colNumber === 1 || colNumber === 3 || colNumber === 5 || colNumber === 8) {
+        if ([1, 2, 4, 6, 7, 9, 10].includes(colNumber)) {
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
         } else {
           cell.alignment = { horizontal: 'left', vertical: 'middle', wrapText: true };
@@ -906,18 +910,11 @@ class LegalExcelExporter {
       currentRowIdx++;
     });
 
-    sheet.autoFilter = { from: { row: 6, column: 1 }, to: { row: currentRowIdx - 1, column: headers.length } };
+    sheet.autoFilter = { from: { row: 6, column: 1 }, to: { row: Math.max(6, currentRowIdx - 1), column: headers.length } };
 
     this.autoFitColumns(sheet, {
-      1: 12,
-      2: 32,
-      3: 18,
-      4: 38,
-      5: 22,
-      6: 28,
-      7: 20,
-      8: 16,
-      9: 34
+      1: 12, 2: 14, 3: 28, 4: 16, 5: 36, 6: 20,
+      7: 14, 8: 28, 9: 18, 10: 14, 11: 24, 12: 30
     });
   }
 
@@ -1215,15 +1212,21 @@ class LegalExcelExporter {
     // Fila 7: Encabezados de tabla
     const headers = [
       "Código",
-      "Categoría Presupuestaria",
-      "Concepto / Partida Presupuestaria",
-      "Tipo Financiero",
+      "Sede",
+      "Centro de Costo",
+      "PCGE",
+      "Categoría",
+      "Concepto / Partida",
+      "Tipo",
       "Frecuencia / Días",
       "Cant.",
       "Unidad",
       "Costo Unitario",
-      "Subtotal Proyectado",
-      "Estado"
+      "Presupuestado",
+      "Ejecutado",
+      "Saldo",
+      "Estado",
+      "Responsable"
     ];
 
     const headerRow = sheet.getRow(7);
@@ -1238,21 +1241,34 @@ class LegalExcelExporter {
     });
 
     let currentRowIdx = 8;
+    let totalEjecutado = 0;
     items.forEach((item, idx) => {
       const row = sheet.getRow(currentRowIdx);
       const bgArgb = idx % 2 === 1 ? this.colors.zebraLight : this.colors.textWhite;
+      const presupuestado = Number(item.subtotal || item.montoPresupuestado || 0);
+      const ejecutado = (item.montoEjecutado !== undefined && item.montoEjecutado !== null)
+        ? Number(item.montoEjecutado)
+        : (item.estado === "Ejecutado" ? presupuestado : 0);
+      totalEjecutado += ejecutado;
+      const saldo = presupuestado - ejecutado;
 
       row.values = [
-        item.id,
-        item.categoria,
-        item.concepto + (item.notas ? ` (${item.notas})` : ''),
-        item.tipo,
-        item.frecuencia + (item.diasEventual ? ` (${item.diasEventual} días)` : ''),
-        item.cantidad,
-        item.unidad || 'Unidad',
+        item.id || "-",
+        item.sede || item.sedeId || "-",
+        item.centroCosto || "-",
+        item.clasePcge || "-",
+        item.categoria || "-",
+        (item.concepto || "-") + (item.notas ? ` (${item.notas})` : ""),
+        item.tipo || "-",
+        String(item.frecuencia || "-") + (item.diasEventual ? ` (${item.diasEventual} días)` : ""),
+        item.cantidad != null ? item.cantidad : 1,
+        item.unidad || "Unidad",
         Number(item.costoUnitario || 0),
-        Number(item.subtotal || 0),
-        item.estado
+        presupuestado,
+        ejecutado,
+        saldo,
+        item.estado || "-",
+        item.responsable || "-"
       ];
       row.height = 21;
 
@@ -1262,12 +1278,12 @@ class LegalExcelExporter {
         cell.border = this.thinBorder;
         cell.alignment = { vertical: 'middle' };
 
-        if (colNumber === 1 || colNumber === 4 || colNumber === 5 || colNumber === 6 || colNumber === 7 || colNumber === 10) {
+        if ([1, 2, 3, 4, 7, 8, 9, 10, 15].includes(colNumber)) {
           cell.alignment = { horizontal: 'center', vertical: 'middle' };
-        } else if (colNumber === 8 || colNumber === 9) {
+        } else if ([11, 12, 13, 14].includes(colNumber)) {
           cell.alignment = { horizontal: 'right', vertical: 'middle' };
           cell.numFmt = '"S/" #,##0.00';
-          if (colNumber === 9) {
+          if (colNumber === 12 || colNumber === 13) {
             cell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: "0B132B" } };
           }
         } else {
@@ -1280,46 +1296,53 @@ class LegalExcelExporter {
 
     // Fila de Total Contable
     const totalRow = sheet.getRow(currentRowIdx);
-    sheet.mergeCells(`A${currentRowIdx}:H${currentRowIdx}`);
+    sheet.mergeCells(`A${currentRowIdx}:K${currentRowIdx}`);
     const lblCell = sheet.getCell(`A${currentRowIdx}`);
     lblCell.value = "TOTAL GENERAL PROYECTADO \u2014 " + (sedeNamePre || "CONSOLIDADO NACIONAL").toUpperCase() + ":";
     lblCell.font = { name: this.fontFamily, size: 9.5, bold: true, color: { argb: this.colors.goldDarkText } };
     lblCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.goldLight } };
     lblCell.alignment = { horizontal: 'right', vertical: 'middle' };
 
-    const sumCell = sheet.getCell(`I${currentRowIdx}`);
+    const sumCell = sheet.getCell(`L${currentRowIdx}`);
     sumCell.value = granTotal;
     sumCell.font = { name: this.fontFamily, size: 10, bold: true, color: { argb: this.colors.goldDarkText } };
     sumCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.goldLight } };
     sumCell.alignment = { horizontal: 'right', vertical: 'middle' };
     sumCell.numFmt = '"S/" #,##0.00';
 
-    const endCell = sheet.getCell(`J${currentRowIdx}`);
+    const ejecCell = sheet.getCell(`M${currentRowIdx}`);
+    ejecCell.value = totalEjecutado;
+    ejecCell.font = { name: this.fontFamily, size: 10, bold: true, color: { argb: this.colors.goldDarkText } };
+    ejecCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.goldLight } };
+    ejecCell.alignment = { horizontal: 'right', vertical: 'middle' };
+    ejecCell.numFmt = '"S/" #,##0.00';
+
+    const saldoCell = sheet.getCell(`N${currentRowIdx}`);
+    saldoCell.value = granTotal - totalEjecutado;
+    saldoCell.font = { name: this.fontFamily, size: 10, bold: true, color: { argb: this.colors.goldDarkText } };
+    saldoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.goldLight } };
+    saldoCell.alignment = { horizontal: 'right', vertical: 'middle' };
+    saldoCell.numFmt = '"S/" #,##0.00';
+
+    const endCell = sheet.getCell(`O${currentRowIdx}`);
     endCell.value = `${items.length} partidas`;
     endCell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: this.colors.goldDarkText } };
     endCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.goldLight } };
     endCell.alignment = { horizontal: 'center', vertical: 'middle' };
+    sheet.getCell(`P${currentRowIdx}`).fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: this.colors.goldLight } };
 
     totalRow.height = 24;
-    for (let c = 1; c <= 10; c++) {
+    for (let c = 1; c <= 16; c++) {
       sheet.getRow(currentRowIdx).getCell(c).border = this.accountingTotalBorder;
     }
 
-    sheet.autoFilter = { from: { row: 7, column: 1 }, to: { row: Math.max(8, currentRowIdx - 1), column: 10 } };
+    sheet.autoFilter = { from: { row: 7, column: 1 }, to: { row: Math.max(8, currentRowIdx - 1), column: 16 } };
 
-    this.addInstitutionalSignatures(sheet, currentRowIdx, 10);
+    this.addInstitutionalSignatures(sheet, currentRowIdx, 16);
 
     this.autoFitColumns(sheet, {
-      1: 12,
-      2: 30,
-      3: 45,
-      4: 18,
-      5: 22,
-      6: 10,
-      7: 14,
-      8: 16,
-      9: 18,
-      10: 15
+      1: 12, 2: 14, 3: 18, 4: 10, 5: 22, 6: 36, 7: 12, 8: 18,
+      9: 8, 10: 10, 11: 14, 12: 14, 13: 14, 14: 12, 15: 12, 16: 18
     });
   }
 
@@ -1336,13 +1359,17 @@ class LegalExcelExporter {
 
     const headers = [
       "ID REGISTRO",
+      "SEDE",
       "COLABORADOR",
       "DNI",
       "CARGO PROFESIONAL",
       "FECHA",
-      "HORA INGRESO",
-      "HORA SALIDA",
-      "GEOCERCA (100m)",
+      "INGRESO",
+      "SALIDA ALMUERZO",
+      "RETORNO ALMUERZO",
+      "SALIDA FINAL",
+      "TIPO MARCACIÓN",
+      "GEOCERCA",
       "DISTANCIA (m)",
       "MOTIVO DILIGENCIA",
       "DETALLE / SUSTENTO",
@@ -1359,42 +1386,48 @@ class LegalExcelExporter {
     });
     headerRow.height = 24;
 
-    const records = window.db ? window.db.get("attendance") : [];
+    const fmtHora = (iso) => {
+      if (!iso) return "-";
+      try { return new Date(iso).toLocaleTimeString("es-PE", { hour: "2-digit", minute: "2-digit", second: "2-digit" }); }
+      catch (_) { return String(iso); }
+    };
+
+    const records = window.db ? (window.db.get("attendance") || []) : [];
     let currentRowIdx = 7;
 
     records.forEach(r => {
-      const horaIngreso = r.ingreso ? new Date(r.ingreso).toLocaleTimeString("es-PE") : "-";
-      const horaSalida = r.salida ? new Date(r.salida).toLocaleTimeString("es-PE") : "-";
-
       const row = sheet.getRow(currentRowIdx);
       row.values = [
-        r.id,
-        r.nombre,
-        r.dni,
-        r.cargo,
-        r.fecha,
-        horaIngreso,
-        horaSalida,
+        r.id || "-",
+        r.sede || r.sedeId || "-",
+        r.nombre || "-",
+        r.dni || "-",
+        r.cargo || "-",
+        r.fecha || "-",
+        fmtHora(r.ingreso),
+        fmtHora(r.salidaAlmuerzo),
+        fmtHora(r.retornoAlmuerzo),
+        fmtHora(r.salida),
+        r.tipoMarcacion || r.modalidad || "-",
         r.enGeocerca ? "EN GEOCERCA" : "FUERA DE GEOCERCA",
-        r.distanciaMetros,
+        r.distanciaMetros != null ? r.distanciaMetros : "-",
         r.motivoExterno || "-",
         r.justificacion || "-",
-        (r.estadoAprobacion || "aprobado").toUpperCase()
+        String(r.estadoAprobacion || "aprobado").toUpperCase()
       ];
       row.height = 20;
 
-      for (let c = 1; c <= 12; c++) {
+      for (let c = 1; c <= 16; c++) {
         const cell = row.getCell(c);
         cell.font = { name: this.fontFamily, size: 8.5, color: { argb: this.colors.textDark } };
         cell.border = this.thinBorder;
         cell.alignment = { vertical: 'middle' };
-        if ([1, 3, 5, 6, 7, 8, 9, 12].includes(c)) {
+        if ([1, 2, 4, 6, 7, 8, 9, 10, 11, 12, 13, 16].includes(c)) {
           cell.alignment.horizontal = 'center';
         }
       }
 
-      // Formato condicional para geocerca y aprobación
-      const geoCell = row.getCell(8);
+      const geoCell = row.getCell(12);
       if (r.enGeocerca) {
         geoCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: "D1FAE5" } };
         geoCell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: "065F46" } };
@@ -1403,8 +1436,8 @@ class LegalExcelExporter {
         geoCell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: "92400E" } };
       }
 
-      const statusCell = row.getCell(12);
-      if (r.estadoAprobacion === "aprobado") {
+      const statusCell = row.getCell(16);
+      if (r.estadoAprobacion === "aprobado" || !r.estadoAprobacion) {
         statusCell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: "D1FAE5" } };
         statusCell.font = { name: this.fontFamily, size: 8.5, bold: true, color: { argb: "065F46" } };
       } else if (r.estadoAprobacion === "pendiente") {
@@ -1418,23 +1451,14 @@ class LegalExcelExporter {
       currentRowIdx++;
     });
 
-    sheet.autoFilter = { from: { row: 6, column: 1 }, to: { row: Math.max(7, currentRowIdx - 1), column: 12 } };
+    sheet.autoFilter = { from: { row: 6, column: 1 }, to: { row: Math.max(7, currentRowIdx - 1), column: 16 } };
 
-    this.addInstitutionalSignatures(sheet, currentRowIdx, 12);
+    this.addInstitutionalSignatures(sheet, currentRowIdx, 16);
 
     this.autoFitColumns(sheet, {
-      1: 15,
-      2: 28,
-      3: 12,
-      4: 24,
-      5: 14,
-      6: 14,
-      7: 14,
-      8: 20,
-      9: 14,
-      10: 30,
-      11: 35,
-      12: 18
+      1: 14, 2: 14, 3: 26, 4: 12, 5: 22, 6: 12,
+      7: 12, 8: 14, 9: 14, 10: 12, 11: 16, 12: 16,
+      13: 12, 14: 24, 15: 28, 16: 16
     });
   }
 
@@ -1451,10 +1475,10 @@ class LegalExcelExporter {
     const sedeNameDisplay = (branchInfo.activeSede === "todas") ? "Consolidado Nacional" : branchInfo.branchName;
     this.addReportHeader(
       sheet,
-      "PADRÃ“N Y DIRECTORIO GENERAL DE PERSONAL PROFESIONAL",
-      `Sede: ${sedeNameDisplay} \u2014 Gesti\u00F3ntrol de Acceso (RBAC)`,
+      "PADRÓN Y DIRECTORIO GENERAL DE PERSONAL PROFESIONAL",
+      `Sede: ${sedeNameDisplay} — Gestión de Personal y Control de Acceso (RBAC)`,
       13,
-      "Diligens et fidelis \u2014 Rigor profesional, probidad e integridad en la labor jurídica."
+      "Diligens et fidelis — Rigor profesional, probidad e integridad en la labor jurídica."
     );
 
     const headers = [
@@ -1468,7 +1492,7 @@ class LegalExcelExporter {
       "SEDE ASIGNADA",
       "DESPACHO",
       "CORREO INSTITUCIONAL",
-      "TELÃ‰FONO / WHATSAPP",
+      "TELÉFONO / WHATSAPP",
       "ESTADO",
       "FECHA INGRESO"
     ];

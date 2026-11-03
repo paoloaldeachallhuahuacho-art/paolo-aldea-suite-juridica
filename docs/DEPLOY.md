@@ -30,7 +30,7 @@
 | **Auth** | Supabase Auth JWT con `app_metadata.role` + `app_metadata.branch_id` |
 | **Datos** | PostgreSQL + outbox IndexedDB + LWW `server_ts` |
 | **Edge** | `attendance-validate`, `petty-cash-transition`, `public-config`, `telegram-proxy` |
-| **Schema** | [`20261102`](../supabase/migrations/20261102_enterprise_zero_trust.sql) + [`20261102b`](../supabase/migrations/20261102b_firm_auth_registry.sql) + [`20261102d_app_records_sync.sql`](../supabase/migrations/20261102d_app_records_sync.sql) |
+| **Schema** | [`20261102`](../supabase/migrations/20261102_enterprise_zero_trust.sql) + [`20261102b`](../supabase/migrations/20261102b_firm_auth_registry.sql) + [`20261102d_app_records_sync.sql`](../supabase/migrations/20261102d_app_records_sync.sql) + **[`20261114_security_hardening.sql`](../supabase/migrations/20261114_security_hardening.sql)** (obligatorio) |
 | **Auditoría** | [`docs/AUDIT_CHECKLIST_MULTI_SEDE.md`](AUDIT_CHECKLIST_MULTI_SEDE.md) |
 
 ### Auth multi-dispositivo (Super Admin compartido)
@@ -77,8 +77,11 @@ Las edge functions viven en `cloudflare/functions/`. El worker las expone en **`
    - `SUPABASE_URL`
    - `SUPABASE_ANON_KEY`
    - `SUPABASE_SERVICE_ROLE_KEY`
+   - `SYNC_TOKEN_SECRET` = secreto distinto del service_role (HMAC de syncToken)
    - `ALLOWED_ORIGIN` = la URL exacta de `*.pages.dev`, sin barra final
-4. Comprobar `POST /api/sync-pull` sin token: debe responder 401, no 404.
+   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (Web Push; generar con `npx web-push generate-vapid-keys`)
+4. En Supabase SQL Editor ejecute también `20261103_push_subscriptions.sql`.
+5. Comprobar `POST /api/sync-pull` sin token: debe responder 401, no 404. `GET /api/public-config` debe incluir `vapidPublicKey` (nunca la privada).
 
 ## Modo C — Híbrido descontrolado (evitar)
 
@@ -97,3 +100,4 @@ Si se necesita offline+cloud: usar **Modo B** con outbox (no abrir el hub PS a I
 | B | `POST /api/attendance-validate` | Geocerca server (syncToken o JWT + Origin) |
 | B | `POST /api/petty-cash-transition` | Flujo caja (syncToken o JWT + Origin) |
 | B | `POST /api/sync-pull` / `sync-push` | Sync `app_records` (HMAC syncToken + LWW) |
+| B | `POST /api/push-subscribe` / `push-unsubscribe` / `push-send` | Web Push VAPID (syncToken; payload genérico) |

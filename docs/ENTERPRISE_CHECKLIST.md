@@ -41,8 +41,12 @@ Leyenda: `PASS` verificado · `WARN` riesgo conocido · `PENDING` manual restant
 | SEC-07 | Headers CSP/HSTS | PASS | |
 | SEC-08 | auth-staff-upsert exige syncToken + rol admin | **PATCHED_LOCAL** | Prod aún abierta hasta redeploy; limpiar AUDIT-PROBE-DO-NOT-KEEP |
 | SEC-09 | sync-push deletedIds filtra sede | **PATCHED_LOCAL** | Redeploy obligatorio |
-| SEC-10 | auth-login no filtra hashes a no-admin | **PATCHED_LOCAL** | Redeploy obligatorio |
+| SEC-10 | auth-login no filtra hashes de terceros (ni a admin) | **PATCHED_LOCAL** | v2026.11.15 — Redeploy obligatorio |
 | SEC-11 | Rate-limit auth-login | PASS | Edge live: 12×200 + 8×429/min; lock 8 fallos/15min |
+| SEC-12 | AUTH_SIG no honra `permisos` forjados en DevTools | PASS | `data.js` + test RBAC |
+| SEC-13 | `jwt_role()` prioriza `app_metadata.role` | **PATCHED_SQL** | Aplicar `20261114_security_hardening.sql` |
+| SEC-14 | `profiles_update_self` congela role/sede/activo | **PATCHED_SQL** | Misma migración |
+| SEC-15 | Servidor local bloquea `/cloudflare/`, `/tests/`, `/docs/` | PASS | `servidor_local.ps1` |
 | AUTH-05 | No password en claro al Worker | PASS | auth-login exige challenge+proofs |
 
 ## C. Auth

@@ -166,7 +166,7 @@ class LegalApp {
       el.addEventListener("change", triggerAutoSave);
     });
 
-    ["cfgPushTopic", "cfgPushAutoSend", "cfgPushAnonymize", "cfgTelegramToken", "cfgTelegramChatId"].forEach(id => {
+    ["cfgWebPushOptIn", "cfgPushAutoSend", "cfgPushScope", "cfgTelegramToken", "cfgTelegramChatId"].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener("input", triggerAutoSave);
@@ -190,9 +190,10 @@ class LegalApp {
       const firmPhone = getSafeVal("cfgFirmPhone", current.firmPhone || "+51 943 410 215");
       const currency = getSafeVal("cfgCurrency", current.currency || "S/");
 
-      const topic = getSafeVal("cfgPushTopic", current.pushTopic || "aldea_notificaciones_seguras").replace(/\s+/g, "_").toLowerCase();
-      const autoSend = document.getElementById("cfgPushAutoSend") ? document.getElementById("cfgPushAutoSend").checked : false;
-      const anonymize = document.getElementById("cfgPushAnonymize") ? document.getElementById("cfgPushAnonymize").checked : true;
+      const autoSend = document.getElementById("cfgPushAutoSend") ? document.getElementById("cfgPushAutoSend").checked : true;
+      const webPushOptIn = document.getElementById("cfgWebPushOptIn") ? document.getElementById("cfgWebPushOptIn").checked : !!current.webPushOptIn;
+      const pushScopeEl = document.getElementById("cfgPushScope");
+      const pushScope = pushScopeEl ? pushScopeEl.value : (current.pushScope || "self");
       const tgToken = getSafeVal("cfgTelegramToken", current.telegramToken || "");
       const tgChat = getSafeVal("cfgTelegramChatId", current.telegramChatId || "");
 
@@ -207,12 +208,14 @@ class LegalApp {
         firmAddress,
         firmPhone,
         currency,
-        pushTopic: topic,
         pushAutoSend: autoSend,
-        pushAnonymize: anonymize,
+        webPushOptIn,
+        pushScope,
+        pushAnonymize: true,
         telegramToken: tgToken,
         telegramChatId: tgChat
       };
+      if (window.PaoloPushService) window.PaoloPushService.setOptIn(!!webPushOptIn);
 
             if (window.SEDES_CONFIG && window.SEDES_CONFIG[activeSedeKey]) {
         window.SEDES_CONFIG[activeSedeKey].nombre = firmBranch;
@@ -326,36 +329,89 @@ class LegalApp {
   // =========================================================================
   // PWA (PROGRESSIVE WEB APP) & SERVICE WORKER MÓVIL
   // =========================================================================
+  isPwaInstalled() {
+    try {
+      if (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) return true;
+      if (window.matchMedia && window.matchMedia("(display-mode: minimal-ui)").matches) return true;
+      if (typeof navigator !== "undefined" && navigator.standalone === true) return true; // iOS Safari
+      if (document.referrer && document.referrer.startsWith("android-app://")) return true;
+      if (localStorage.getItem("PA_PWA_INSTALLED") === "1") return true;
+    } catch (_) {}
+    return false;
+  }
+
+  setPwaInstallButtonVisible(visible) {
+    const btnInstall = document.getElementById("btnPwaInstall");
+    if (!btnInstall) return;
+    if (visible && !this.isPwaInstalled()) {
+      btnInstall.classList.remove("hidden");
+      btnInstall.classList.add("inline-flex");
+      btnInstall.setAttribute("aria-hidden", "false");
+    } else {
+      btnInstall.classList.add("hidden");
+      btnInstall.classList.remove("inline-flex");
+      btnInstall.setAttribute("aria-hidden", "true");
+    }
+  }
+
   initPwa() {
     // El service worker y el aviso de versión nueva viven en js/app-update.js.
+    // Si ya está instalada en este dispositivo, nunca mostrar "Instalar App".
+    this.setPwaInstallButtonVisible(false);
 
-    // Evento beforeinstallprompt para instalación directa PWA en Android y Chrome
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
-      this.deferredPwaPrompt = e;
-      const btnInstall = document.getElementById("btnPwaInstall");
-      if (btnInstall) {
-        btnInstall.classList.remove("hidden");
-        btnInstall.classList.add("inline-flex");
+      if (this.isPwaInstalled()) {
+        this.deferredPwaPrompt = null;
+        this.setPwaInstallButtonVisible(false);
+        return;
       }
+      this.deferredPwaPrompt = e;
+      this.setPwaInstallButtonVisible(true);
     });
 
-    // 3. Confirmación de app instalada en pantalla principal
     window.addEventListener("appinstalled", () => {
       this.deferredPwaPrompt = null;
-      const btnInstall = document.getElementById("btnPwaInstall");
-      if (btnInstall) {
-        btnInstall.classList.add("hidden");
-      }
+      try {
+        localStorage.setItem("PA_PWA_INSTALLED", "1");
+      } catch (_) {}
+      this.setPwaInstallButtonVisible(false);
       this.showToast("¡Aplicación Paolo Aldea instalada en su dispositivo!", "success");
     });
+
+    // Revalidar si el usuario abre la PWA ya instalada
+    try {
+      if (window.matchMedia) {
+        const mq = window.matchMedia("(display-mode: standalone)");
+        const sync = () => {
+          if (mq.matches) {
+            try {
+              localStorage.setItem("PA_PWA_INSTALLED", "1");
+            } catch (_) {}
+            this.setPwaInstallButtonVisible(false);
+          }
+        };
+        sync();
+        if (typeof mq.addEventListener === "function") mq.addEventListener("change", sync);
+        else if (typeof mq.addListener === "function") mq.addListener(sync);
+      }
+    } catch (_) {}
   }
 
   async installPwa() {
+    if (this.isPwaInstalled()) {
+      this.setPwaInstallButtonVisible(false);
+      this.showToast("Esta aplicación ya está instalada en este dispositivo.", "info");
+      return;
+    }
     if (this.deferredPwaPrompt) {
       this.deferredPwaPrompt.prompt();
       const choiceResult = await this.deferredPwaPrompt.userChoice;
       if (choiceResult.outcome === "accepted") {
+        try {
+          localStorage.setItem("PA_PWA_INSTALLED", "1");
+        } catch (_) {}
+        this.setPwaInstallButtonVisible(false);
         this.showToast("Instalando aplicaci\u00F3n Paolo Aldea...", "success");
       }
       this.deferredPwaPrompt = null;
@@ -462,6 +518,9 @@ class LegalApp {
     this.setupAutoSaveSettings();
     if (window.AttendanceModule) {
       window.AttendanceModule.init();
+      if (typeof window.AttendanceModule.enterKioskColaborador === "function") {
+        window.AttendanceModule.enterKioskColaborador();
+      }
     }
 
     setInterval(() => {
@@ -551,20 +610,21 @@ class LegalApp {
     }
     if (inCurr) inCurr.value = s.currency || "S/";
 
-    const inPushTopic = document.getElementById("cfgPushTopic");
     const inPushAuto = document.getElementById("cfgPushAutoSend");
-    const inPushAnon = document.getElementById("cfgPushAnonymize");
+    const inWebPushOpt = document.getElementById("cfgWebPushOptIn");
+    const inPushScope = document.getElementById("cfgPushScope");
     const inTgToken = document.getElementById("cfgTelegramToken");
     const inTgChat = document.getElementById("cfgTelegramChatId");
-    const dispTopic = document.getElementById("displayPushTopic");
 
-    const activeTopic = s.pushTopic || `aldea_notificaciones_${activeSedeKey}`;
-    if (inPushTopic) inPushTopic.value = activeTopic;
-    if (dispTopic) dispTopic.textContent = activeTopic;
-    if (inPushAuto) inPushAuto.checked = s.pushAutoSend === true;
-    if (inPushAnon) inPushAnon.checked = s.pushAnonymize !== false;
+    if (inPushAuto) inPushAuto.checked = s.pushAutoSend !== false;
+    if (inWebPushOpt) {
+      inWebPushOpt.checked =
+        s.webPushOptIn === true || (window.PaoloPushService && window.PaoloPushService.isOptedIn());
+    }
+    if (inPushScope) inPushScope.value = s.pushScope || "self";
     if (inTgToken) inTgToken.value = s.telegramToken || "";
     if (inTgChat) inTgChat.value = s.telegramChatId || "";
+    if (typeof this.refreshWebPushStatus === "function") this.refreshWebPushStatus();
 
     // Sincronizaci\u00F3n Arquitectura Multi-Sede (RBAC)
     // currentUser already initialized above in applySettingsToUI
@@ -578,6 +638,7 @@ class LegalApp {
     if (isGlobal) {
       if (globalSedeContainer) globalSedeContainer.classList.remove("hidden");
       if (globalSedeSelect) globalSedeSelect.value = activeSedeKey;
+      if (typeof this.syncSedePickerUI === "function") this.syncSedePickerUI(activeSedeKey);
       if (workerSedeBadge) {
         workerSedeBadge.classList.add("hidden");
         workerSedeBadge.classList.remove("flex");
@@ -709,6 +770,129 @@ class LegalApp {
     if (locked) locked.textContent = labelTitle;
   }
 
+  /** Iconos institucionales por sede (selector custom / topbar). */
+  getSedePickerIcon(sedeId) {
+    const map = {
+      todas: "fa-globe-americas",
+      miraflores: "fa-city",
+      abancay: "fa-mountain-sun",
+      cusco: "fa-landmark",
+      huaraz: "fa-mountain",
+      challhuahuacho: "fa-building-flag"
+    };
+    return map[sedeId] || "fa-building-columns";
+  }
+
+  /** Sincroniza botón visible del selector con la sede activa (evita picker nativo Android). */
+  syncSedePickerUI(sedeId) {
+    const key = sedeId
+      || (window.db && typeof window.db.getActiveSede === "function" ? window.db.getActiveSede() : null)
+      || "challhuahuacho";
+    const select = document.getElementById("globalSedeSelect");
+    if (select && [...select.options].some((o) => o.value === key)) {
+      select.value = key;
+    }
+    const cfg = (window.SEDES_CONFIG && window.SEDES_CONFIG[key]) ? window.SEDES_CONFIG[key] : null;
+    const labelEl = document.getElementById("globalSedeSelectLabel");
+    if (labelEl) {
+      labelEl.textContent = key === "todas"
+        ? "Consolidado Nacional"
+        : (cfg ? (cfg.nombre || ("Sede " + (cfg.nombreCorto || key))) : ("Sede " + key));
+    }
+    const iconEl = document.getElementById("globalSedeSelectIcon");
+    if (iconEl) {
+      iconEl.className = "fa-solid " + this.getSedePickerIcon(key) + " text-[11px]";
+    }
+    const trigger = document.getElementById("btnOpenSedePicker");
+    if (trigger) {
+      trigger.setAttribute("aria-label", "Sede activa: " + (labelEl ? labelEl.textContent : key));
+      trigger.setAttribute("aria-expanded", "false");
+    }
+  }
+
+  async openSedePicker() {
+    const currentUser = window.db && typeof window.db.getCurrentUser === "function" ? window.db.getCurrentUser() : null;
+    const isGlobal = window.db ? window.db.isGlobalAdmin(currentUser) : true;
+    if (!isGlobal) {
+      this.showToast("Su perfil tiene sede fija. No puede cambiar de ubicación.", "info");
+      return;
+    }
+    this.renderSedePickerList();
+    const trigger = document.getElementById("btnOpenSedePicker");
+    if (trigger) trigger.setAttribute("aria-expanded", "true");
+    await this.openModal("modalSedePicker");
+    setTimeout(() => {
+      const selected = document.querySelector("#sedePickerList .sede-picker-option.is-selected");
+      if (selected && typeof selected.focus === "function") selected.focus();
+    }, 80);
+  }
+
+  closeSedePicker() {
+    this.closeModal("modalSedePicker");
+    const trigger = document.getElementById("btnOpenSedePicker");
+    if (trigger) {
+      trigger.setAttribute("aria-expanded", "false");
+      if (typeof trigger.focus === "function") trigger.focus();
+    }
+  }
+
+  renderSedePickerList() {
+    const list = document.getElementById("sedePickerList");
+    if (!list || !window.SEDES_CONFIG) return;
+    const active = (window.db && typeof window.db.getActiveSede === "function")
+      ? window.db.getActiveSede()
+      : "challhuahuacho";
+    const preferred = ["todas", "miraflores", "abancay", "cusco", "huaraz", "challhuahuacho"];
+    const keys = preferred
+      .filter((k) => window.SEDES_CONFIG[k])
+      .concat(Object.keys(window.SEDES_CONFIG).filter((k) => !preferred.includes(k)));
+
+    const esc = (typeof escapeHtml === "function")
+      ? escapeHtml
+      : (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    list.innerHTML = keys.map((k) => {
+      const s = window.SEDES_CONFIG[k];
+      const selected = k === active;
+      const title = k === "todas" ? "Consolidado Nacional" : (s.nombre || ("Sede " + (s.nombreCorto || k)));
+      const subtitle = s.region || s.direccion || "";
+      const code = s.codigo ? String(s.codigo) : "";
+      const icon = this.getSedePickerIcon(k);
+      const accent = String(s.color || "#D97706").replace(/[^#a-fA-F0-9(),.%\s]/g, "");
+      const safeKey = String(k).replace(/[^a-z0-9_]/gi, "");
+      return `
+        <button type="button" role="option" aria-selected="${selected ? "true" : "false"}"
+          class="sede-picker-option ${selected ? "is-selected" : ""}"
+          data-sede="${esc(safeKey)}"
+          onclick="window.app.pickSede('${safeKey}')">
+          <span class="sede-picker-option-icon" style="color:${accent};border-color:${accent}55;background:${accent}18">
+            <i class="fa-solid ${icon}"></i>
+          </span>
+          <span class="sede-picker-option-text">
+            <span class="sede-picker-option-title">${esc(title)}</span>
+            <span class="sede-picker-option-sub">${esc(subtitle)}</span>
+          </span>
+          ${code ? `<span class="sede-picker-option-code">${esc(code)}</span>` : ""}
+          <span class="sede-picker-option-radio" aria-hidden="true">
+            <i class="fa-solid ${selected ? "fa-circle-check" : "fa-circle"}"></i>
+          </span>
+        </button>`;
+    }).join("");
+  }
+
+  pickSede(sedeId) {
+    this.closeSedePicker();
+    if (!sedeId) return;
+    const current = (window.db && typeof window.db.getActiveSede === "function")
+      ? window.db.getActiveSede()
+      : null;
+    if (current === sedeId) {
+      this.syncSedePickerUI(sedeId);
+      return;
+    }
+    this.switchSede(sedeId);
+  }
+
   // Alternar sede activa (Permiso exclusivo de Administrador Global)
   switchSede(newSedeId) {
     if (!window.db) return;
@@ -722,6 +906,7 @@ class LegalApp {
     const cfg = window.SEDES_CONFIG ? window.SEDES_CONFIG[norm] : null;
     const label = cfg ? cfg.nombreCorto : "Consolidado Nacional";
 
+    this.syncSedePickerUI(norm);
     this.showToast(`Vista de despacho cambiada a: ${label}`, "info");
     this.applySettingsToUI();
     this.applySedeToHeader();
@@ -939,7 +1124,13 @@ class LegalApp {
     const _rbacObs = new MutationObserver(() => { clearTimeout(_rbacTimer); _rbacTimer = setTimeout(() => this.applyRbacUI(), 60); });
     _rbacObs.observe(document.body, { childList: true, subtree: true });
     document.addEventListener("keydown", (ev) => {
-      if (ev.key === "Escape") this.toggleMobileSidebar(false);
+      if (ev.key !== "Escape") return;
+      const sedeModal = document.getElementById("modalSedePicker");
+      if (sedeModal && !sedeModal.classList.contains("hidden")) {
+        this.closeSedePicker();
+        return;
+      }
+      this.toggleMobileSidebar(false);
     });
     window.addEventListener("resize", () => {
       const sidebar = document.getElementById("mainAppSidebar");
@@ -2806,58 +2997,105 @@ class LegalApp {
   }
 
   // =========================================================================
-  // AJUSTES DE NOTIFICACIONES PUSH MÓVILES & PC
+  // AJUSTES WEB PUSH (VAPID) — segundo plano
   // =========================================================================
+  async refreshWebPushStatus() {
+    const label = document.getElementById("webPushStatusLabel");
+    if (!label) return;
+    if (!window.PaoloPushService) {
+      label.textContent = "Estado: servicio push no cargado.";
+      return;
+    }
+    try {
+      const st = await window.PaoloPushService.status();
+      if (!st.supported) {
+        label.textContent = "Estado: este navegador no soporta Web Push.";
+        return;
+      }
+      const parts = [
+        "permiso " + st.permission,
+        st.optedIn ? "opt-in activo" : "sin opt-in",
+        st.subscribed ? "dispositivo suscrito" : "sin suscripción",
+        st.hasToken ? "sesión cloud OK" : "falta sesión cloud",
+        st.vapidReady ? "VAPID listo" : "VAPID pendiente en servidor"
+      ];
+      label.textContent = "Estado: " + parts.join(" · ");
+    } catch (_) {
+      label.textContent = "Estado: no disponible.";
+    }
+  }
+
+  async enableWebPushOnDevice() {
+    if (!window.PaoloPushService) {
+      this.showToast("PushService no disponible.", "error");
+      return;
+    }
+    this.showToast("Solicitando permiso y registrando este dispositivo…", "info");
+    try {
+      const res = await window.PaoloPushService.subscribe({ forcePermission: true });
+      const opt = document.getElementById("cfgWebPushOptIn");
+      if (opt) opt.checked = !!res.ok;
+      if (res.ok) {
+        this.showToast("Dispositivo suscrito a Web Push.", "success");
+        this.autoSaveCurrentSettings();
+      } else {
+        const map = {
+          denied: "Permiso denegado en el navegador.",
+          vapid_missing: "Falta VAPID_PUBLIC_KEY en Cloudflare.",
+          no_session: "Inicie sesión online (syncToken) primero.",
+          unsupported: "Navegador sin soporte Push.",
+          permission_needed: "Se requiere permiso de notificaciones."
+        };
+        this.showToast(map[res.reason] || ("No se pudo suscribir (" + (res.reason || "?") + ")."), "error");
+      }
+    } catch (err) {
+      this.showToast((err && err.message) || "Error al suscribir Web Push", "error");
+    }
+    this.refreshWebPushStatus();
+  }
+
+  async disableWebPushOnDevice() {
+    if (!window.PaoloPushService) return;
+    try {
+      await window.PaoloPushService.unsubscribe();
+      const opt = document.getElementById("cfgWebPushOptIn");
+      if (opt) opt.checked = false;
+      this.autoSaveCurrentSettings();
+      this.showToast("Web Push desactivado en este dispositivo.", "info");
+    } catch (err) {
+      this.showToast((err && err.message) || "Error al desactivar", "error");
+    }
+    this.refreshWebPushStatus();
+  }
+
   savePushNotificationSettings() {
     try {
-      const current = window.db.getSettings();
-      const topic = getSafeVal("cfgPushTopic", "aldea_aldea_challhuahuacho").replace(/\s+/g, "_").toLowerCase();
-      const autoSend = document.getElementById("cfgPushAutoSend") ? document.getElementById("cfgPushAutoSend").checked : false;
-      const anonymize = document.getElementById("cfgPushAnonymize") ? document.getElementById("cfgPushAnonymize").checked : true;
-      const tgToken = getSafeVal("cfgTelegramToken", "");
-      const tgChat = getSafeVal("cfgTelegramChatId", "");
-
-      const newSettings = {
-        ...current,
-        pushTopic: topic,
-        pushAutoSend: autoSend,
-        pushAnonymize: anonymize,
-        telegramToken: tgToken,
-        telegramChatId: tgChat
-      };
-
-      window.db.saveSettings(newSettings);
+      this.autoSaveCurrentSettings();
       this.applySettingsToUI();
-    if (typeof this.renderDynamicSidebarModules === 'function') this.renderDynamicSidebarModules();
-      this.showToast("Canal y parámetros de notificaciones móviles guardados con éxito", "success");
+      if (typeof this.renderDynamicSidebarModules === "function") this.renderDynamicSidebarModules();
+      this.showToast("Ajustes de Web Push guardados", "success");
     } catch (err) {
       console.error("Error al guardar ajustes push:", err);
       alert("Error al guardar ajustes de notificaciones: " + err.message);
     }
   }
 
-  generateNewPushTopic() {
-    const rand = Math.random().toString(36).substring(2, 8);
-    const newTopic = `aldea_aldea_${rand}`;
-    const inTopic = document.getElementById("cfgPushTopic");
-    if (inTopic) inTopic.value = newTopic;
-    const disp = document.getElementById("displayPushTopic");
-    if (disp) disp.textContent = newTopic;
-  }
-
   async testPushNotification() {
-    this.showToast("Enviando alerta de prueba a su celular y PC...", "info");
+    this.showToast("Enviando prueba Web Push…", "info");
     const res = await window.alerts.testPushNotification();
     if (res.success) {
-      this.showToast(`¡Alerta enviada con éxito al canal «${res.topic}»! Verifique su celular.`, "success");
+      this.showToast("Prueba enviada. Revise la notificación del sistema.", "success");
     } else {
-      this.showToast(`¡Alerta despachada. Asegúrese de tener la app ntfy suscrita al canal «${res.topic}».`, "info");
+      this.showToast(
+        "No se completó la prueba. Suscriba el dispositivo e inicie sesión cloud (VAPID configurado).",
+        "info"
+      );
     }
+    this.refreshWebPushStatus();
   }
 
   openPhoneNotificationUrl() {
-    const topic = window.alerts ? window.alerts.getPushTopic() : "aldea_aldea_challhuahuacho";
-    window.open(`https://ntfy.sh/${encodeURIComponent(topic)}`, "_blank");
+    this.showToast("Web Push usa el navegador/PWA; ya no se usa un canal público.", "info");
   }
 
   showWindowsNotifierInstructions() {
@@ -6101,6 +6339,127 @@ ${callToAction}
     this.editingId = null;
   }
 
+  /**
+   * Confirmación institucional (reemplaza window.confirm nativo).
+   * options: { title, message, detail, confirmLabel, cancelLabel, danger }
+   */
+  ensureAppConfirmModal() {
+    let modal = document.getElementById("modalAppConfirm");
+    if (modal && document.getElementById("btnAppConfirmOk") && document.getElementById("btnAppConfirmCancel")) {
+      return modal;
+    }
+    if (modal) modal.remove();
+    modal = document.createElement("div");
+    modal.id = "modalAppConfirm";
+    modal.className = "modal-container hidden fixed inset-0 z-[10060] items-center justify-center p-4";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.style.background = "rgba(15, 23, 42, 0.72)";
+    modal.style.backdropFilter = "blur(6px)";
+    modal.innerHTML = `
+      <div class="w-full max-w-md rounded-2xl border border-amber-500/50 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
+        <div class="px-4 py-3.5 border-b border-slate-800 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/50 flex items-start gap-3">
+          <span id="modalAppConfirmIcon" class="w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0"><i class="fa-solid fa-user-xmark"></i></span>
+          <div class="min-w-0 flex-1 pt-0.5">
+            <h3 id="modalAppConfirmTitle" class="text-sm font-extrabold tracking-wide text-white">Confirmar acción</h3>
+            <p id="modalAppConfirmSubtitle" class="text-[10px] text-amber-300/90 font-semibold mt-0.5">Paolo Aldea &amp; Abogados · Control seguro</p>
+          </div>
+          <button type="button" id="btnAppConfirmClose" class="text-slate-400 hover:text-white p-1.5 rounded-lg transition" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="px-4 py-4 space-y-3">
+          <p id="modalAppConfirmMessage" class="text-xs leading-relaxed text-slate-300"></p>
+          <div id="modalAppConfirmDetail" class="hidden rounded-xl border border-amber-500/40 bg-slate-900 px-3 py-2.5">
+            <p class="text-[10px] uppercase tracking-wider text-amber-400/90 font-bold mb-0.5">Registro</p>
+            <p id="modalAppConfirmDetailText" class="text-xs font-semibold text-slate-100 break-words"></p>
+          </div>
+        </div>
+        <div class="px-4 py-3 border-t border-slate-800 bg-slate-950 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <button type="button" id="btnAppConfirmCancel" class="min-h-[44px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">Cancelar</button>
+          <button type="button" id="btnAppConfirmOk" class="min-h-[44px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition">Sí, eliminar</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  confirmAction(options = {}) {
+    const opts = typeof options === "string" ? { message: options } : (options || {});
+    return new Promise((resolve) => {
+      const modal = this.ensureAppConfirmModal();
+      const titleEl = document.getElementById("modalAppConfirmTitle");
+      const msgEl = document.getElementById("modalAppConfirmMessage");
+      const detailBox = document.getElementById("modalAppConfirmDetail");
+      const detailText = document.getElementById("modalAppConfirmDetailText");
+      const iconWrap = document.getElementById("modalAppConfirmIcon");
+      const okBtn = document.getElementById("btnAppConfirmOk");
+      const cancelBtn = document.getElementById("btnAppConfirmCancel");
+      const closeBtn = document.getElementById("btnAppConfirmClose");
+
+      if (!modal || !okBtn || !cancelBtn) {
+        resolve(false);
+        return;
+      }
+
+      if (titleEl) titleEl.textContent = opts.title || "Confirmar acción";
+      if (msgEl) msgEl.textContent = opts.message || "¿Desea continuar?";
+      if (detailBox && detailText) {
+        if (opts.detail) {
+          detailText.textContent = opts.detail;
+          detailBox.classList.remove("hidden");
+        } else {
+          detailBox.classList.add("hidden");
+          detailText.textContent = "";
+        }
+      }
+      okBtn.textContent = opts.confirmLabel || "Confirmar";
+      cancelBtn.textContent = opts.cancelLabel || "Cancelar";
+      const danger = opts.danger !== false;
+      if (iconWrap) {
+        iconWrap.className = danger
+          ? "w-10 h-10 rounded-xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0"
+          : "w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0";
+        iconWrap.innerHTML = danger
+          ? '<i class="fa-solid fa-user-xmark"></i>'
+          : '<i class="fa-solid fa-triangle-exclamation"></i>';
+      }
+      okBtn.className = danger
+        ? "min-h-[44px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition"
+        : "min-h-[44px] px-4 py-2 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 shadow-md transition";
+
+      const finish = (value) => {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+        modal.style.display = "none";
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        if (closeBtn) closeBtn.onclick = null;
+        modal.onclick = null;
+        document.removeEventListener("keydown", onKey);
+        resolve(!!value);
+      };
+
+      const onKey = (ev) => {
+        if (ev.key === "Escape") finish(false);
+      };
+
+      okBtn.onclick = () => finish(true);
+      cancelBtn.onclick = () => finish(false);
+      if (closeBtn) closeBtn.onclick = () => finish(false);
+      modal.onclick = (ev) => {
+        if (ev.target === modal) finish(false);
+      };
+      document.addEventListener("keydown", onKey);
+
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      modal.style.display = "flex";
+      modal.style.zIndex = "10060";
+      try {
+        okBtn.focus();
+      } catch (_) {}
+    });
+  }
+
   showToast(message, type = "success", durationMs = null) {
     if (typeof message === "string") {
       message = message
@@ -6761,6 +7120,12 @@ ${callToAction}
 
       this.switchTab("asistencia");
       if (window.AttendanceModule) {
+        // Siempre abrir en Kiosco Colaborador (Supervisión solo bajo demanda).
+        if (typeof window.AttendanceModule.enterKioskColaborador === "function") {
+          window.AttendanceModule.enterKioskColaborador();
+        } else if (typeof window.AttendanceModule.setRoleView === "function") {
+          window.AttendanceModule.setRoleView("colaborador");
+        }
         if (userObj.dni && typeof window.AttendanceModule.selectWorker === "function") {
           window.AttendanceModule.selectWorker(userObj.dni);
         }
@@ -6770,9 +7135,9 @@ ${callToAction}
         if (typeof window.AttendanceModule.updateAnchorOfficeVisibility === "function") {
           window.AttendanceModule.updateAnchorOfficeVisibility();
         }
-        // Super Admin / Socio / Admin: supervisión lista al entrar (sin sync manual).
+        // Roles privilegiados: dejan supervisión lista, sin abrir el panel admin.
         if (typeof window.AttendanceModule.ensurePrivilegedSupervision === "function") {
-          window.AttendanceModule.ensurePrivilegedSupervision(true);
+          window.AttendanceModule.ensurePrivilegedSupervision(false);
         }
       }
       if (window.alerts) window.alerts.evaluateAlerts();
@@ -6780,8 +7145,8 @@ ${callToAction}
       // Refresco post-login. La sync nube la dispara handleLogin en background
       // (evita doble pull/push que retrasaba el arranque del panel).
       this.refreshCurrentModuleView();
-      if (window.AttendanceModule && typeof window.AttendanceModule.ensurePrivilegedSupervision === "function") {
-        window.AttendanceModule.ensurePrivilegedSupervision(true);
+      if (window.AttendanceModule && typeof window.AttendanceModule.enterKioskColaborador === "function") {
+        window.AttendanceModule.enterKioskColaborador();
       }
     } finally {
       // Ventana breve: evita que un F5 en otra pestaña tumbe el login recién hecho.
@@ -7984,9 +8349,15 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
       return;
     }
 
-    if (!confirm(`¿Está seguro de eliminar del padrón a: ${worker.nombre} (${worker.cargo})? Esta acción es irreversible.`)) {
-      return;
-    }
+    const confirmed = await this.confirmAction({
+      title: "Eliminar del padrón",
+      message: "Esta acción es irreversible. El colaborador dejará de aparecer en la nómina tras sincronizar.",
+      detail: `${worker.nombre || "Colaborador"}${worker.cargo ? " · " + worker.cargo : ""}`,
+      confirmLabel: "Sí, eliminar",
+      cancelLabel: "Cancelar",
+      danger: true
+    });
+    if (!confirmed) return;
 
     // Baja en nube primero para que el sync periódico no lo resuscite
     if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && typeof window.PaoloAuthService.upsertStaffCloud === "function") {
@@ -8451,6 +8822,24 @@ _________________________________                _______________________________
     return false;
   }
   async exportModule(module) {
+    // KPIs → reporte maestro completo (todas las pestañas)
+    if (module === "kpis") {
+      const canMaster = !window.db || ["kpis", "caja_chica", "casos", "presupuestos"].some((m) => window.db.canDo(null, "export", m));
+      if (!canMaster) {
+        this.showToast("Acceso denegado: su rol no puede exportar el reporte maestro.", "error");
+        return;
+      }
+      if (window.excelExporter && typeof window.excelExporter.exportMasterWorkbook === "function") {
+        this.showExportLoading("Generando Libro Excel Maestro...", "Consolidando caja, casos, citas, presupuestos, inventario, documentos, asistencia y personal.");
+        try {
+          await new Promise(r => setTimeout(r, 80));
+          return await window.excelExporter.exportMasterWorkbook();
+        } finally {
+          this.hideExportLoading();
+        }
+      }
+      return;
+    }
     if (!this._canExport(module)) return;
     if (window.excelExporter && typeof window.excelExporter.exportModule === "function") {
       this.showExportLoading("Generando Libro Excel de Alta Definición...", `Procesando registros de ${module} con formato contable oficial.`);
@@ -8464,7 +8853,7 @@ _________________________________                _______________________________
   }
 
   async exportPdf(module) {
-    if (!this._canExport(module)) return;
+    if (!this._canExport(module === "kpis" ? "casos" : module)) return;
     if (window.pdfExporter && typeof window.pdfExporter.exportModulePdf === "function") {
       this.showExportLoading("Renderizando Informe Oficial en PDF...", `Generando vista vectorial y foliado institucional de ${module}.`);
       try {
@@ -8895,6 +9284,7 @@ _________________________________                _______________________________
       globalSel.innerHTML = buildOptions(true);
       if ([...globalSel.options].some((o) => o.value === prev)) globalSel.value = prev;
       else if ([...globalSel.options].some((o) => o.value === active)) globalSel.value = active;
+      if (typeof this.syncSedePickerUI === "function") this.syncSedePickerUI(globalSel.value || active);
     }
 
     const modalIds = ["casoSede", "cajaSede", "citaSede", "presSede", "invSede", "docSede", "personalSede", "permModalWorkerSede"];
@@ -10498,15 +10888,38 @@ _________________________________                _______________________________
   }
 }
 
+function openAlertsFromDeepLink() {
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const open = params.get("open");
+    if (open === "alerts" && window.alerts && typeof window.alerts.openDrawer === "function") {
+      window.alerts.openDrawer();
+      params.delete("open");
+      const next = params.toString();
+      const url = window.location.pathname + (next ? "?" + next : "") + (window.location.hash || "");
+      window.history.replaceState({}, "", url);
+    }
+  } catch (_) {}
+}
+
 async function bootLegalApp() {
   if (!window.app && typeof LegalApp === "function") {
     try {
       window.app = new LegalApp();
       await window.app.init();
+      openAlertsFromDeepLink();
     } catch (e) {
       console.error("Error al inicializar LegalApp:", e);
     }
   }
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "PA_OPEN_ALERTS" && window.alerts && typeof window.alerts.openDrawer === "function") {
+      window.alerts.openDrawer();
+    }
+  });
 }
 
 if (document.readyState === 'loading') {

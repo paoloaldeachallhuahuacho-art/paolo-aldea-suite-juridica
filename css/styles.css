@@ -46,6 +46,31 @@ html.dark {
   z-index: 10050;
 }
 
+#webPushPermissionBanner {
+  z-index: 10040;
+  transition: opacity 200ms ease, transform 200ms ease;
+}
+
+html:not(.dark) #webPushPermissionBanner {
+  background-color: #FFFFFF !important;
+  color: #0F172A !important;
+  border-color: #E2E8F0 !important;
+  box-shadow: 0 8px 24px rgba(15, 23, 42, 0.12);
+}
+
+html:not(.dark) #webPushPermissionTitle {
+  color: #B45309 !important;
+}
+
+html:not(.dark) #webPushPermissionText {
+  color: #475569 !important;
+}
+
+html:not(.dark) #btnDismissWebPushPermission {
+  border-color: #E2E8F0 !important;
+  color: #475569 !important;
+}
+
 body {
   font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   background-color: var(--bg-app);
@@ -469,6 +494,7 @@ html.dark .bg-white,
 html.dark .kpi-card,
 html.dark .kanban-card,
 html.dark .modal-container > div,
+html.dark #alertsDrawer,
 html.dark #drawerAlerts > div {
   background-color: #1E293B !important;
   border-color: #334155 !important;
@@ -600,12 +626,167 @@ html.dark .slicer-btn.active {
 }
 
 html.dark #globalSedeSelectorContainer {
+  background-color: transparent !important;
+  border-color: transparent !important;
+}
+
+html.dark .sede-picker-trigger {
   background-color: #141518 !important;
   border-color: #334155 !important;
 }
 
+html.dark .sede-picker-trigger:hover {
+  background-color: #1a1520 !important;
+  border-color: #D97706 !important;
+}
+
+html.dark #globalSedeSelectLabel {
+  color: #F8FAFC !important;
+}
+
 html.dark #globalSedeSelect {
   color: #F8FAFC !important;
+}
+
+/* Selector de sede institucional (bottom sheet / modal) */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.sede-picker-trigger:focus-visible {
+  outline: 2px solid #D97706;
+  outline-offset: 2px;
+}
+
+#modalSedePicker.flex .sede-picker-sheet {
+  animation: sedeSheetIn 0.28s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes sedeSheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(28px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.sede-picker-option {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.85rem 0.9rem;
+  border-radius: 1rem;
+  border: 1px solid #1e293b;
+  background: linear-gradient(180deg, #0f172a 0%, #0b1220 100%);
+  color: #f8fafc;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease, transform 0.12s ease;
+  min-height: 64px;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.sede-picker-option:hover,
+.sede-picker-option:focus-visible {
+  border-color: rgba(217, 119, 6, 0.55);
+  background: linear-gradient(180deg, #152036 0%, #101a2e 100%);
+  outline: none;
+}
+
+.sede-picker-option:active {
+  transform: scale(0.985);
+}
+
+.sede-picker-option.is-selected {
+  border-color: rgba(217, 119, 6, 0.75);
+  background: linear-gradient(135deg, rgba(217, 119, 6, 0.18) 0%, #0f172a 55%, #0b1220 100%);
+  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.25);
+}
+
+.sede-picker-option-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.85rem;
+  border: 1px solid;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.95rem;
+}
+
+.sede-picker-option-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.sede-picker-option-title {
+  font-size: 0.8125rem;
+  font-weight: 800;
+  letter-spacing: 0.01em;
+  color: #f8fafc;
+  line-height: 1.25;
+}
+
+.sede-picker-option-sub {
+  font-size: 0.6875rem;
+  color: #94a3b8;
+  line-height: 1.3;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sede-picker-option-code {
+  font-size: 0.625rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  color: #fbbf24;
+  background: rgba(217, 119, 6, 0.12);
+  border: 1px solid rgba(217, 119, 6, 0.35);
+  border-radius: 0.4rem;
+  padding: 0.2rem 0.4rem;
+  flex-shrink: 0;
+}
+
+.sede-picker-option-radio {
+  flex-shrink: 0;
+  color: #475569;
+  font-size: 1.05rem;
+}
+
+.sede-picker-option.is-selected .sede-picker-option-radio {
+  color: #f59e0b;
+}
+
+@media (min-width: 640px) {
+  #modalSedePicker.flex .sede-picker-sheet {
+    animation-name: sedeSheetInDesktop;
+  }
+  @keyframes sedeSheetInDesktop {
+    from {
+      opacity: 0;
+      transform: translateY(12px) scale(0.97);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
 }
 
 html.dark #mobileBottomNav {
@@ -778,6 +959,59 @@ button, select, input, a {
   border-top: 1px solid #e2e8f0;
   z-index: 45;
   box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.05);
+}
+
+/* Panel de alertas: por encima de la barra móvil; pie siempre visible */
+#alertsDrawerBackdrop {
+  z-index: 55;
+}
+
+#alertsDrawer {
+  z-index: 60;
+  top: 0;
+  right: 0;
+  height: 100%;
+  height: 100dvh;
+  max-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overscroll-behavior: contain;
+}
+
+#alertsListContainer {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+#alertsDrawerFooter {
+  flex-shrink: 0;
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+}
+
+body.alerts-drawer-open {
+  overflow: hidden;
+}
+
+@media (max-width: 768px) {
+  body.alerts-drawer-open #mobileBottomNav {
+    opacity: 0;
+    pointer-events: none;
+    transform: translateY(110%);
+    transition: opacity 200ms ease, transform 200ms ease;
+  }
+
+  body.alerts-drawer-open #mainAppSidebar {
+    pointer-events: none;
+  }
+
+  .modal-container {
+    z-index: 70;
+    padding-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  }
+
+  .modal-container > div {
+    max-height: min(92dvh, calc(100dvh - 1.5rem)) !important;
+  }
 }
 
 .mobile-nav-btn {

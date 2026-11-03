@@ -12,9 +12,17 @@ RETURNS text
 LANGUAGE sql
 STABLE
 AS $$
+  -- No usar el claim PostgREST "role" (authenticated/anon) como rol de app.
   SELECT COALESCE(
-    NULLIF(current_setting('request.jwt.claims', true)::jsonb ->> 'role', ''),
     NULLIF(current_setting('request.jwt.claims', true)::jsonb -> 'app_metadata' ->> 'role', ''),
+    NULLIF(current_setting('request.jwt.claims', true)::jsonb -> 'user_metadata' ->> 'role', ''),
+    NULLIF(current_setting('request.jwt.claims', true)::jsonb ->> 'user_role', ''),
+    CASE
+      WHEN NULLIF(current_setting('request.jwt.claims', true)::jsonb ->> 'role', '')
+           IN ('super_admin', 'socio', 'admin', 'abogado', 'asistente_legal', 'asistente_admin', 'service_role')
+      THEN current_setting('request.jwt.claims', true)::jsonb ->> 'role'
+      ELSE NULL
+    END,
     'authenticated'
   );
 $$;
@@ -523,7 +531,16 @@ CREATE POLICY profiles_select ON public.user_profiles FOR SELECT TO authenticate
 DROP POLICY IF EXISTS profiles_update_self ON public.user_profiles;
 CREATE POLICY profiles_update_self ON public.user_profiles FOR UPDATE TO authenticated
   USING (public.is_super_admin() OR auth_uid = auth.uid())
-  WITH CHECK (public.is_super_admin() OR auth_uid = auth.uid());
+  WITH CHECK (
+    public.is_super_admin()
+    OR (
+      auth_uid = auth.uid()
+      AND role = (SELECT p.role FROM public.user_profiles p WHERE p.id = user_profiles.id)
+      AND branch_id IS NOT DISTINCT FROM (SELECT p.branch_id FROM public.user_profiles p WHERE p.id = user_profiles.id)
+      AND activo IS NOT DISTINCT FROM (SELECT p.activo FROM public.user_profiles p WHERE p.id = user_profiles.id)
+      AND auth_uid IS NOT DISTINCT FROM (SELECT p.auth_uid FROM public.user_profiles p WHERE p.id = user_profiles.id)
+    )
+  );
 
 -- user_roles read
 DROP POLICY IF EXISTS roles_select ON public.user_roles;
@@ -573,8 +590,11 @@ DROP POLICY IF EXISTS audit_insert ON public.audit_logs;
 CREATE POLICY audit_insert ON public.audit_logs FOR INSERT TO authenticated
   WITH CHECK (auth.uid() IS NOT NULL);
 
--- Confidential notes: only super_admin|admin|abogado via view
-CREATE OR REPLACE VIEW public.cases_safe AS
+-- Confidential notes: only super_admin|admin|abogado via view (security_invoker = RLS del llamador)
+DROP VIEW IF EXISTS public.cases_safe;
+CREATE VIEW public.cases_safe
+WITH (security_invoker = true)
+AS
 SELECT
   c.id, c.branch_id, c.expediente, c.caratula, c.materia, c.cliente, c.juzgado,
   c.estado, c.etapa, c.vencimiento, c.abogado_asignado, c.assigned_auth_uid,

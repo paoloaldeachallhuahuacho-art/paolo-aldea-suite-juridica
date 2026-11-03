@@ -105,7 +105,7 @@ const { assertBranchAccess, haversineMeters, BRANCH_GEO } = require(path.join(
   assert.ok(!installBlock.includes("skipWaiting("));
   assert.ok(sw.includes("SKIP_WAITING"));
   const version = JSON.parse(fs.readFileSync(path.join(root, "version.json"), "utf8"));
-  assert.strictEqual(version.version, "2026.11.06");
+  assert.strictEqual(version.version, "2026.11.15");
 
   console.log("enterprise-sync-rls.test.js OK");
 })();

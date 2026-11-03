@@ -13,7 +13,10 @@ const handlers = {
   "sync-push": require("./functions/sync-push.js"),
   "attendance-validate": require("./functions/attendance-validate.js"),
   "petty-cash-transition": require("./functions/petty-cash-transition.js"),
-  "telegram-proxy": require("./functions/telegram-proxy.js")
+  "telegram-proxy": require("./functions/telegram-proxy.js"),
+  "push-subscribe": require("./functions/push-subscribe.js"),
+  "push-unsubscribe": require("./functions/push-unsubscribe.js"),
+  "push-send": require("./functions/push-send.js")
 };
 
 const SECURITY_HEADERS = {
@@ -23,9 +26,9 @@ const SECURITY_HEADERS = {
   "Cross-Origin-Opener-Policy": "same-origin",
   "Cross-Origin-Resource-Policy": "same-origin",
   "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
-  "Permissions-Policy": "geolocation=(self), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()",
+  "Permissions-Policy": "geolocation=(self), notifications=(self), camera=(), microphone=(), payment=(), usb=(), interest-cohort=()",
   "Content-Security-Policy":
-    "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.telegram.org; worker-src 'self' blob:; manifest-src 'self'"
+    "default-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self' https://cdn.jsdelivr.net https://www.gstatic.com; script-src-attr 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.googleapis.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://firestore.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://api.telegram.org https://fcm.googleapis.com https://fcmregistrations.googleapis.com https://updates.push.services.mozilla.com https://*.push.services.mozilla.com https://web.push.apple.com; worker-src 'self' blob:; manifest-src 'self'"
 };
 
 function applyEnv(env) {

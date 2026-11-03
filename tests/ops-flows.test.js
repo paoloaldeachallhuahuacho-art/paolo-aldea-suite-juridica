@@ -102,6 +102,19 @@ const partidas = [
 const filtradas = presupuesto.filterPresupuestos(partidas, "cotabambas", "challhuahuacho", "OPEX", "Aprobado");
 assert.strictEqual(filtradas.length, 1);
 
+global.PaoloBudgetAnalytics = {
+  localAggregate: () => ({
+    presupuestado_centavos: 500000,
+    ejecutado_centavos: 250000,
+    utilization_bps: 5000,
+    projected_month_centavos: 500000,
+    remaining_centavos: 250000
+  })
+};
+const runRate = presupuesto.getRunRateSnapshot("challhuahuacho", 2026, 11);
+assert.strictEqual(runRate.utilization_bps, 5000);
+assert.strictEqual(runRate.remaining_centavos, 250000);
+
 const N = 20000;
 const t0 = process.hrtime.bigint();
 for (let i = 0; i < N; i++) {

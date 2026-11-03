@@ -355,30 +355,47 @@
           </form>
         </div>
 
-        <!-- Notificaciones Móviles Push (ntfy) -->
+        <!-- Web Push (VAPID) — segundo plano, sin canal público -->
         <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
           <div class="flex items-center justify-between border-b border-slate-100 pb-2">
             <h4 class="font-extrabold text-sm text-slate-900 flex items-center gap-2">
-              <i class="fa-solid fa-mobile-screen-button text-amber-600"></i> Notificaciones Móviles Push (ntfy.sh)
+              <i class="fa-solid fa-bell text-amber-600"></i> Notificaciones Web Push (segundo plano)
             </h4>
-            <span class="text-xs bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full">Multi-Dispositivo</span>
+            <span class="text-xs bg-emerald-100 text-emerald-900 font-bold px-2 py-0.5 rounded-full">VAPID · PWA</span>
           </div>
+          <p class="text-[11px] text-slate-500 leading-relaxed">
+            Opt-in por dispositivo. Las alertas remotas solo envían un aviso genérico y un enlace a la suite (sin datos del expediente).
+          </p>
           <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <label class="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 cursor-pointer">
+              <input type="checkbox" id="cfgWebPushOptIn" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+              <span class="font-bold text-slate-800">Activar avisos push en este despacho</span>
+            </label>
+            <label class="flex items-center gap-2 p-2.5 rounded-lg border border-slate-200 bg-slate-50 cursor-pointer">
+              <input type="checkbox" id="cfgPushAutoSend" class="rounded border-slate-300 text-amber-600 focus:ring-amber-500">
+              <span class="font-bold text-slate-800">Enviar push automático en alertas urgentes</span>
+            </label>
             <div>
-              <label class="block font-bold text-slate-700 mb-1">Canal Privado de Avisos</label>
-              <div class="flex items-center gap-1.5">
-                <input type="text" id="cfgPushTopic" value="aldea_notificaciones_seguras" class="flex-1 p-2 rounded-lg border border-slate-300 font-mono font-bold text-slate-900">
-                <button type="button" onclick="window.app.generateNewPushTopic()" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 px-2.5 py-2 rounded-lg text-xs font-semibold" title="Generar nuevo canal">
-                  <i class="fa-solid fa-dice"></i>
-                </button>
-              </div>
+              <label class="block font-bold text-slate-700 mb-1" for="cfgPushScope">Alcance del aviso remoto</label>
+              <select id="cfgPushScope" class="w-full p-2 rounded-lg border border-slate-300 bg-white font-semibold text-slate-900">
+                <option value="self">Solo mis dispositivos</option>
+                <option value="branch">Mi sede</option>
+                <option value="firm">Toda la firma (admin)</option>
+              </select>
             </div>
-            <div class="flex items-end gap-2">
+            <div class="flex flex-wrap items-end gap-2">
+              <button type="button" onclick="window.app.enableWebPushOnDevice()" class="bg-slate-900 hover:bg-black text-white font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition">
+                <i class="fa-solid fa-mobile-screen-button"></i> Suscribir este dispositivo
+              </button>
               <button type="button" onclick="window.app.testPushNotification()" class="bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-2 rounded-lg text-xs flex items-center gap-1.5 shadow-sm transition">
-                <i class="fa-solid fa-paper-plane"></i> Enviar Prueba al Celular
+                <i class="fa-solid fa-paper-plane"></i> Enviar prueba
+              </button>
+              <button type="button" onclick="window.app.disableWebPushOnDevice()" class="bg-slate-100 hover:bg-slate-200 border border-slate-300 text-slate-700 font-bold px-3 py-2 rounded-lg text-xs transition">
+                Desactivar
               </button>
             </div>
           </div>
+          <p id="webPushStatusLabel" class="text-[11px] font-semibold text-slate-600">Estado: comprobando…</p>
         </div>
       </div>
 

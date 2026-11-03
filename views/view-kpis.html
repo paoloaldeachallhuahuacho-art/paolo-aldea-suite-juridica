@@ -12,10 +12,10 @@
           </div>
 
           <div class="flex flex-wrap items-center gap-2 w-full sm:w-auto shrink-0">
-            <button onclick="window.excelExporter.exportMasterWorkbook()" class="flex-1 sm:flex-initial justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
+            <button onclick="window.app.exportModule('kpis')" class="flex-1 sm:flex-initial justify-center bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
               <i class="fa-solid fa-file-excel"></i> Exportar Reporte Maestro a Excel
             </button>
-            <button onclick="window.pdfExporter.exportModulePdf('kpis')" class="flex-1 sm:flex-initial justify-center bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
+            <button onclick="window.app.exportPdf('kpis')" class="flex-1 sm:flex-initial justify-center bg-amber-600 hover:bg-amber-700 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer">
               <i class="fa-solid fa-file-pdf"></i> Exportar Informe KPIs PDF
             </button>
             <button onclick="window.app && window.app.copiarUrlPowerBI ? window.app.copiarUrlPowerBI() : null" class="flex-1 sm:flex-initial justify-center bg-amber-500 hover:bg-amber-600 text-slate-950 font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm cursor-pointer" title="Copiar enlace directo de datos para Microsoft Power BI"><i class="fa-solid fa-chart-pie"></i> Conector Power BI</button>
