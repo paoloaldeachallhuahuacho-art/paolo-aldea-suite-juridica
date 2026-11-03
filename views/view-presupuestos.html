@@ -12,10 +12,10 @@
           </div>
 
           <div class="flex items-center gap-2">
-            <button onclick="window.pdfExporter.exportModulePdf('presupuestos')" class="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Exportar presupuesto en PDF con membrete oficial">
+            <button onclick="window.app.exportPdf('presupuestos')" class="bg-rose-700 hover:bg-rose-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Exportar presupuesto en PDF con membrete oficial">
               <i class="fa-solid fa-file-pdf"></i> Exportar PDF
             </button>
-            <button onclick="window.excelExporter.exportModule('presupuestos')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Exportar presupuesto en Excel con formato contable">
+            <button onclick="window.app.exportModule('presupuestos')" class="bg-emerald-700 hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-lg text-xs flex items-center gap-1.5 transition shadow-sm" title="Exportar presupuesto en Excel con formato contable">
               <i class="fa-solid fa-file-excel"></i> Exportar Excel
             </button>
           </div>

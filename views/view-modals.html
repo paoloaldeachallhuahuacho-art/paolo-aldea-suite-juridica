@@ -327,14 +327,15 @@
         <!-- Despacho específico para Sede Miraflores (Lima) -->
         <div id="containerPersonalDespacho" class="hidden p-3 bg-amber-500/10 border border-amber-400/40 rounded-xl animate-in fade-in duration-200">
           <label class="block font-bold text-amber-900 text-[11px] mb-1 flex items-center gap-1.5">
-            <i class="fa-solid fa-door-open text-amber-600"></i> Despachos (Exclusivo Sede Miraflores) *
+            <i class="fa-solid fa-door-open text-amber-600"></i> Despacho (Exclusivo Sede Miraflores) *
           </label>
           <select id="personalDespacho" class="w-full px-3 py-2 bg-white border border-amber-300 rounded-lg text-xs font-bold text-slate-800 focus:outline-none focus:border-amber-500 focus:ring-1 focus:ring-amber-500">
             <option value="Despacho 1">Despacho 1</option>
             <option value="Despacho 2">Despacho 2</option>
             <option value="Despacho 3">Despacho 3</option>
+            <option value="Administrador General">Administrador General</option>
           </select>
-          <p class="text-[10px] text-amber-800/80 mt-1 font-medium">Seleccione el número de despacho asignado dentro de la sede Miraflores (Lima).</p>
+          <p class="text-[10px] text-amber-800/80 mt-1 font-medium">Seleccione Despacho 1, Despacho 2, Despacho 3 o Administrador General.</p>
         </div>
 
         <!-- MÓDULO OFICIAL: GENERACIÓN DE CREDENCIALES DE DESPACHO (USUARIO & CONTRASEÑA) -->
@@ -742,7 +743,7 @@
         <h3 class="font-bold text-sm text-cyan-400 flex items-center gap-2">
           <i class="fa-solid fa-location-crosshairs"></i> Parámetros de Geocerca (Oficina Central)
         </h3>
-        <button onclick="document.getElementById('modal-asistencia-config-geocerca').classList.add('hidden')" class="text-slate-400 hover:text-white p-1">
+        <button type="button" onclick="document.getElementById('modal-asistencia-config-geocerca').classList.add('hidden'); document.getElementById('modal-asistencia-config-geocerca').classList.remove('flex')" class="text-slate-400 hover:text-white p-1">
           <i class="fa-solid fa-xmark"></i>
         </button>
       </div>
@@ -775,20 +776,42 @@
         <div>
           <label class="block font-bold text-slate-300 mb-1">Radio de Tolerancia de Marcaje (Metros):</label>
           <input type="number" id="input-config-oficina-radio" class="w-full p-2 bg-slate-950 border border-slate-700 rounded-xl text-xs text-amber-400 font-mono font-bold">
-          <p class="text-[10px] text-slate-500 mt-1">Estándar institucional: 100 metros mediante fórmula de Haversine.</p>
+          <p class="text-[10px] text-slate-500 mt-1">Estándar institucional: 300 metros mediante fórmula de Haversine.</p>
         </div>
 
-  
-        <button onclick="AttendanceModule.captureCurrentAsCentralOffice()" class="w-full py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-xl font-semibold flex items-center justify-center gap-1.5 transition">
+        <button type="button" onclick="AttendanceModule.captureCurrentAsCentralOffice()" class="w-full min-h-[44px] py-2 bg-slate-800 hover:bg-slate-700 text-cyan-300 border border-slate-700 rounded-xl font-semibold flex items-center justify-center gap-1.5 transition">
           <i class="fa-solid fa-satellite-dish"></i> Capturar GPS Actual del Dispositivo
         </button>
+
+        <button type="button" id="btnAnclarOficinaAqui" onclick="AttendanceModule.anchorOfficeHere()" class="hidden w-full min-h-[44px] px-3 py-2 rounded-xl text-[11px] font-bold bg-amber-950 text-amber-100 border border-amber-500/40 active:scale-[0.98] touch-manipulation transition-colors duration-200" title="Solo Super Admin, Socio o Admin de sede">
+          <i class="fa-solid fa-map-pin mr-1"></i> Anclar oficina aquí
+        </button>
+
+        <div id="asistencia-sede-hero-editor" class="rounded-xl border border-amber-500/35 bg-slate-950 p-3 space-y-2">
+          <div class="flex items-center justify-between gap-2">
+            <p class="text-[11px] font-bold text-amber-200 flex items-center gap-1.5">
+              <i class="fa-solid fa-image"></i> Editar foto de la sede
+            </p>
+            <span id="asistencia-sede-hero-editor-sede" class="text-[10px] font-semibold text-slate-400 truncate">Challhuahuacho</span>
+          </div>
+          <p class="text-[10px] text-slate-400 leading-snug">Reemplace el fondo del nombre de la sede. La foto se guarda para esta sede y la ven todos al marcar asistencia.</p>
+          <div class="flex flex-col sm:flex-row gap-2">
+            <button type="button" onclick="document.getElementById('asistencia-sede-hero-file').click()" class="w-full sm:flex-1 min-h-[40px] px-3 py-2 rounded-xl text-[11px] font-bold bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 inline-flex items-center justify-center gap-1.5">
+              <i class="fa-solid fa-upload"></i> Cambiar foto
+            </button>
+            <input id="asistencia-sede-hero-file" type="file" accept="image/jpeg,image/png,image/webp" class="hidden" onchange="AttendanceModule.onSedeHeroPhotoSelected(event)">
+            <button type="button" onclick="AttendanceModule.resetSedeHeroPhoto()" class="w-full sm:w-auto min-h-[40px] px-3 py-2 rounded-xl text-[11px] font-bold bg-slate-900 text-slate-200 border border-slate-600">
+              Restaurar original
+            </button>
+          </div>
+        </div>
       </div>
 
   
 
       <div class="flex items-center justify-end gap-2 pt-2 border-t border-slate-800">
-        <button onclick="document.getElementById('modal-asistencia-config-geocerca').classList.add('hidden')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">Cancelar</button>
-        <button onclick="AttendanceModule.saveGeofenceConfig()" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-xl shadow">Guardar Cambios</button>
+        <button type="button" onclick="document.getElementById('modal-asistencia-config-geocerca').classList.add('hidden'); document.getElementById('modal-asistencia-config-geocerca').classList.remove('flex')" class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-xl font-semibold">Cancelar</button>
+        <button type="button" onclick="AttendanceModule.saveGeofenceConfig()" class="px-4 py-1.5 bg-amber-600 hover:bg-amber-500 text-slate-950 font-bold rounded-xl shadow">Guardar Cambios</button>
       </div>
 
   
@@ -880,57 +903,41 @@
 <!-- =========================================================================
        DRAWER DESLIZABLE DE ALERTAS JURÍDICAS
        ========================================================================= -->
-  <div id="alertsDrawerBackdrop" onclick="window.alerts.closeDrawer()" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-30 transition-opacity"></div>
+  <div id="alertsDrawerBackdrop" onclick="window.alerts.closeDrawer()" class="hidden fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-[55] transition-opacity"></div>
 
-  
-  <aside id="alertsDrawer" class="fixed top-0 right-0 h-full w-96 max-w-[90vw] bg-white border-l border-slate-200 shadow-2xl z-40 transform translate-x-full transition-transform duration-300 flex flex-col">
-    <div class="p-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <i class="fa-solid fa-bell text-amber-400"></i>
-        <h3 class="font-bold text-sm">Alertas Procesales & Plazos Fatales</h3>
+  <aside id="alertsDrawer" class="fixed top-0 right-0 w-96 max-w-[90vw] bg-white border-l border-slate-200 shadow-2xl z-[60] transform translate-x-full transition-transform duration-300 flex flex-col" aria-label="Panel de alertas">
+    <div class="shrink-0 p-4 border-b border-slate-200 bg-slate-900 text-white flex items-center justify-between">
+      <div class="flex items-center gap-2 min-w-0">
+        <i class="fa-solid fa-bell text-amber-400 shrink-0"></i>
+        <h3 class="font-bold text-sm truncate">Alertas Procesales & Plazos Fatales</h3>
       </div>
-
-  
-
-<button onclick="window.alerts.closeDrawer()" class="text-slate-400 hover:text-white p-1">
+      <button type="button" onclick="window.alerts.closeDrawer()" class="text-slate-400 hover:text-white p-2 min-w-[40px] min-h-[40px] inline-flex items-center justify-center" aria-label="Cerrar alertas">
         <i class="fa-solid fa-xmark text-base"></i>
       </button>
     </div>
 
-  
-
-<div class="p-2 border-b border-slate-100 bg-slate-50 flex items-center gap-1 text-xs">
-      <button onclick="window.alerts.renderDrawerList('all')" class="px-2.5 py-1 rounded font-bold hover:bg-white text-slate-700">Todas</button>
-      <button onclick="window.alerts.renderDrawerList('urgent')" class="px-2.5 py-1 rounded font-bold hover:bg-white text-rose-700">Plazos Fatales</button>
-      <button onclick="window.alerts.renderDrawerList('warning')" class="px-2.5 py-1 rounded font-bold hover:bg-white text-amber-700">Próximas</button>
+    <div class="shrink-0 p-2 border-b border-slate-100 bg-slate-50 flex items-center gap-1 text-xs overflow-x-auto">
+      <button type="button" onclick="window.alerts.renderDrawerList('all')" class="px-2.5 py-1.5 rounded font-bold hover:bg-white text-slate-700 whitespace-nowrap">Todas</button>
+      <button type="button" onclick="window.alerts.renderDrawerList('urgent')" class="px-2.5 py-1.5 rounded font-bold hover:bg-white text-rose-700 whitespace-nowrap">Plazos Fatales</button>
+      <button type="button" onclick="window.alerts.renderDrawerList('warning')" class="px-2.5 py-1.5 rounded font-bold hover:bg-white text-amber-700 whitespace-nowrap">Próximas</button>
     </div>
 
-  
+    <div id="alertsListContainer" class="flex-1 min-h-0 overflow-y-auto overscroll-contain p-4 space-y-2.5"></div>
 
-<div id="alertsListContainer" class="flex-1 overflow-y-auto p-4 space-y-2.5"></div>
-
-  
-
-    <div class="p-3 bg-slate-50 border-t border-slate-200 flex flex-col gap-2">
-      <button onclick="window.alerts.syncAllAlertsToPhone()" class="w-full bg-amber-600 hover:bg-amber-700 text-white font-bold py-2 px-3 rounded-lg text-xs flex items-center justify-center gap-2 transition shadow-sm" title="Enviar resumen de alertas a celular y PC">
+    <div id="alertsDrawerFooter" class="shrink-0 p-3 bg-slate-50 border-t border-slate-200 flex flex-col gap-2">
+      <button type="button" onclick="window.alerts.syncAllAlertsToPhone()" class="w-full min-h-[44px] bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-3 rounded-lg text-xs flex items-center justify-center gap-2 transition shadow-sm" title="Enviar resumen de alertas a celular y PC">
         <i class="fa-solid fa-mobile-screen-button"></i> Enviar Alertas a mi Celular y PC
       </button>
-      <div class="flex items-center justify-between text-[11px] text-slate-500 pt-0.5">
-        <button onclick="window.alerts.playChime('urgent')" class="hover:text-slate-900 inline-flex items-center gap-1 font-semibold">
+      <div class="flex items-center justify-between gap-2 text-[11px] text-slate-500 pt-0.5">
+        <button type="button" onclick="window.alerts.playChime('urgent')" class="hover:text-slate-900 inline-flex items-center gap-1 font-semibold min-h-[40px] px-1">
           <i class="fa-solid fa-volume-low"></i> Probar Tono
         </button>
-        <button onclick="window.app.switchTab('master_admin'); window.app.switchMasterSubTab('ajustes'); window.alerts.closeDrawer();" class="text-blue-700 hover:text-blue-900 hover:underline inline-flex items-center gap-1 font-semibold">
+        <button type="button" onclick="window.app.switchTab('master_admin'); window.app.switchMasterSubTab('ajustes'); window.alerts.closeDrawer();" class="text-blue-700 hover:text-blue-900 hover:underline inline-flex items-center gap-1 font-semibold min-h-[40px] px-1">
           <i class="fa-solid fa-gear"></i> Configurar Móvil
         </button>
       </div>
-
-  
-
-</div>
-
-  
-
-</aside>
+    </div>
+  </aside>
 
   <!-- =========================================================================
        MODAL 1: CAJA CHICA (Con Centro de Costo)
@@ -4398,6 +4405,8 @@
       </div>
     </div>
   </div>
+
+  <!-- modalAppConfirm vive en index.html (siempre disponible) -->
 
   <!-- =========================================================================
        MODAL: INSTALACIÓN EN DISPOSITIVOS MÓVILES (PWA ANDROID / IPHONE)

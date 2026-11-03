@@ -20,10 +20,21 @@ service cloud.firestore {
 
     // 3. Admin global: solo vía perfil worker o custom claims verificados por Admin SDK
     //    (eliminados emails hardcodeados y token.rol sin claims reales — Semana 2 / S18)
+    function workerRole() {
+      return hasWorkerProfile() ? getWorkerProfile().rol : '';
+    }
+
     function isAdmin() {
       return isAuthenticated() && (
         (request.auth.token.rol is string && request.auth.token.rol in ['super_admin', 'admin', 'socio']) ||
-        (hasWorkerProfile() && getWorkerProfile().rol in ['super_admin', 'admin', 'socio'])
+        workerRole() in ['super_admin', 'admin', 'socio']
+      );
+    }
+
+    function isWriterRole() {
+      return isAuthenticated() && (
+        (request.auth.token.rol is string && request.auth.token.rol in ['super_admin', 'admin', 'socio', 'abogado', 'asistente_legal', 'asistente_admin']) ||
+        workerRole() in ['super_admin', 'admin', 'socio', 'abogado', 'asistente_legal', 'asistente_admin']
       );
     }
 
@@ -37,6 +48,10 @@ service cloud.firestore {
           docData.sede == getWorkerProfile().sede
         )
       );
+    }
+
+    function canWriteSedeData(docData) {
+      return isWriterRole() && canAccessSedeData(docData);
     }
 
     function isValidPayload() {
@@ -61,14 +76,14 @@ service cloud.firestore {
 
     match /casos/{casoId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
-      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
-      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+      allow create, update: if isValidPayload() && canWriteSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isWriterRole() && canAccessSedeData(resource.data));
     }
 
     match /caja_chica/{movId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
-      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
-      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+      allow create, update: if isValidPayload() && canWriteSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isWriterRole() && canAccessSedeData(resource.data));
     }
 
     match /attendance/{asistenciaId} {
@@ -93,31 +108,31 @@ service cloud.firestore {
 
     match /citas/{citaId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
-      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
-      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+      allow create, update: if isValidPayload() && canWriteSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isWriterRole() && canAccessSedeData(resource.data));
     }
 
     match /documentos/{docId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
-      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
-      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+      allow create, update: if isValidPayload() && canWriteSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isWriterRole() && canAccessSedeData(resource.data));
     }
 
     match /inventario/{invId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
-      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
-      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+      allow create, update: if isValidPayload() && canWriteSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isWriterRole() && canAccessSedeData(resource.data));
     }
 
     match /presupuestos/{presId} {
       allow read: if isAuthenticated() && canAccessSedeData(resource.data);
-      allow create, update: if isAuthenticated() && isValidPayload() && canAccessSedeData(request.resource.data);
-      allow delete: if isAdmin() || (isAuthenticated() && canAccessSedeData(resource.data));
+      allow create, update: if isValidPayload() && canWriteSedeData(request.resource.data);
+      allow delete: if isAdmin() || (isWriterRole() && canAccessSedeData(resource.data));
     }
 
     match /auditoria/{audId} {
       allow read: if isAdmin();
-      allow create: if isAuthenticated() && isValidPayload();
+      allow create: if hasWorkerProfile() && isValidPayload();
       allow update, delete: if false;
     }
 

@@ -88,6 +88,25 @@ class BudgetController {
   }
 
   /**
+   * Run-rate / proyección del mes (céntimos vía PaoloBudgetAnalytics; sin float).
+   */
+  getRunRateSnapshot(branchId = "todas", anio = null, mes = null) {
+    const now = new Date();
+    const y = Number(anio) || now.getFullYear();
+    const m = Number(mes) || (now.getMonth() + 1);
+    if (window.PaoloBudgetAnalytics && typeof window.PaoloBudgetAnalytics.localAggregate === "function") {
+      return window.PaoloBudgetAnalytics.localAggregate(branchId, y, m);
+    }
+    return {
+      presupuestado_centavos: 0,
+      ejecutado_centavos: 0,
+      utilization_bps: 0,
+      projected_month_centavos: 0,
+      remaining_centavos: 0
+    };
+  }
+
+  /**
    * Filtrado multi-criterio de partidas presupuestales
    */
   filterPresupuestos(items, searchVal = "", sede = "ALL", tipo = "ALL", estado = "ALL") {

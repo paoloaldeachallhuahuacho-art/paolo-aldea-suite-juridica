@@ -20,6 +20,7 @@ yarn-error.log*
 .env
 .env.local
 .env.production
+!.env.example
 
 # Archivos del sistema operativo
 Thumbs.db
@@ -29,3 +30,4 @@ Desktop.ini
 
 central_cloud_data.json
 .env.*
+!.env.example

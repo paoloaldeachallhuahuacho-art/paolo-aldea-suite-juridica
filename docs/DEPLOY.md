@@ -1,63 +1,103 @@
 # Modo de despliegue — PAOLO ALDEA Suite Jurídica
 
-**Decisión Semana 4:** el modo soportado por defecto es **Local unipersonal (hub en sede)**.  
-Nube multi-sede e híbrido quedan documentados como opcionales y no se mezclan en el mismo arranque.
+**Arquitectura dual (Zero-Trust):** Modo A local siempre disponible; Modo B enterprise se activa solo con variables Netlify/Supabase.
 
 ---
 
-## Modo A — Local unipersonal (recomendado)
+## Modo A — Local unipersonal (siempre soportado)
 
 | | |
 |---|---|
-| **Cuándo** | Una PC de despacho (Challhuahuacho u otra sede), sin depender de internet |
-| **Arranque** | `abrir_app.bat` → `servidor_local.ps1` → navegador en `http://localhost:<puerto>/` |
-| **Datos** | IndexedDB primario (`PaoloAldeaJuridicoDB_v2`); localStorage solo espejo/stub |
-| **Auth** | Bootstrap de primer arranque + PBKDF2; sesión con `AUTH_SIG`; APIs con cookie/Bearer de pairing |
-| **Sync** | Opcional entre PCs de la misma LAN vía `/api/cloud_sync` + snapshot `/api/cloud_snapshot` |
-| **Prohibido** | Tokens Telegram en el cliente; Anonymous Firebase; hashes default en repo |
+| **Cuándo** | Una PC de despacho, sin depender de internet |
+| **Arranque** | `abrir_app.bat` → `servidor_local.ps1` → `http://localhost:<puerto>/` |
+| **Datos** | IndexedDB primario; localStorage espejo/stub |
+| **Auth** | Bootstrap + PBKDF2; sesión `AUTH_SIG`; APIs cookie/Bearer pairing |
+| **Flag** | `window.__ENTERPRISE_CLOUD__ === false` |
 
-### Checklist operativo
-1. No commitear `.server_token`, `.server_pairing`, `.env`, ni `central_cloud_data.json` con datos reales.
-2. Primer usuario: pantalla de bootstrap (crea `super_admin`).
-3. Backups: `_backups/` vía `/api/backup` o export JSON desde la UI.
-4. Librerías pesadas (Chart/Excel/PDF) se cargan solo al usarse.
+### Checklist
+1. No commitear `.server_token`, `.server_pairing`, `.env`, ni datos reales en `central_cloud_data.json`.
+2. Primer usuario vía bootstrap.
+3. Backups `_backups/` o export JSON.
 
 ---
 
-## Modo B — Multi-sede nube (opcional)
+## Modo B — Multi-sede nube Zero-Trust (enterprise)
 
 | | |
 |---|---|
-| **Cuándo** | Varias sedes necesitan consolidar expedientes/caja |
-| **Requisitos** | Firebase Auth **real** (sin Anonymous); `firestore.rules` por rol/sede; Telegram solo vía Netlify proxy con secretos en env |
-| **No usar** | Servidor PowerShell público a internet; secretos en `settings` sincronizados |
+| **Cuándo** | 5 sedes sincronizadas con RLS y Realtime |
+| **Activación** | Netlify env `SUPABASE_URL` + `SUPABASE_ANON_KEY` + `ALLOWED_ORIGIN` (exacto) |
+| **Auth** | Supabase Auth JWT con `app_metadata.role` + `app_metadata.branch_id` |
+| **Datos** | PostgreSQL + outbox IndexedDB + LWW `server_ts` |
+| **Edge** | `attendance-validate`, `petty-cash-transition`, `public-config`, `telegram-proxy` |
+| **Schema** | [`20261102`](../supabase/migrations/20261102_enterprise_zero_trust.sql) + [`20261102b`](../supabase/migrations/20261102b_firm_auth_registry.sql) + [`20261102d_app_records_sync.sql`](../supabase/migrations/20261102d_app_records_sync.sql) + **[`20261114_security_hardening.sql`](../supabase/migrations/20261114_security_hardening.sql)** (obligatorio) |
+| **Auditoría** | [`docs/AUDIT_CHECKLIST_MULTI_SEDE.md`](AUDIT_CHECKLIST_MULTI_SEDE.md) |
 
-Activar solo cuando Modo A esté estable y haya responsable de cloud (App Check, rotación de claves).
+### Auth multi-dispositivo (Super Admin compartido)
+1. En Supabase SQL Editor ejecute **también** `20261102b_firm_auth_registry.sql`.
+2. Netlify Functions: `auth-firm-status`, `auth-bootstrap`, `auth-login`, `auth-staff-upsert`.
+3. Al crear el Super Admin en un PC/celular, se publica en `staff_directory`.
+4. Otro dispositivo vacío ya **no** pide “crear admin”: muestra login y valida contra la nube.
+5. Variables en Netlify (valores solo en el panel, no en el repo): `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `SUPABASE_SERVICE_ROLE_KEY`, `ALLOWED_ORIGIN` (= URL exacta del sitio, sin barra final).
+
+### Sync de datos (casos, citas, caja, presupuestos, inventario, documentos, asistencia, personal)
+1. En Supabase SQL Editor ejecute `20261102d_app_records_sync.sql`.
+2. Edge: `sync-pull`, `sync-push` (token HMAC emitido por `auth-login`).
+3. Tras login online el cliente hace pull (LWW) y push de lo local; cada guardado encola push.
+
+### Roles JWT
+`super_admin` | `admin` (BranchAdmin) | `abogado` | `asistente_*` | `accountant`
+
+### Edge Functions — auth obligatoria
+| Function | Requisitos |
+|----------|------------|
+| `attendance-validate` | `Origin === ALLOWED_ORIGIN` + `Authorization: Bearer <supabase access_token>` → RPC `validate_attendance_punch` **como usuario** (anon key). Sin fallback service_role. |
+| `petty-cash-transition` | Igual → RPC `transition_petty_cash` como usuario. |
+| `telegram-proxy` | Origin + Bearer Firebase ID token + `FIREBASE_API_KEY`. |
+| `public-config` | Solo anon URL/key; nunca service_role. |
+
+`SUPABASE_SERVICE_ROLE_KEY` puede existir en Netlify para tareas admin futuras, pero **no** se usa en las rutas de marcaje/caja anteriores.
+
+### Prohibido en Modo B
+- Anonymous Firebase / anon Supabase policies
+- Service role en el navegador
+- Telegram token en cliente
+- Confiar solo en Haversine client-side para aceptar marcajes
+- Fallback REST con service_role si falla el RPC
 
 ---
 
-## Modo C — Híbrido (evitar)
+## Publicar en Cloudflare Pages (canónico)
 
-Mezclar hub local + Firestore + Supabase en el mismo flujo sin política clara viola el secreto profesional y complica incidentes.  
-Si se necesita: documentar qué colecciones salen del despacho y base legal (Ley 29733) **antes** de encender sync.
+Las edge functions viven en `cloudflare/functions/`. El worker las expone en **`/api/<nombre>`** (alias legacy `/.netlify/functions/<nombre>`).
+
+1. Cuenta gratis en [Cloudflare](https://dash.cloudflare.com/).
+2. Desde la carpeta del proyecto: `npx wrangler login` y luego `npx wrangler pages deploy . --project-name paoloaldea-abogados`.
+3. En el proyecto Pages → Settings → Variables (solo en el panel, nunca en el repo):
+   - `SUPABASE_URL`
+   - `SUPABASE_ANON_KEY`
+   - `SUPABASE_SERVICE_ROLE_KEY`
+   - `SYNC_TOKEN_SECRET` = secreto distinto del service_role (HMAC de syncToken)
+   - `ALLOWED_ORIGIN` = la URL exacta de `*.pages.dev`, sin barra final
+   - `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` (Web Push; generar con `npx web-push generate-vapid-keys`)
+4. En Supabase SQL Editor ejecute también `20261103_push_subscriptions.sql`.
+5. Comprobar `POST /api/sync-pull` sin token: debe responder 401, no 404. `GET /api/public-config` debe incluir `vapidPublicKey` (nunca la privada).
+
+## Modo C — Híbrido descontrolado (evitar)
+
+Mezclar hub PowerShell público + Firestore + Supabase sin SyncManager/RLS.  
+Si se necesita offline+cloud: usar **Modo B** con outbox (no abrir el hub PS a Internet).
 
 ---
 
-## Mapa rápido de endpoints locales
+## Endpoints
 
-| Método | Ruta | Uso |
-|--------|------|-----|
-| POST | `/api/session` | Emparejar cookie de sesión (pairing one-time) |
-| POST | `/api/cloud_sync` | Merge multi-sede → ACK liviano |
-| GET | `/api/cloud_snapshot` | Stream del JSON central (hidratación) |
-| GET | `/api/health` | Salud del hub |
-| POST | `/api/backup` | Snapshot zip allowlist |
-
----
-
-## Relación con PRs de hardening
-
-- Semana 1: APIs autenticadas + clean slate de credenciales  
-- Semana 2: Firebase/XSS/Telegram proxy  
-- Semana 3: shell liviano + lazy libs + paginación  
-- Semana 4: IndexedDB primario, controllers diferidos, sync ACK + este documento  
+| Modo | Ruta | Uso |
+|------|------|-----|
+| A | `POST /api/session` | Pairing local |
+| A | `POST /api/cloud_sync` + `GET /api/cloud_snapshot` | Sync LAN |
+| B | `GET /api/public-config` | Anon config |
+| B | `POST /api/attendance-validate` | Geocerca server (syncToken o JWT + Origin) |
+| B | `POST /api/petty-cash-transition` | Flujo caja (syncToken o JWT + Origin) |
+| B | `POST /api/sync-pull` / `sync-push` | Sync `app_records` (HMAC syncToken + LWW) |
+| B | `POST /api/push-subscribe` / `push-unsubscribe` / `push-send` | Web Push VAPID (syncToken; payload genérico) |

@@ -124,164 +124,135 @@ class AlertEngine {
   }
 
   // =========================================================================
-  // SISTEMA DE NOTIFICACIONES PUSH A CELULAR (ANDROID / IOS) Y PC / LAPTOP
-  // Funciona incluso con la página web o la aplicación completamente cerrada
+  // WEB PUSH (VAPID) — segundo plano, sin ntfy público
+  // Payload remoto siempre genérico (secreto profesional / Ley 29733)
   // =========================================================================
-  getPushTopic() {
+  _remotePushEnabled(isManual) {
     const s = window.db ? window.db.getSettings() : null;
-    return (s && s.pushTopic) ? s.pushTopic.trim() : "aldea_aldea_challhuahuacho";
+    if (isManual) return true;
+    if (!s) return false;
+    if (s.webPushOptIn !== true && !(window.PaoloPushService && window.PaoloPushService.isOptedIn())) {
+      return false;
+    }
+    return s.pushAutoSend !== false;
   }
 
-  async sendPushNotification({ title, message, priority = "default", tags = [], isManual = false }) {
+  async sendPushNotification({ title, message, priority = "default", tags = [], isManual = false, scope = "self" } = {}) {
     const s = window.db ? window.db.getSettings() : null;
-    const topic = this.getPushTopic();
 
-    // 1. Notificación local inmediata en el navegador si la pestaña está activa
-    this.sendBrowserNotification(title, message);
+    // 1. Notificación local (puede mostrar detalle; el usuario ya está autenticado en el dispositivo)
+    this.sendBrowserNotification(
+      title || "PAOLO ALDEA — Aviso",
+      message || "Hay un aviso en el despacho.",
+      "./index.html?open=alerts"
+    );
 
-    // Si las notificaciones remotas están deshabilitadas y no es prueba manual, respetar privacidad
-    if (!isManual && s && s.pushAutoSend === false) {
-      return true;
+    if (!this._remotePushEnabled(isManual)) {
+      return false;
     }
 
-    let ntfyOk = false;
+    let pushOk = false;
 
-    // 2. Envío a ntfy.sh con protección de Secreto Profesional y Ley N° 29733
-    if (topic && (isManual || (s && s.pushAutoSend !== false))) {
+    // 2. Web Push vía edge (payload genérico en servidor; sin datos de expediente)
+    if (window.PaoloPushService && typeof window.PaoloPushService.sendRemote === "function") {
       try {
-        const ntfyPriority = priority === "urgent" ? "urgent" : priority === "high" ? "high" : "default";
-        
-        // En modo anónimo, protegemos nombres de partes y cuantías en buses públicos no autenticados
-        let pushMessage = message;
-        if (s && s.pushAnonymize !== false && !isManual) {
-          pushMessage = `⚖️ [NOTIFICACIÓN CONFIDENCIAL DESPACHO]\n${title}\nPlazo o diligencia perentoria detectada. Ingrese a la Suite Segura de Challhuahuacho para ver los actuados del caso.`;
-        }
-
-        const headers = {
-          "Title": title,
-          "Priority": ntfyPriority,
-          "Tags": tags.join(",")
-        };
-
-        const res = await fetch(`https://ntfy.sh/${encodeURIComponent(topic)}`, {
-          method: "POST",
-          body: pushMessage,
-          headers: headers
+        const remoteScope =
+          scope ||
+          (s && (s.pushScope === "branch" || s.pushScope === "firm") ? s.pushScope : "self");
+        const res = await window.PaoloPushService.sendRemote({
+          scope: remoteScope,
+          priority: priority === "urgent" ? "urgent" : "high",
+          tag: "alerta-urgente",
+          url: "./index.html?open=alerts"
         });
-        ntfyOk = res.ok;
+        pushOk = !!(res && res.ok && (res.sent > 0 || res.sent === 0));
+        if (res && res.ok && Number(res.sent) > 0) pushOk = true;
+        if (res && res.ok) pushOk = true;
       } catch (err) {
-        console.warn("No se pudo enviar push a ntfy:", err);
+        console.warn("Web Push remoto:", err);
       }
     }
 
-    // 3. Telegram SOLO vía proxy Netlify (Semana 2: sin fallback con bot token en el cliente)
-    if (s && (s.telegramEnabled !== false)) {
+    // 3. Telegram solo vía proxy edge (sin token en cliente; texto genérico)
+    if (s && s.telegramEnabled === true) {
       try {
-        const text = `⚖️ ${title}\n\n${message}`;
+        const text =
+          "⚖️ PAOLO ALDEA — Aviso urgente\n\nHay un plazo o diligencia perentoria. Abra la suite segura (sin datos del expediente en este canal).";
         const headers = { "Content-Type": "application/json" };
         const sendViaProxy = async () => {
           if (window.firebaseService && typeof window.firebaseService.getIdToken === "function") {
             const idTok = await window.firebaseService.getIdToken();
             if (idTok) headers.Authorization = "Bearer " + idTok;
           }
-          return fetch("/.netlify/functions/telegram-proxy", {
+          return fetch("/api/telegram-proxy", {
             method: "POST",
             headers,
             body: JSON.stringify({ text })
           });
         };
-        sendViaProxy().catch(e => console.warn("Telegram proxy:", e));
+        sendViaProxy().catch((e) => console.warn("Telegram proxy:", e));
       } catch (te) {
         console.warn("Telegram fail:", te);
       }
     }
 
-    return ntfyOk;
+    return pushOk;
   }
 
   async testPushNotification() {
-    const topic = this.getPushTopic();
+    if (window.PaoloPushService) {
+      const st = await window.PaoloPushService.status();
+      if (!st.subscribed) {
+        const sub = await window.PaoloPushService.subscribe({ forcePermission: true });
+        if (!sub.ok) {
+          return { success: false, reason: sub.reason || "subscribe_failed" };
+        }
+      }
+    }
     const ok = await this.sendPushNotification({
-      title: "⚖️ PAOLO ALDEA & ABOGADOS - Notificaciones Activas",
-      message: `¡Conexión exitosa! Su celular y PC están enlazados al canal «${topic}». Recibirá alertas de plazos fatales, audiencias y gastos fijos incluso con la app cerrada.`,
+      title: "PAOLO ALDEA — Notificaciones activas",
+      message: "Prueba de Web Push. Si ve este aviso, el dispositivo quedó enlazado.",
       priority: "high",
-      tags: ["white_check_mark", "tada", "scales"],
-      isManual: true
+      isManual: true,
+      scope: "self"
     });
-    return { success: ok, topic };
+    return { success: ok };
   }
 
   async syncAllAlertsToPhone() {
     const totalUrgent = this.alerts.urgent.length;
     const totalWarn = this.alerts.warning.length;
-
-    if (totalUrgent === 0 && totalWarn === 0) {
-      await this.sendPushNotification({
-        title: "✅ PAOLO ALDEA & ABOGADOS - Todos los Módulos al Día",
-        message: "No se registran plazos fatales, audiencias inminentes, pagos fijos vencidos ni quiebres de inventario. Toda la oficina opera al 100%.",
-        priority: "default",
-        tags: ["white_check_mark", "clipboard"]
-      });
-      return { count: 0, success: true };
-    }
-
-    // Organizar alertas por cada apartado de la página web
-    let summary = `🚨 ${totalUrgent} URGENTES | ⏳ ${totalWarn} PRÓXIMAS\n\n`;
-
-    const casosAlerts = [...this.alerts.urgent, ...this.alerts.warning].filter(a => a.source === "caso");
-    const cajaAlerts = [...this.alerts.urgent, ...this.alerts.warning].filter(a => a.source === "caja");
-    const citasAlerts = [...this.alerts.urgent, ...this.alerts.warning].filter(a => a.source === "cita");
-    const invAlerts = [...this.alerts.urgent, ...this.alerts.warning].filter(a => a.source === "inventario");
-
-    if (casosAlerts.length > 0) {
-      summary += `⚖️ CASOS & EXPEDIENTES (${casosAlerts.length}):\n`;
-      casosAlerts.slice(0, 3).forEach(a => summary += `• ${a.title.replace(/^[^\w\s]+/, '').trim()}: ${a.meta}\n`);
-      summary += `\n`;
-    }
-
-    if (cajaAlerts.length > 0) {
-      summary += `💰 CAJA CHICA & GASTOS FIJOS (${cajaAlerts.length}):\n`;
-      cajaAlerts.slice(0, 3).forEach(a => summary += `• ${a.title.replace(/^[^\w\s]+/, '').trim()}: ${a.meta}\n`);
-      summary += `\n`;
-    }
-
-    if (citasAlerts.length > 0) {
-      summary += `📅 AGENDA & CITAS (${citasAlerts.length}):\n`;
-      citasAlerts.slice(0, 3).forEach(a => summary += `• ${a.title.replace(/^[^\w\s]+/, '').trim()}: ${a.meta}\n`);
-      summary += `\n`;
-    }
-
-    if (invAlerts.length > 0) {
-      summary += `📦 INVENTARIO & ARCHIVO (${invAlerts.length}):\n`;
-      invAlerts.slice(0, 2).forEach(a => summary += `• ${a.title.replace(/^[^\w\s]+/, '').trim()}: ${a.meta}\n`);
-      summary += `\n`;
-    }
-
     const ok = await this.sendPushNotification({
-      title: `⚖️ PAOLO ALDEA & ABOGADOS: Alertas Generales de Sede`,
-      message: summary,
+      title: "PAOLO ALDEA — Resumen de alertas",
+      message:
+        totalUrgent === 0 && totalWarn === 0
+          ? "Sin alertas críticas pendientes en este dispositivo."
+          : "Hay avisos perentorios o próximos. Abra la suite para el detalle.",
       priority: totalUrgent > 0 ? "urgent" : "high",
-      tags: ["warning", "calendar", "scales", "bell"]
+      isManual: true,
+      scope: "self"
     });
-
     return { count: totalUrgent + totalWarn, success: ok };
   }
 
   async dispatchAutoPush() {
     const s = window.db ? window.db.getSettings() : null;
     if (!s || s.pushAutoSend === false) return;
+    if (s.webPushOptIn !== true && !(window.PaoloPushService && window.PaoloPushService.isOptedIn())) {
+      return;
+    }
 
-    // Despachar alertas perentorias de cualquier módulo (Casos, Caja Chica, Citas, Inventario)
     const criticals = this.alerts.urgent.slice(0, 4);
     for (const alert of criticals) {
       const key = `${alert.type}_${alert.id}_${alert.date}`;
       if (!this.pushThrottles.has(key)) {
         this.pushThrottles.add(key);
+        // Remoto: solo aviso genérico. Local: título ya se muestra vía sendBrowserNotification.
         await this.sendPushNotification({
-          title: alert.title,
-          message: `${alert.subtitle || ""}\n${alert.meta || ""}`,
+          title: "PAOLO ALDEA — Alerta urgente",
+          message: "Hay un aviso perentorio. Abra la suite segura para ver el detalle.",
           priority: "urgent",
-          tags: ["warning", "gavel", "scales", "bell"]
+          scope: (s && s.pushScope) || "self"
         });
       }
     }
@@ -837,32 +808,116 @@ class AlertEngine {
     }
   }
 
+  _bannerDismissKey(alert) {
+    if (!alert) return "";
+    return String(alert.type || "") + "|" + String(alert.id || "") + "|" + String(alert.date || "");
+  }
+
+  _loadDismissedBanners() {
+    try {
+      const raw = sessionStorage.getItem("PA_ALERT_BANNER_DISMISSED") || "{}";
+      const data = JSON.parse(raw);
+      return data && typeof data === "object" ? data : {};
+    } catch (_) {
+      return {};
+    }
+  }
+
+  _saveDismissedBanners(map) {
+    try {
+      sessionStorage.setItem("PA_ALERT_BANNER_DISMISSED", JSON.stringify(map || {}));
+    } catch (_) {}
+  }
+
+  dismissTopBanner(persistKey) {
+    try {
+      clearTimeout(this._bannerAutoHideTimer);
+      this._bannerAutoHideTimer = null;
+      const banner = document.getElementById("topAlertBanner");
+      if (banner) banner.classList.add("hidden");
+      const container = document.getElementById("topAlertBannerContent");
+      if (container) container.innerHTML = "";
+      if (persistKey) {
+        const map = this._loadDismissedBanners();
+        map[String(persistKey)] = Date.now();
+        this._saveDismissedBanners(map);
+      }
+    } catch (err) {
+      console.warn("[alerts] dismissTopBanner:", err && err.message);
+      const banner = document.getElementById("topAlertBanner");
+      if (banner) banner.classList.add("hidden");
+    }
+  }
+
   renderAlertBanner() {
     const banner = document.getElementById("topAlertBanner");
     const container = document.getElementById("topAlertBannerContent");
     if (!banner || !container) return;
 
+    // Restaurar estilo base de alertas críticas (puede haber sido alterado por Meet).
+    banner.className =
+      "hidden bg-gradient-to-r from-red-100 via-rose-50 to-red-100 border-b border-red-300 px-3 sm:px-6 py-2.5 shrink-0 transition-all";
+
     if (this.alerts.urgent.length > 0) {
-      const topAlert = this.alerts.urgent[0];
+      const dismissed = this._loadDismissedBanners();
+      const visible = this.alerts.urgent.filter((a) => !dismissed[this._bannerDismissKey(a)]);
+      if (!visible.length) {
+        banner.classList.add("hidden");
+        container.innerHTML = "";
+        return;
+      }
+      const topAlert = visible[0];
+      const key = this._bannerDismissKey(topAlert);
+      const safeTitle =
+        typeof escapeHtml === "function" ? escapeHtml(topAlert.title || "") : String(topAlert.title || "");
+      const safeSub =
+        typeof escapeHtml === "function" ? escapeHtml(topAlert.subtitle || "") : String(topAlert.subtitle || "");
+      const safeMeta =
+        typeof escapeHtml === "function" ? escapeHtml(topAlert.meta || "") : String(topAlert.meta || "");
       container.innerHTML = `
         <div class="flex items-center justify-between gap-3 text-xs md:text-sm">
-          <div class="flex items-center gap-2">
-            <span class="flex h-3 w-3 relative">
+          <div class="flex items-center gap-2 min-w-0">
+            <span class="flex h-3 w-3 relative shrink-0">
               <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
               <span class="relative inline-flex rounded-full h-3 w-3 bg-red-600"></span>
             </span>
-            <span class="font-bold text-red-900">${topAlert.title}:</span>
-            <span class="text-red-800 truncate max-w-[280px] sm:max-w-md md:max-w-xl">${topAlert.subtitle} - <span class="font-medium underline">${topAlert.meta}</span></span>
+            <span class="font-bold text-red-900 shrink-0">${safeTitle}:</span>
+            <span class="text-red-800 truncate max-w-[200px] sm:max-w-md md:max-w-xl">${safeSub} - <span class="font-medium underline">${safeMeta}</span></span>
           </div>
           <div class="flex items-center gap-2 shrink-0">
-            <span class="bg-red-200 text-red-900 px-2 py-0.5 rounded text-xs font-bold">${this.alerts.urgent.length} alerta(s) crítica(s)</span>
-            <button onclick="window.alerts.openDrawer()" class="bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded text-xs font-semibold transition">Ver Todas</button>
+            <span class="hidden sm:inline bg-red-200 text-red-900 px-2 py-0.5 rounded text-xs font-bold">${visible.length} alerta(s) crítica(s)</span>
+            <button type="button" data-alert-action="open-drawer" class="bg-red-700 hover:bg-red-800 text-white px-2.5 py-1 rounded text-xs font-semibold transition min-h-[36px]">Ver Todas</button>
+            <button type="button" data-alert-action="dismiss" class="min-w-[36px] min-h-[36px] rounded-lg text-red-800 hover:bg-red-200/80 flex items-center justify-center touch-manipulation" title="Cerrar banner" aria-label="Cerrar alerta">
+              <i class="fa-solid fa-xmark pointer-events-none"></i>
+            </button>
           </div>
         </div>
       `;
+      const openBtn = container.querySelector('[data-alert-action="open-drawer"]');
+      const closeBtn = container.querySelector('[data-alert-action="dismiss"]');
+      if (openBtn) {
+        openBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.openDrawer();
+        });
+      }
+      if (closeBtn) {
+        closeBtn.addEventListener("click", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          this.dismissTopBanner(key);
+        });
+      }
       banner.classList.remove("hidden");
+      // Auto-ocultar a los 45 s (sigue disponible en el cajón de alertas).
+      clearTimeout(this._bannerAutoHideTimer);
+      this._bannerAutoHideTimer = setTimeout(() => {
+        this.dismissTopBanner(key);
+      }, 45000);
     } else {
       banner.classList.add("hidden");
+      container.innerHTML = "";
     }
   }
 
@@ -874,6 +929,7 @@ class AlertEngine {
     this.renderDrawerList();
     drawer.classList.remove("translate-x-full");
     if (backdrop) backdrop.classList.remove("hidden");
+    document.body.classList.add("alerts-drawer-open");
   }
 
   closeDrawer() {
@@ -882,6 +938,7 @@ class AlertEngine {
     if (!drawer) return;
     drawer.classList.add("translate-x-full");
     if (backdrop) backdrop.classList.add("hidden");
+    document.body.classList.remove("alerts-drawer-open");
   }
 
   renderDrawerList(filter = "all") {

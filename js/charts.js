@@ -90,12 +90,15 @@ class KpiDashboard {
     }
 
     if (moduleType === "casos") {
-      const text = `${item.organoJurisdiccional || ''} ${item.sede || ''} ${item.expediente || ''} ${item.materia || ''}`.toLowerCase();
+      const sedeNorm = window.db && typeof window.db.normalizeSede === "function"
+        ? window.db.normalizeSede(item.sede || item.sedeId)
+        : String(item.sede || "").toLowerCase();
+      const text = `${item.organoJurisdiccional || ""} ${item.juzgado || ""} ${item.expediente || ""} ${item.materia || ""}`.toLowerCase();
       if (target === "challhuahuacho") {
-        return text.includes("challhuahuacho") || text.includes("sede") || !text.includes("tambobamba");
+        return sedeNorm === "challhuahuacho" || text.includes("challhuahuacho");
       }
       if (target === "cotabambas") {
-        return text.includes("cotabambas") || text.includes("tambobamba") || text.includes("juzgado");
+        return text.includes("cotabambas") || text.includes("tambobamba");
       }
     }
 
@@ -121,7 +124,11 @@ class KpiDashboard {
   }
 
   getFilteredCitas() {
-    return window.db.get("citas").filter(c => this.matchTime(c.fecha) && this.matchCenter(c, "citas"));
+    return window.db.get("citas").filter(c => {
+      const raw = c.fechaHora || c.fecha || "";
+      const day = String(raw).slice(0, 10);
+      return this.matchTime(day) && this.matchCenter(c, "citas");
+    });
   }
 
   renderMetrics() {
@@ -291,7 +298,7 @@ class KpiDashboard {
         plugins: {
           legend: {
             position: 'top',
-            labels: { boxWidth: 12, font: { family: "'Plus Jakarta Sans', sans-serif", size: 11, weight: '600' } }
+            labels: { boxWidth: 12, font: { family: "'Source Sans 3', sans-serif", size: 11, weight: '600' } }
           },
           tooltip: {
             callbacks: {
@@ -359,7 +366,7 @@ class KpiDashboard {
             position: 'right',
             labels: {
               boxWidth: 11,
-              font: { family: "'Plus Jakarta Sans', sans-serif", size: 10, weight: '500' },
+              font: { family: "'Source Sans 3', sans-serif", size: 10, weight: '500' },
               padding: 8
             }
           }

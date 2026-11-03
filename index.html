@@ -7,7 +7,7 @@
   
   <!-- Configuración PWA y Aplicación Móvil Nativa (Android & iOS) -->
   <link rel="manifest" href="manifest.json">
-  <meta name="theme-color" content="#0B132B" id="metaThemeColor">
+  <meta name="theme-color" content="#F8FAFC" id="metaThemeColor">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="application-name" content="Paolo Aldea - Gestión Jurídica">
   
@@ -21,115 +21,136 @@
   <link rel="apple-touch-icon" sizes="167x167" href="assets/logo_paolo_aldea.jpg">
   <link rel="icon" type="image/jpeg" href="assets/logo_paolo_aldea.jpg">
 
-    <!-- Purga Definitiva Cero Kilómetros (Elimina datos de prueba residuales de versiones anteriores) -->
-  <script>
-    (function() {
-      var CLEAN_TOKEN = "PAOLO_ALDEA_ZERO_KM_CLEAN_2026_EMPTY_PRODUCTION_V3";
-      if (!localStorage.getItem(CLEAN_TOKEN)) {
-        // Salvaguarda: si ya existen expedientes o datos activos reales, no purgar
-        var existingCases = localStorage.getItem("PAOLO ALDEA_PAOLO_ALDEA_casos");
-        if (existingCases && existingCases.length > 20) {
-          localStorage.setItem(CLEAN_TOKEN, "true");
-          return;
-        }
-        try {
-          var prefix = "PAOLO ALDEA_PAOLO_ALDEA_";
-          var keys = ["caja_chica", "casos", "citas", "inventario", "documentos", "presupuestos", "workers", "attendance", "auditoria"];
-          keys.forEach(function(k) {
-            localStorage.removeItem(prefix + k);
-            localStorage.removeItem(prefix + k + "_BACKUP");
-            localStorage.removeItem("PAOLO ALDEA_" + k);
-          });
-          if (window.indexedDB) {
-            window.indexedDB.deleteDatabase("PaoloAldeaJuridicoDB");
-          }
-          if ('caches' in window) {
-            caches.keys().then(function(names) {
-              names.forEach(function(n) { caches.delete(n); });
-            });
-          }
-        } catch(e) {}
-        localStorage.setItem(CLEAN_TOKEN, "true");
-        console.info("[Sistema] Despacho Cero Kilómetros inicializado en blanco.");
-      }
-    })();
-  </script>
-
-  <!-- Script Zero-FOUC para prevenir parpadeo de modo oscuro/claro -->
-  <script>
-    (function() {
-      try {
-        var savedTheme = localStorage.getItem('PAOLO_ALDEA_THEME');
-        var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-        if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
-          document.documentElement.classList.add('dark');
-        } else {
-          document.documentElement.classList.remove('dark');
-        }
-      } catch (e) {}
-    })();
-
-    // Visibilidad universal de contraseñas (disponible inmediatamente)
-    window.togglePasswordVisibility = function(inputId, iconId) {
-      try {
-        var input = document.getElementById(inputId);
-        if (!input) return;
-        var icon = document.getElementById(iconId || ('toggleIcon-' + inputId));
-        if (input.type === 'password') {
-          input.type = 'text';
-          if (icon) {
-            icon.classList.remove('fa-eye');
-            icon.classList.add('fa-eye-slash');
-          }
-        } else {
-          input.type = 'password';
-          if (icon) {
-            icon.classList.remove('fa-eye-slash');
-            icon.classList.add('fa-eye');
-          }
-        }
-      } catch (err) {
-        console.error('Error al alternar visibilidad de contraseña:', err);
-      }
-    };
-  </script>
+    <!-- Purga, tema y ojo de contraseña (externo: CSP bloquea <script> embebidos) -->
+  <script src="js/boot-early.js?v=20261102_csp_handlers"></script>
 
   <!-- Google Fonts con carga asíncrona segura (no bloqueante en modo offline) -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" media="print" onload="this.media='all'">
-  <noscript><link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@600;700;800;900&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
+  <link id="paoloFonts" href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet" media="print">
+  <noscript><link href="https://fonts.googleapis.com/css2?family=Libre+Baskerville:ital,wght@0,400;0,700;1,400&family=Source+Sans+3:ital,wght@0,300;0,400;0,500;0,600;0,700;0,800;1,400&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap" rel="stylesheet"></noscript>
 
   <!-- Librerías 100% Locales (Funcionan sin internet en Challhuahuacho) -->
   <link rel="stylesheet" href="lib/fa/css/all.min.css">
   <script src="lib/tailwind.js"></script>
+  <script src="js/tailwind-config.js?v=20261103_fonts_legal"></script>
   <!-- Chart / ExcelJS / FileSaver / html2pdf: carga diferida vía js/lib-loader.js (Semana 3) -->
   <script src="js/lib-loader.js?v=20261101_week3_perf"></script>
 
   <!-- Estilos Personalizados del Estudio Jurídico -->
-  <link rel="stylesheet" href="css/styles.css?v=20261101_week2_firebase_xss">
-
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          colors: {
-            legal: {
-              navy: '#0B132B',
-              slate: '#1C2541',
-              card: '#132247',
-              gold: '#C5A059',
-              goldMuted: '#997B28',
-              accent: '#3A506B'
-            }
-          }
-        }
-      }
-    }
-  </script>
+  <link rel="stylesheet" href="css/styles.css?v=20261103_fonts_legal">
 </head>
 <body class="bg-slate-100 text-slate-800 antialiased flex h-screen overflow-hidden">
+
+  <div id="appUpdateBanner" class="app-update-banner hidden fixed bottom-24 md:bottom-5 left-1/2 -translate-x-1/2 z-[10050] w-[min(22.5rem,calc(100%-1.5rem))] items-stretch" role="status" aria-live="polite">
+    <div class="w-full rounded-2xl border border-amber-500/40 bg-slate-950/95 text-white shadow-2xl overflow-hidden backdrop-blur-md">
+      <div class="h-1 bg-gradient-to-r from-amber-600 via-amber-400 to-amber-600"></div>
+      <div class="p-3.5 sm:p-4 flex gap-3">
+        <span class="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/35 text-amber-400 flex items-center justify-center shrink-0">
+          <i class="fa-solid fa-cloud-arrow-down"></i>
+        </span>
+        <div class="flex-1 min-w-0 space-y-2">
+          <div class="flex items-center gap-2 flex-wrap">
+            <p class="text-sm font-extrabold tracking-wide text-white leading-none">Actualización lista</p>
+            <span id="appUpdateBannerVersion" class="text-[10px] font-bold uppercase tracking-wider text-amber-300/95 bg-amber-500/10 border border-amber-500/30 rounded-md px-1.5 py-0.5">v—</span>
+          </div>
+          <p id="appUpdateBannerText" class="text-[11px] leading-snug text-slate-300">Se reiniciará la sesión. Guarde su trabajo y actualice.</p>
+          <p id="appUpdateBannerNotes" class="hidden text-[10px] leading-snug text-slate-500"></p>
+          <div class="flex gap-2 pt-0.5">
+            <button type="button" id="btnApplyAppUpdate" class="min-h-[40px] px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-extrabold inline-flex items-center gap-1.5 shadow-sm transition">
+              <i class="fa-solid fa-rotate"></i> Actualizar
+            </button>
+            <button type="button" id="btnDismissAppUpdate" class="min-h-[40px] px-3.5 py-2 rounded-xl border border-slate-600 hover:bg-slate-900 text-[11px] font-bold text-slate-200 transition">
+              Después
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Permiso de notificaciones (tarjeta tipo aviso in-app; luego dispara el permiso del sistema) -->
+  <div id="webPushPermissionBanner" class="hidden fixed bottom-24 md:bottom-4 left-1/2 -translate-x-1/2 z-[10040] w-[min(36rem,calc(100%-1.5rem))] items-start gap-3 bg-slate-950 text-white border border-amber-400/70 rounded-2xl shadow-2xl p-4" role="alertdialog" aria-labelledby="webPushPermissionTitle" aria-describedby="webPushPermissionText">
+    <span class="w-10 h-10 rounded-xl bg-amber-500/20 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0">
+      <i class="fa-solid fa-bell"></i>
+    </span>
+    <div class="flex-1 space-y-2 min-w-0">
+      <p id="webPushPermissionTitle" class="text-sm font-bold text-amber-300">Activar avisos del despacho</p>
+      <p id="webPushPermissionText" class="text-xs leading-relaxed text-slate-200">Reciba alertas de plazos y diligencias en este dispositivo, incluso con la app en segundo plano. El contenido sensible solo se ve dentro de la Suite.</p>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" id="btnAcceptWebPushPermission" class="px-3 py-2 min-h-[40px] rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 text-[11px] font-bold inline-flex items-center gap-1.5">
+          <i class="fa-solid fa-check"></i> Permitir notificaciones
+        </button>
+        <button type="button" id="btnDismissWebPushPermission" class="px-3 py-2 min-h-[40px] rounded-lg border border-slate-600 text-[11px] text-slate-200 hover:bg-slate-900">
+          Ahora no
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Selector de sede institucional (reemplaza el picker nativo de Android) -->
+  <div id="modalSedePicker" class="modal-container hidden fixed inset-0 z-[10050] items-end sm:items-center justify-center" role="dialog" aria-modal="true" aria-labelledby="modalSedePickerTitle" style="background: rgba(8, 12, 24, 0.78); backdrop-filter: blur(8px);">
+    <button type="button" tabindex="-1" class="absolute inset-0 cursor-default" onclick="window.app.closeSedePicker()" aria-label="Cerrar selector de sede"></button>
+    <div class="sede-picker-sheet relative w-full sm:max-w-md sm:mx-4 max-h-[88vh] sm:max-h-[80vh] flex flex-col rounded-t-3xl sm:rounded-2xl border border-amber-500/35 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
+      <div class="sm:hidden flex justify-center pt-2.5 pb-1 shrink-0">
+        <span class="w-10 h-1 rounded-full bg-slate-600"></span>
+      </div>
+      <div class="px-4 pt-2 pb-3.5 border-b border-slate-800/90 bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950/40 flex items-start gap-3 shrink-0">
+        <span class="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0 shadow-inner">
+          <i class="fa-solid fa-building-columns text-lg"></i>
+        </span>
+        <div class="min-w-0 flex-1 pt-0.5">
+          <p class="text-[10px] uppercase tracking-[0.18em] text-amber-400/90 font-bold">Paolo Aldea &amp; Abogados</p>
+          <h3 id="modalSedePickerTitle" class="text-base font-extrabold tracking-wide text-white mt-0.5">Elegir sede</h3>
+          <p class="text-[11px] text-slate-400 mt-0.5">Filtra KPIs, casos y asistencia por ubicación</p>
+        </div>
+        <button type="button" onclick="window.app.closeSedePicker()" class="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div id="sedePickerList" class="flex-1 overflow-y-auto overscroll-contain px-3 py-3 space-y-2" role="listbox" aria-label="Sedes disponibles"></div>
+      <div class="px-4 py-3 border-t border-slate-800 bg-slate-950/95 shrink-0">
+        <button type="button" onclick="window.app.closeSedePicker()" class="w-full min-h-[44px] rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">
+          Cerrar
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirmación institucional (siempre en DOM; no depende de view-modals) -->
+  <div id="modalAppConfirm" class="modal-container hidden fixed inset-0 z-[10060] items-center justify-center p-4" role="dialog" aria-modal="true" aria-labelledby="modalAppConfirmTitle" style="display:none;background: rgba(8, 12, 24, 0.82); backdrop-filter: blur(10px);">
+    <div class="app-confirm-sheet relative w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
+      <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-600 via-rose-500 to-amber-600"></div>
+      <div class="px-5 pt-5 pb-3.5 border-b border-slate-800/90 bg-gradient-to-r from-slate-950 via-slate-900 to-rose-950/30 flex items-start gap-3">
+        <span id="modalAppConfirmIcon" class="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0 shadow-inner text-lg">
+          <i class="fa-solid fa-trash-can"></i>
+        </span>
+        <div class="min-w-0 flex-1 pt-0.5">
+          <p id="modalAppConfirmSubtitle" class="text-[10px] uppercase tracking-[0.16em] text-amber-400/90 font-bold">Paolo Aldea &amp; Abogados · Control seguro</p>
+          <h3 id="modalAppConfirmTitle" class="text-base font-extrabold tracking-wide text-white mt-0.5">Confirmar acción</h3>
+        </div>
+        <button type="button" id="btnAppConfirmClose" class="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition" aria-label="Cerrar">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+      </div>
+      <div class="px-5 py-4 space-y-3">
+        <p id="modalAppConfirmMessage" class="text-xs sm:text-sm leading-relaxed text-slate-300"></p>
+        <div id="modalAppConfirmDetail" class="hidden rounded-xl border border-amber-500/35 bg-gradient-to-br from-slate-900 to-slate-950 px-3.5 py-3">
+          <p class="text-[10px] uppercase tracking-wider text-amber-400/90 font-bold mb-1">Registro afectado</p>
+          <p id="modalAppConfirmDetailText" class="text-xs font-semibold text-slate-100 break-words"></p>
+        </div>
+      </div>
+      <div class="px-5 py-3.5 border-t border-slate-800 bg-slate-950/95 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+        <button type="button" id="btnAppConfirmCancel" class="min-h-[46px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">
+          Cancelar
+        </button>
+        <button type="button" id="btnAppConfirmOk" class="min-h-[46px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition inline-flex items-center justify-center gap-2">
+          <i class="fa-solid fa-trash-can text-[11px]"></i>
+          <span>Sí, eliminar</span>
+        </button>
+      </div>
+    </div>
+  </div>
 
   <!-- =========================================================================
        PANTALLA DE ACCESO INSTITUCIONAL / LOGIN SEGURO DE DESPACHO
@@ -154,7 +175,7 @@
         <h1 class="font-serif-legal font-bold text-lg sm:text-xl text-white tracking-wide leading-tight">
           PAOLO ALDEA & ABOGADOS
         </h1>
-        <div class="text-[11px] font-bold text-amber-400 uppercase tracking-widest">
+        <div id="loginSedeDisplay" class="text-[11px] font-bold text-amber-400 uppercase tracking-widest firm-branch-display firm-branch-login">
           Sede Challhuahuacho • Cotabambas
         </div>
 
@@ -282,11 +303,25 @@
             PAOLO ALDEA &amp; ABOGADOS &bull; Acceso Autorizado mediante Hash Criptográfico
           </span>
         </div>
+        <button type="button" id="btnShowResetAdmin" onclick="document.getElementById('formResetAdmin').classList.toggle('hidden')" class="w-full text-[11px] text-amber-300/90 hover:text-amber-200 underline underline-offset-2">
+          No puedo entrar: restablecer contraseña
+        </button>
+      </form>
+
+      <form id="formResetAdmin" class="hidden space-y-3 pt-2" onsubmit="event.preventDefault(); window.ejecutarResetSuperAdmin(event);">
+        <p class="text-[11px] text-slate-400 text-left leading-relaxed">Escriba el código de restablecimiento y una contraseña nueva de al menos 10 caracteres. Luego ingrese con el usuario que le indique la pantalla.</p>
+        <input type="text" id="resetAdminCode" required autocomplete="off" placeholder="Código de restablecimiento" class="w-full px-3 py-2.5 bg-slate-800/90 border border-slate-700 focus:border-amber-400 rounded-xl text-white text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-400">
+        <input type="password" id="resetAdminPassword" required autocomplete="new-password" placeholder="Nueva contraseña" class="w-full px-3 py-2.5 bg-slate-800/90 border border-slate-700 focus:border-amber-400 rounded-xl text-white text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-400">
+        <input type="password" id="resetAdminPasswordConfirm" required autocomplete="new-password" placeholder="Confirmar contraseña" class="w-full px-3 py-2.5 bg-slate-800/90 border border-slate-700 focus:border-amber-400 rounded-xl text-white text-xs font-mono focus:outline-none focus:ring-1 focus:ring-amber-400">
+        <button type="submit" class="w-full py-2.5 bg-slate-700 hover:bg-slate-600 text-amber-200 font-bold text-xs uppercase tracking-wider rounded-xl transition">Guardar contraseña nueva</button>
       </form>
 
       <!-- Pie de página de la pantalla de acceso -->
       <div class="pt-3 border-t border-slate-800/80 text-center text-[10px] text-slate-500 space-y-1">
-        <div><i class="fa-solid fa-shield-halved text-emerald-500 mr-1"></i> Modo Autónomo Local Offline — Sede Challhuahuacho</div>
+        <div id="loginModeBadge">
+          <i id="loginModeBadgeIcon" class="fa-solid fa-circle-notch fa-spin text-slate-400 mr-1"></i>
+          <span id="loginModeBadgeText">Comprobando modo de acceso…</span>
+        </div>
 
   
         <div class="text-slate-600">Acceso restringido únicamente a miembros autorizados de la firma.</div>
@@ -513,8 +548,9 @@
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-1.5 sm:gap-2 min-w-0">
               <h2 id="pageHeaderTitle" class="text-xs sm:text-sm font-bold text-slate-900 truncate tracking-tight">Control de Asistencia</h2>
-              <span class="inline-flex items-center gap-1 text-[9px] sm:text-[9.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded-full shrink-0 whitespace-nowrap" title="Operando localmente en su máquina sin requerir internet">
-                <i class="fa-solid fa-shield-halved text-[8px]"></i> 100% Local
+              <span id="topbarModeBadge" class="inline-flex items-center gap-1 text-[9px] sm:text-[9.5px] font-bold bg-emerald-50 text-emerald-800 border border-emerald-300 px-1.5 py-0.2 rounded-full shrink-0 whitespace-nowrap" title="Modo de operación">
+                <i id="topbarModeBadgeIcon" class="fa-solid fa-shield-halved text-[8px]"></i>
+                <span id="topbarModeBadgeText">Local</span>
               </span>
             </div>
             <div class="text-[10px] sm:text-[10.5px] text-slate-500 flex items-center gap-1.5 mt-0.5 truncate font-medium min-w-0">
@@ -530,10 +566,16 @@
 
       <!-- Fila 2 (Móvil) / Lado Derecho (Escritorio): Selector de Sede y Herramientas Compactas -->
       <div class="flex flex-wrap sm:flex-nowrap items-center justify-between lg:justify-end gap-1 sm:gap-1.5 w-full lg:w-auto shrink-0">
-        <!-- Selector Global de Sedes -->
-        <div id="globalSedeSelectorContainer" class="h-7 sm:h-8 flex-1 sm:flex-initial min-w-[125px] max-w-full flex items-center gap-1.5 bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-lg px-2 text-xs shadow-2xs transition" title="Sede activa">
-          <i class="fa-solid fa-building-columns text-amber-600 text-[11px] sm:text-xs shrink-0"></i>
-          <select id="globalSedeSelect" onchange="window.app.switchSede(this.value)" class="w-full bg-transparent font-bold text-slate-800 text-[11px] sm:text-xs focus:outline-none cursor-pointer truncate">
+        <!-- Selector Global de Sedes (botón custom → modal; evita picker nativo Android) -->
+        <div id="globalSedeSelectorContainer" class="flex-1 sm:flex-initial min-w-[150px] max-w-full" title="Sede activa">
+          <button type="button" id="btnOpenSedePicker" onclick="window.app.openSedePicker()" class="sede-picker-trigger w-full h-8 sm:h-9 flex items-center gap-2 bg-slate-50 hover:bg-amber-50 border border-slate-200 hover:border-amber-400 rounded-xl px-2.5 text-xs shadow-sm transition active:scale-[0.98]">
+            <span class="w-6 h-6 rounded-lg bg-amber-500/15 border border-amber-400/40 text-amber-600 flex items-center justify-center shrink-0">
+              <i id="globalSedeSelectIcon" class="fa-solid fa-building-columns text-[11px]"></i>
+            </span>
+            <span id="globalSedeSelectLabel" class="flex-1 text-left font-bold text-slate-800 text-[11px] sm:text-xs truncate">Sede Challhuahuacho</span>
+            <i class="fa-solid fa-chevron-down text-[10px] text-slate-400 shrink-0"></i>
+          </button>
+          <select id="globalSedeSelect" class="sr-only" tabindex="-1" aria-hidden="true" onchange="window.app.switchSede(this.value)">
             <option value="todas">Consolidado Nacional</option>
             <option value="miraflores">Sede Miraflores (Lima)</option>
             <option value="abancay">Sede Abancay</option>
@@ -592,7 +634,7 @@
           </button>
 
           <!-- Botón de Instalación PWA (Móvil / Pantalla de Inicio) -->
-          <button id="btnPwaInstall" onclick="window.app.installPwa()" class="inline-flex h-7 sm:h-8 items-center justify-center gap-1.5 px-2 sm:px-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md transition cursor-pointer shrink-0 whitespace-nowrap" title="Descargar e Instalar en Celular / Escritorio">
+          <button id="btnPwaInstall" onclick="window.app.installPwa()" class="hidden h-7 sm:h-8 items-center justify-center gap-1.5 px-2 sm:px-2.5 rounded-lg text-xs font-bold bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 shadow-md transition cursor-pointer shrink-0 whitespace-nowrap" title="Descargar e Instalar en Celular / Escritorio" aria-hidden="true">
             <i class="fa-solid fa-mobile-screen-button text-xs"></i>
             <span class="hidden sm:inline text-[11px] font-extrabold">Instalar App</span>
           </button>
@@ -927,9 +969,9 @@
             </div>
 
             <p class="text-[11px] sm:text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-building-flag text-amber-400/80 mr-1"></i>Sede Central Challhuahuacho</span>
+              <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-building-flag text-amber-400/80 mr-1"></i>Sede Challhuahuacho</span>
               <span class="text-slate-600">•</span>
-              <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-location-dot text-emerald-400/80 mr-1"></i>Radio Geocerca: 100 metros</span>
+              <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-location-dot text-emerald-400/80 mr-1"></i>Radio Geocerca: 300 metros</span>
               <span class="text-slate-600">•</span>
               <span class="text-amber-300 font-mono whitespace-nowrap">Haversine Algorithm</span>
             </p>
@@ -960,24 +1002,21 @@
             <!-- Columna Izquierda: Reloj Digital, Identificación y Sensor GPS -->
             <div class="lg:col-span-5 space-y-4 min-w-0">
               <!-- Tarjeta de Reloj Digital Oficial -->
-              <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-xl text-center relative overflow-hidden">
-                <div class="absolute -right-6 -bottom-6 text-amber-500/5 text-8xl font-black select-none pointer-events-none">
-                  <i class="fa-regular fa-clock"></i>
+              <div class="asistencia-legal-clock">
+                <div class="asistencia-legal-clock__watermark" aria-hidden="true"><i class="fa-regular fa-clock"></i></div>
+                <div class="asistencia-legal-clock__label">
+                  <span class="asistencia-legal-clock__pulse" aria-hidden="true"></span>
+                  Hora legal oficial de marcaje
                 </div>
-
-                <div class="text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-400/90 mb-1 flex items-center justify-center gap-2">
-                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
-                  Hora Legal Oficial de Marcaje
+                <div class="asistencia-legal-clock__time-row">
+                  <div id="asistencia-live-clock" class="asistencia-legal-clock__time">--:--:--</div>
+                  <span id="asistencia-live-meridiem" class="asistencia-legal-clock__meridiem">--</span>
                 </div>
-
-                <div id="asistencia-live-clock" class="text-2xl sm:text-4xl md:text-5xl font-black font-mono tracking-tight text-white py-1 whitespace-nowrap">
-                  --:--:--
+                <div id="asistencia-live-date" class="asistencia-legal-clock__date">
+                  <i class="fa-regular fa-calendar"></i>
+                  <span>Cargando fecha…</span>
                 </div>
-
-                <div id="asistencia-live-date" class="text-xs font-medium text-slate-400 capitalize">
-                  Cargando fecha...
-                </div>
-
+                <div class="asistencia-legal-clock__tz">Zona horaria · Perú (UTC−5)</div>
               </div>
 
               <!-- Tarjeta de Identificación del Colaborador -->
@@ -1050,33 +1089,35 @@
                   </span>
                 </div>
 
-                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs">
-                  <div class="flex flex-wrap items-center justify-between gap-1">
-                    <span class="text-slate-300 font-semibold text-[11px] sm:text-xs flex items-center gap-1.5">
-                      <i class="fa-solid fa-location-crosshairs text-cyan-400 text-xs"></i> Coordenadas Actuales:
-                    </span>
-                    <span id="asistencia-gps-coords" class="font-mono text-cyan-300 font-bold text-[11px] sm:text-xs bg-slate-900 px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap">--.------, --.------</span>
+                <div class="space-y-2.5">
+                  <div id="asistencia-sede-hero" class="asistencia-sede-hero" data-sede="challhuahuacho">
+                    <div id="asistencia-sede-hero-mosaic" class="asistencia-sede-hero__mosaic hidden" aria-hidden="true">
+                      <span class="asistencia-sede-hero__tile asistencia-sede-hero__tile--lead" data-tile="challhuahuacho"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="cusco"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="miraflores"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="abancay"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="huaraz"></span>
+                    </div>
+                    <div class="asistencia-sede-hero__shade" aria-hidden="true"></div>
+                    <div class="asistencia-sede-hero__copy">
+                      <p id="asistencia-sede-hero-kicker" class="asistencia-sede-hero__kicker"><i class="fa-solid fa-location-dot"></i> Sede detectada</p>
+                      <h4 id="asistencia-sede-hero-nombre" class="asistencia-sede-hero__name">Sede Challhuahuacho</h4>
+                      <p id="asistencia-sede-hero-region" class="asistencia-sede-hero__region">Cotabambas, Apurímac</p>
+                    </div>
                   </div>
 
-                  <div class="flex flex-wrap items-center justify-between gap-1">
-                    <span id="asistencia-label-distancia" class="text-slate-300 font-semibold text-[11px] sm:text-xs flex items-center gap-1.5">
-                      <i class="fa-solid fa-route text-amber-400 text-xs"></i> Distancia a Sede:
-                    </span>
-                    <span id="asistencia-gps-distance" class="font-mono text-amber-300 font-extrabold text-[11px] sm:text-xs bg-slate-900 px-2 py-0.5 rounded border border-amber-500/30 whitespace-nowrap">Calculando...</span>
+                  <div class="hidden" aria-hidden="true">
+                    <span id="asistencia-label-distancia"></span>
+                    <span id="asistencia-gps-coords">--.------, --.------</span>
+                    <span id="asistencia-gps-distance">Calculando...</span>
+                    <span id="asistencia-gps-tolerance">300 metros</span>
+                    <span id="asistencia-sede-oficial-coords">-14.116667, -72.245000</span>
                   </div>
 
-                  <div class="flex flex-wrap items-center justify-between gap-1 border-t border-slate-800 pt-2 text-[11px]">
-                    <span class="text-slate-300 font-semibold flex items-center gap-1.5">
-                      <i class="fa-solid fa-circle-notch text-emerald-400 text-xs"></i> Radio de Tolerancia:
-                    </span>
-                    <span id="asistencia-gps-tolerance" class="text-emerald-300 font-bold text-xs whitespace-nowrap">100 metros</span>
-                  </div>
-
-                  <div class="flex flex-wrap items-center justify-between gap-1 border-t border-slate-800/80 pt-1.5 text-[10px]">
-                    <span class="text-slate-400 flex items-center gap-1">
-                      <i class="fa-solid fa-building text-slate-500"></i> Punto Oficial de Sede:
-                    </span>
-                    <span id="asistencia-sede-oficial-coords" class="font-mono text-slate-300 font-semibold whitespace-nowrap">-14.116667, -72.245000</span>
+                  <div class="flex flex-col gap-2">
+                    <button type="button" onclick="AttendanceModule.refreshGpsPosition('gps_real')" class="w-full min-h-[44px] px-3 py-2 rounded-xl text-[11px] font-bold bg-cyan-950 text-slate-50 border border-cyan-500/40 active:scale-[0.98] touch-manipulation transition-colors duration-200">
+                      <i class="fa-solid fa-satellite-dish mr-1"></i> Actualizar GPS (celular)
+                    </button>
                   </div>
                 </div>
 
@@ -1093,7 +1134,7 @@
 
                   <!-- 3 Modos Claros: Oficina según Sede, GPS Tiempo Real, Comisión en Otras Sedes -->
                   <div class="grid grid-cols-3 gap-1.5 bg-slate-950 p-1.5 rounded-xl border border-slate-800 text-center">
-                    <button type="button" id="btnModoOficinaSede" onclick="AttendanceModule.setAttendanceMode('oficina_sede')" class="attendance-mode-btn py-2 px-1 rounded-lg text-[10.5px] sm:text-[11px] font-bold transition flex flex-col items-center gap-1 bg-amber-500/20 text-amber-300 border border-amber-500/40 shadow-sm cursor-pointer">
+                    <button type="button" id="btnModoOficinaSede" onclick="AttendanceModule.setAttendanceMode('oficina_sede')" class="attendance-mode-btn py-2 px-1 rounded-lg text-[10.5px] sm:text-[11px] font-bold transition-colors duration-200 flex flex-col items-center gap-1 bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 shadow-sm cursor-pointer">
                       <i class="fa-solid fa-building text-xs"></i>
                       <span>En Oficina</span>
                       <span class="text-[8.5px] font-normal opacity-80">(Según Sede)</span>
@@ -1185,45 +1226,45 @@
                 <!-- 4 Botones Secuenciales de Marcaje Blindado (Jornada y Almuerzo) -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
                   <!-- 1. INGRESO JORNADA -->
-                  <button id="btn-asistencia-marcar-ingreso" onclick="AttendanceModule.performRegularPunch('ingreso')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold shadow-lg shadow-emerald-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-ingreso" onclick="AttendanceModule.performRegularPunch('ingreso')" class="asistencia-punch asistencia-punch--ingreso group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-right-to-bracket"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">1. Jornada</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">1. Jornada</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Marcar Ingreso</div>
                     </div>
                   </button>
 
                   <!-- 2. SALIDA A ALMUERZO -->
-                  <button id="btn-asistencia-marcar-salida-almuerzo" onclick="AttendanceModule.performRegularPunch('salida_almuerzo')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold shadow-lg shadow-amber-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-salida-almuerzo" onclick="AttendanceModule.performRegularPunch('salida_almuerzo')" class="asistencia-punch asistencia-punch--almuerzo group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-black/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-utensils"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-amber-200 font-bold">2. Almuerzo</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">2. Almuerzo</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Salida Almuerzo</div>
                     </div>
                   </button>
 
                   <!-- 3. RETORNO DE ALMUERZO -->
-                  <button id="btn-asistencia-marcar-retorno-almuerzo" onclick="AttendanceModule.performRegularPunch('retorno_almuerzo')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold shadow-lg shadow-blue-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-retorno-almuerzo" onclick="AttendanceModule.performRegularPunch('retorno_almuerzo')" class="asistencia-punch asistencia-punch--retorno group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-mug-hot"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-cyan-200 font-bold">3. Almuerzo</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">3. Almuerzo</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Retorno Almuerzo</div>
                     </div>
                   </button>
 
                   <!-- 4. SALIDA FINAL -->
-                  <button id="btn-asistencia-marcar-salida" onclick="AttendanceModule.performRegularPunch('salida')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold shadow-lg shadow-rose-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-salida" onclick="AttendanceModule.performRegularPunch('salida')" class="asistencia-punch asistencia-punch--salida group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-right-from-bracket"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-rose-200 font-bold">4. Jornada</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">4. Jornada</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Salida Final</div>
                     </div>
                   </button>
@@ -1403,7 +1444,7 @@
 
             <div class="bg-slate-900 border border-slate-800 p-4 rounded-2xl shadow-lg space-y-1">
               <div class="flex items-center justify-between text-slate-400 text-xs">
-                <span>En Geocerca (&le;100m)</span>
+                <span>En Geocerca (&le;300m)</span>
                 <i class="fa-solid fa-building-circle-check text-emerald-400"></i>
               </div>
 
@@ -1447,7 +1488,101 @@
   
           </div>
 
-  
+          <!-- =================================================================
+               KPIs POWER BI — Mapeo semanal / mensual de asistencia
+               ================================================================= -->
+          <div id="asistencia-kpi-powerbi" class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+            <div class="p-3.5 sm:p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="w-8 h-8 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                  <i class="fa-solid fa-chart-column text-sm"></i>
+                </span>
+                <div class="min-w-0">
+                  <h3 class="text-xs sm:text-sm font-bold text-white tracking-wide">KPIs de Asistencia · estilo Power BI</h3>
+                  <p class="text-[10px] sm:text-[11px] text-slate-400 truncate">Mapeo por semana y por mes · puntualidad, geocerca y jornada</p>
+                </div>
+              </div>
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+                  <button type="button" data-mode="week" class="att-kpi-mode-btn px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-950 shadow transition" onclick="window.AttendanceKpis && AttendanceKpis.setMode('week')">Semana</button>
+                  <button type="button" data-mode="month" class="att-kpi-mode-btn px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-slate-100 transition" onclick="window.AttendanceKpis && AttendanceKpis.setMode('month')">Mes</button>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button type="button" onclick="window.AttendanceKpis && AttendanceKpis.shiftPeriod(-1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center transition" title="Período anterior"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                  <span id="att-kpi-period-label" class="min-w-[9.5rem] text-center text-[11px] font-bold text-amber-300 px-1">—</span>
+                  <button type="button" onclick="window.AttendanceKpis && AttendanceKpis.shiftPeriod(1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center transition" title="Período siguiente"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                </div>
+                <select id="att-kpi-sede-filter" onchange="window.AttendanceKpis && AttendanceKpis.setSede(this.value)" class="p-1.5 bg-slate-950 border border-slate-700 rounded-xl text-[11px] text-slate-200 focus:outline-none focus:border-cyan-500 max-w-[11rem]">
+                  <option value="ALL">Todas las sedes</option>
+                </select>
+              </div>
+            </div>
+            <div class="p-3.5 sm:p-4 space-y-4">
+              <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5">
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">% Asistencia</div>
+                  <div id="att-kpi-asistencia-pct" class="text-xl font-black text-emerald-400 font-mono">0%</div>
+                  <p id="att-kpi-asistencia-sub" class="text-[9px] text-slate-500 leading-snug">slots laborables</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Tardeos</div>
+                  <div id="att-kpi-tardeos" class="text-xl font-black text-amber-400 font-mono">0</div>
+                  <p class="text-[9px] text-slate-500">ingreso &gt; 09:15</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Fuera geocerca</div>
+                  <div id="att-kpi-fuera" class="text-xl font-black text-rose-400 font-mono">0</div>
+                  <p class="text-[9px] text-slate-500">diligencias / GPS externo</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Jornada promedio</div>
+                  <div id="att-kpi-horas" class="text-xl font-black text-cyan-400 font-mono">0 h</div>
+                  <p class="text-[9px] text-slate-500">neto (menos almuerzo)</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Marcajes</div>
+                  <div id="att-kpi-marcajes" class="text-xl font-black text-white font-mono">0</div>
+                  <p class="text-[9px] text-slate-500">registros del período</p>
+                </div>
+                <div class="bg-slate-950/70 border border-amber-500/30 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-amber-400/90 font-bold">Pendientes</div>
+                  <div id="att-kpi-pendientes-periodo" class="text-xl font-black text-amber-400 font-mono">0</div>
+                  <p class="text-[9px] text-amber-300/70">en el período filtrado</p>
+                </div>
+              </div>
+              <div class="grid grid-cols-1 xl:grid-cols-12 gap-3">
+                <div class="xl:col-span-8 bg-slate-950/50 border border-slate-800 rounded-xl p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Asistencia por día</h4>
+                    <span class="text-[9px] text-slate-500">Presentes · Tardeos · Fuera geocerca</span>
+                  </div>
+                  <div class="h-52 relative">
+                    <canvas id="chartAttKpiDaily" aria-label="Gráfico de asistencia diaria"></canvas>
+                  </div>
+                </div>
+                <div class="xl:col-span-4 bg-slate-950/50 border border-slate-800 rounded-xl p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Modalidad de marcaje</h4>
+                  </div>
+                  <div class="h-52 relative">
+                    <canvas id="chartAttKpiModality" aria-label="Donut modalidades de marcaje"></canvas>
+                  </div>
+                </div>
+              </div>
+              <div class="bg-slate-950/50 border border-slate-800 rounded-xl p-3 space-y-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Mapa colaborador × día</h4>
+                  <div class="flex flex-wrap items-center gap-2 text-[9px] text-slate-400">
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-emerald-500/80"></span> Presente</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-amber-500/90"></span> Tardeo</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-sky-500/80"></span> Externa</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-slate-800"></span> Sin marcaje</span>
+                  </div>
+                </div>
+                <div id="att-kpi-heatmap" class="min-h-[4rem]"></div>
+              </div>
+            </div>
+          </div>
 
           <!-- Bandeja de Excepciones Pendientes de Aprobación -->
           <div id="asistencia-pending-queue-wrapper" class="hidden bg-slate-900 border border-amber-500/50 rounded-2xl p-4 shadow-xl space-y-3">
@@ -1490,7 +1625,7 @@
 
               <select id="select-filtro-asistencia-geocerca" onchange="AttendanceModule.renderAdminAttendanceTable()" class="p-1.5 bg-slate-950 border border-slate-700 rounded-xl text-xs text-slate-200 focus:outline-none focus:border-amber-500">
                 <option value="todos">&#128205; Todas las ubicaciones</option>
-                <option value="en_geocerca">&#129001; En Geocerca (&le;100m)</option>
+                <option value="en_geocerca">&#129001; En Geocerca (&le;300m)</option>
                 <option value="fuera_geocerca">&#129000; Diligencias Externas</option>
               </select>
 
@@ -1568,82 +1703,37 @@
     </nav>
   </div>
 
-    <!-- =========================================================================
-         MODAL: AUTENTICACIÓN MAESTRA DEL SOCIO FUNDADOR (MODALMASTERAUTH)
-         ========================================================================= -->
-  <!-- Modales diferidos: views/view-modals.html vía ComponentLoader (Semana 3) -->
+  <!-- Modales diferidos: views/view-modals.html vía ComponentLoader -->
   <!-- Scripts del Sistema -->
-  <script src="js/data.js?v=20261101_week4_qa"></script>
-  <script src="js/alerts.js?v=20261101_week2_firebase_xss"></script>
+  <script src="js/data.js?v=20261115_auth_sig_hardening"></script>
+  <script src="js/alerts.js?v=20261114_confirm_modal"></script>
   <script src="js/charts.js?v=20261101_week3_perf"></script>
-  <script src="js/attendance.js?v=20261101_week3_perf"></script>
-  <script src="js/draft-autosave.js?v=20261101_week2_firebase_xss"></script>
+  <script src="js/attendance.js?v=20261103_confirm_del"></script>
+  <script src="js/attendance-kpis.js?v=20261103_att_kpis_fix"></script>
+  <script src="js/draft-autosave.js?v=20261102_jsstr_all"></script>
   <!-- Controllers: carga diferida por pestaña (Semana 4) -->
   <script src="js/controller-loader.js?v=20261101_week4_qa"></script>
-  <script src="js/component-loader.js?v=20261101_week4_qa"></script>
-  <script src="js/excel-export.js?v=20261101_week3_perf"></script>
-  <script src="js/pdf-export.js?v=20261101_week3_perf"></script>
-  <!-- Supabase Cloud SDK v2 & Realtime Engine -->
+  <script src="js/component-loader.js?v=20261114_confirm_modal"></script>
+  <script src="js/excel-export.js?v=20261103_excel_zebra"></script>
+  <script src="js/pdf-export.js?v=20261103_fonts_legal"></script>
+  <!-- Supabase Cloud SDK v2 — nube canónica (Modo B). Firebase CDN retirado del arranque. -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <!-- Firebase Cloud SDK & Backend Real -->
-  <script src="https://www.gstatic.com/firebasejs/10.14.2/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.2/firebase-auth-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/10.14.2/firebase-firestore-compat.js"></script>
-  <script src="js/firebase-auth.js?v=20261101_week2_firebase_xss"></script>
-  <script src="js/app.js?v=20261101_week4_qa"></script>
-
-  <script>
-    // Puente oficial de envío del formulario de inicio de sesión / bootstrap
-    window._ensureLegalApp = async function() {
-      if (!window.app && typeof LegalApp === "function") {
-        try {
-          window.app = new LegalApp();
-          await window.app.init();
-        } catch (e) {
-          console.error("Error al arrancar LegalApp bajo demanda:", e);
-        }
-      } else if (window.db && typeof window.db.ready === "function") {
-        try { await window.db.ready(); } catch (_) {}
-      }
-      return window.app;
-    };
-    window.ejecutarAccesoDespacho = async function(event) {
-      if (event) event.preventDefault();
-      const app = await window._ensureLegalApp();
-      if (app && typeof app.handleLogin === "function") {
-        app.handleLogin(event);
-      } else {
-        const errMsg = document.getElementById("loginErrorMessage");
-        const errAlert = document.getElementById("loginErrorAlert");
-        if (errMsg && errAlert) {
-          errMsg.textContent = "Iniciando módulos del despacho. Por favor intente en un instante...";
-          errAlert.classList.remove("hidden");
-        }
-      }
-    };
-    window.ejecutarBootstrapDespacho = async function(event) {
-      if (event) event.preventDefault();
-      const app = await window._ensureLegalApp();
-      if (app && typeof app.completeAuthBootstrap === "function") {
-        app.completeAuthBootstrap(event);
-      }
-    };
-  </script>
-
-  <script>
-    const now = new Date();
-    const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
-    const dateEl = document.getElementById("currentDateStr");
-    if (dateEl) {
-      dateEl.textContent = now.toLocaleDateString('es-ES', options);
-    }
-
-    // Registro de Service Worker para soporte PWA y notificaciones
-    if ('serviceWorker' in navigator && (window.location.protocol === 'http:' || window.location.protocol === 'https:')) {
-      navigator.serviceWorker.register('sw.js').then(reg => {
-        reg.update();
-      }).catch(err => console.warn('SW registration skipped:', err));
-    }
-  </script>
+  <script src="js/firebase-auth.js?v=20261102_retire_cdn"></script>
+  <!-- Enterprise Zero-Trust (Modo B) — se auto-desactiva sin env Supabase -->
+  <script src="js/enterprise/sanitize.js?v=20261102_jsstr_all"></script>
+  <script src="js/enterprise/ErrorBoundary.js?v=20261102_zt"></script>
+  <script src="js/enterprise/config.js?v=20261102_cf_api"></script>
+  <script src="js/enterprise/AuthService.js?v=20261102_create_fix"></script>
+  <script src="js/enterprise/SyncManager.js?v=20261102_zt"></script>
+  <script src="js/enterprise/CloudDataSync.js?v=20261114_confirm_modal"></script>
+  <script src="js/enterprise/PushService.js?v=20261114_confirm_modal"></script>
+  <script src="js/enterprise/AttendanceService.js?v=20261102_cf_api"></script>
+  <script src="js/enterprise/CashManager.js?v=20261102_cf_api"></script>
+  <script src="js/enterprise/CaseService.js?v=20261102_zt"></script>
+  <script src="js/enterprise/BudgetAnalytics.js?v=20261102_zt"></script>
+  <script src="js/enterprise/bootstrap.js?v=20261102_mode_badge2"></script>
+  <script src="js/app-update.js?v=20261103_update_ui"></script>
+  <script src="js/app.js?v=20261103_confirm_del"></script>
+  <script src="js/auth-bridge.js?v=20261103_release"></script>
 </body>
 </html>

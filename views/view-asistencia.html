@@ -10,7 +10,7 @@
             </div>
 
             <p class="text-[11px] sm:text-xs text-slate-400 flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-building-flag text-amber-400/80 mr-1"></i>Sede Central Challhuahuacho</span>
+              <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-building-flag text-amber-400/80 mr-1"></i>Sede Challhuahuacho</span>
               <span class="text-slate-600">•</span>
               <span class="inline-flex items-center whitespace-nowrap"><i class="fa-solid fa-location-dot text-emerald-400/80 mr-1"></i>Radio Geocerca: 100 metros</span>
               <span class="text-slate-600">•</span>
@@ -43,24 +43,21 @@
             <!-- Columna Izquierda: Reloj Digital, Identificación y Sensor GPS -->
             <div class="lg:col-span-5 space-y-4 min-w-0">
               <!-- Tarjeta de Reloj Digital Oficial -->
-              <div class="bg-gradient-to-br from-slate-900 via-slate-900 to-slate-950 border border-amber-500/30 rounded-2xl p-4 sm:p-5 shadow-xl text-center relative overflow-hidden">
-                <div class="absolute -right-6 -bottom-6 text-amber-500/5 text-8xl font-black select-none pointer-events-none">
-                  <i class="fa-regular fa-clock"></i>
+              <div class="asistencia-legal-clock">
+                <div class="asistencia-legal-clock__watermark" aria-hidden="true"><i class="fa-regular fa-clock"></i></div>
+                <div class="asistencia-legal-clock__label">
+                  <span class="asistencia-legal-clock__pulse" aria-hidden="true"></span>
+                  Hora legal oficial de marcaje
                 </div>
-
-                <div class="text-[10.5px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-400/90 mb-1 flex items-center justify-center gap-2">
-                  <span class="w-2 h-2 rounded-full bg-emerald-400 animate-ping shrink-0"></span>
-                  Hora Legal Oficial de Marcaje
+                <div class="asistencia-legal-clock__time-row">
+                  <div id="asistencia-live-clock" class="asistencia-legal-clock__time">--:--:--</div>
+                  <span id="asistencia-live-meridiem" class="asistencia-legal-clock__meridiem">--</span>
                 </div>
-
-                <div id="asistencia-live-clock" class="text-2xl sm:text-4xl md:text-5xl font-black font-mono tracking-tight text-white py-1 whitespace-nowrap">
-                  --:--:--
+                <div id="asistencia-live-date" class="asistencia-legal-clock__date">
+                  <i class="fa-regular fa-calendar"></i>
+                  <span>Cargando fecha…</span>
                 </div>
-
-                <div id="asistencia-live-date" class="text-xs font-medium text-slate-400 capitalize">
-                  Cargando fecha...
-                </div>
-
+                <div class="asistencia-legal-clock__tz">Zona horaria · Perú (UTC−5)</div>
               </div>
 
               <!-- Tarjeta de Identificación del Colaborador -->
@@ -133,33 +130,35 @@
                   </span>
                 </div>
 
-                <div class="bg-slate-950 p-3 rounded-xl border border-slate-800 space-y-2 text-xs">
-                  <div class="flex flex-wrap items-center justify-between gap-1">
-                    <span class="text-slate-300 font-semibold text-[11px] sm:text-xs flex items-center gap-1.5">
-                      <i class="fa-solid fa-location-crosshairs text-cyan-400 text-xs"></i> Coordenadas Actuales:
-                    </span>
-                    <span id="asistencia-gps-coords" class="font-mono text-cyan-300 font-bold text-[11px] sm:text-xs bg-slate-900 px-2 py-0.5 rounded border border-cyan-500/30 whitespace-nowrap">--.------, --.------</span>
+                <div class="space-y-2.5">
+                  <div id="asistencia-sede-hero" class="asistencia-sede-hero" data-sede="challhuahuacho">
+                    <div id="asistencia-sede-hero-mosaic" class="asistencia-sede-hero__mosaic hidden" aria-hidden="true">
+                      <span class="asistencia-sede-hero__tile asistencia-sede-hero__tile--lead" data-tile="challhuahuacho"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="cusco"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="miraflores"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="abancay"></span>
+                      <span class="asistencia-sede-hero__tile" data-tile="huaraz"></span>
+                    </div>
+                    <div class="asistencia-sede-hero__shade" aria-hidden="true"></div>
+                    <div class="asistencia-sede-hero__copy">
+                      <p id="asistencia-sede-hero-kicker" class="asistencia-sede-hero__kicker"><i class="fa-solid fa-location-dot"></i> Sede detectada</p>
+                      <h4 id="asistencia-sede-hero-nombre" class="asistencia-sede-hero__name">Sede Challhuahuacho</h4>
+                      <p id="asistencia-sede-hero-region" class="asistencia-sede-hero__region">Cotabambas, Apurímac</p>
+                    </div>
                   </div>
 
-                  <div class="flex flex-wrap items-center justify-between gap-1">
-                    <span id="asistencia-label-distancia" class="text-slate-300 font-semibold text-[11px] sm:text-xs flex items-center gap-1.5">
-                      <i class="fa-solid fa-route text-amber-400 text-xs"></i> Distancia a Sede:
-                    </span>
-                    <span id="asistencia-gps-distance" class="font-mono text-amber-300 font-extrabold text-[11px] sm:text-xs bg-slate-900 px-2 py-0.5 rounded border border-amber-500/30 whitespace-nowrap">Calculando...</span>
+                  <div class="hidden" aria-hidden="true">
+                    <span id="asistencia-label-distancia"></span>
+                    <span id="asistencia-gps-coords">--.------, --.------</span>
+                    <span id="asistencia-gps-distance">Calculando...</span>
+                    <span id="asistencia-gps-tolerance">300 metros</span>
+                    <span id="asistencia-sede-oficial-coords">-14.116667, -72.245000</span>
                   </div>
 
-                  <div class="flex flex-wrap items-center justify-between gap-1 border-t border-slate-800 pt-2 text-[11px]">
-                    <span class="text-slate-300 font-semibold flex items-center gap-1.5">
-                      <i class="fa-solid fa-circle-notch text-emerald-400 text-xs"></i> Radio de Tolerancia:
-                    </span>
-                    <span id="asistencia-gps-tolerance" class="text-emerald-300 font-bold text-xs whitespace-nowrap">100 metros</span>
-                  </div>
-
-                  <div class="flex flex-wrap items-center justify-between gap-1 border-t border-slate-800/80 pt-1.5 text-[10px]">
-                    <span class="text-slate-400 flex items-center gap-1">
-                      <i class="fa-solid fa-building text-slate-500"></i> Punto Oficial de Sede:
-                    </span>
-                    <span id="asistencia-sede-oficial-coords" class="font-mono text-slate-300 font-semibold whitespace-nowrap">-14.116667, -72.245000</span>
+                  <div class="flex flex-col gap-2">
+                    <button type="button" onclick="AttendanceModule.refreshGpsPosition('gps_real')" class="w-full min-h-[44px] px-3 py-2 rounded-xl text-[11px] font-bold bg-cyan-950 text-cyan-200 border border-cyan-500/40 active:scale-[0.98] touch-manipulation">
+                      <i class="fa-solid fa-satellite-dish mr-1"></i> Actualizar GPS (celular)
+                    </button>
                   </div>
                 </div>
 
@@ -268,45 +267,45 @@
                 <!-- 4 Botones Secuenciales de Marcaje Blindado (Jornada y Almuerzo) -->
                 <div class="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-2.5">
                   <!-- 1. INGRESO JORNADA -->
-                  <button id="btn-asistencia-marcar-ingreso" onclick="AttendanceModule.performRegularPunch('ingreso')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-bold shadow-lg shadow-emerald-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-ingreso" onclick="AttendanceModule.performRegularPunch('ingreso')" class="asistencia-punch asistencia-punch--ingreso group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-right-to-bracket"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-emerald-200 font-bold">1. Jornada</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">1. Jornada</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Marcar Ingreso</div>
                     </div>
                   </button>
 
                   <!-- 2. SALIDA A ALMUERZO -->
-                  <button id="btn-asistencia-marcar-salida-almuerzo" onclick="AttendanceModule.performRegularPunch('salida_almuerzo')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-500 hover:to-orange-500 text-white font-bold shadow-lg shadow-amber-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-salida-almuerzo" onclick="AttendanceModule.performRegularPunch('salida_almuerzo')" class="asistencia-punch asistencia-punch--almuerzo group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-black/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-utensils"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-amber-200 font-bold">2. Almuerzo</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">2. Almuerzo</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Salida Almuerzo</div>
                     </div>
                   </button>
 
                   <!-- 3. RETORNO DE ALMUERZO -->
-                  <button id="btn-asistencia-marcar-retorno-almuerzo" onclick="AttendanceModule.performRegularPunch('retorno_almuerzo')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-bold shadow-lg shadow-blue-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-retorno-almuerzo" onclick="AttendanceModule.performRegularPunch('retorno_almuerzo')" class="asistencia-punch asistencia-punch--retorno group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-mug-hot"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-cyan-200 font-bold">3. Almuerzo</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">3. Almuerzo</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Retorno Almuerzo</div>
                     </div>
                   </button>
 
                   <!-- 4. SALIDA FINAL -->
-                  <button id="btn-asistencia-marcar-salida" onclick="AttendanceModule.performRegularPunch('salida')" class="group relative overflow-hidden p-3.5 rounded-2xl bg-gradient-to-r from-rose-600 to-red-600 hover:from-rose-500 hover:to-red-500 text-white font-bold shadow-lg shadow-rose-950/40 transition-all text-left flex items-center gap-2.5 cursor-pointer">
-                    <span class="w-10 h-10 rounded-xl bg-white/10 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
+                  <button id="btn-asistencia-marcar-salida" onclick="AttendanceModule.performRegularPunch('salida')" class="asistencia-punch asistencia-punch--salida group relative overflow-hidden p-3.5 rounded-2xl font-bold text-left flex items-center gap-2.5 cursor-pointer">
+                    <span class="w-10 h-10 rounded-xl bg-white/15 flex items-center justify-center text-lg shrink-0 group-hover:scale-105 transition-transform">
                       <i class="fa-solid fa-right-from-bracket"></i>
                     </span>
                     <div class="min-w-0">
-                      <div class="text-[10px] uppercase tracking-wider text-rose-200 font-bold">4. Jornada</div>
+                      <div class="asistencia-punch__step text-[10px] uppercase tracking-wider font-bold">4. Jornada</div>
                       <div class="text-xs sm:text-sm font-extrabold truncate">Salida Final</div>
                     </div>
                   </button>
@@ -530,7 +529,105 @@
   
           </div>
 
-  
+          <!-- =================================================================
+               KPIs POWER BI — Mapeo semanal / mensual de asistencia
+               ================================================================= -->
+          <div id="asistencia-kpi-powerbi" class="bg-slate-900 border border-slate-800 rounded-2xl shadow-xl overflow-hidden">
+            <div class="p-3.5 sm:p-4 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3">
+              <div class="flex items-center gap-2.5 min-w-0">
+                <span class="w-8 h-8 rounded-lg bg-cyan-500/15 text-cyan-400 border border-cyan-500/30 flex items-center justify-center shrink-0">
+                  <i class="fa-solid fa-chart-column text-sm"></i>
+                </span>
+                <div class="min-w-0">
+                  <h3 class="text-xs sm:text-sm font-bold text-white tracking-wide">KPIs de Asistencia · estilo Power BI</h3>
+                  <p class="text-[10px] sm:text-[11px] text-slate-400 truncate">Mapeo por semana y por mes · puntualidad, geocerca y jornada</p>
+                </div>
+              </div>
+
+              <div class="flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-1 bg-slate-950/80 p-1 rounded-xl border border-slate-800">
+                  <button type="button" data-mode="week" class="att-kpi-mode-btn px-3 py-1.5 rounded-lg text-[11px] font-bold bg-amber-500 text-slate-950 shadow transition" onclick="window.AttendanceKpis && AttendanceKpis.setMode('week')">Semana</button>
+                  <button type="button" data-mode="month" class="att-kpi-mode-btn px-3 py-1.5 rounded-lg text-[11px] font-semibold text-slate-400 hover:text-slate-100 transition" onclick="window.AttendanceKpis && AttendanceKpis.setMode('month')">Mes</button>
+                </div>
+                <div class="flex items-center gap-1">
+                  <button type="button" onclick="window.AttendanceKpis && AttendanceKpis.shiftPeriod(-1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center transition" title="Período anterior"><i class="fa-solid fa-chevron-left text-xs"></i></button>
+                  <span id="att-kpi-period-label" class="min-w-[9.5rem] text-center text-[11px] font-bold text-amber-300 px-1">—</span>
+                  <button type="button" onclick="window.AttendanceKpis && AttendanceKpis.shiftPeriod(1)" class="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 flex items-center justify-center transition" title="Período siguiente"><i class="fa-solid fa-chevron-right text-xs"></i></button>
+                </div>
+                <select id="att-kpi-sede-filter" onchange="window.AttendanceKpis && AttendanceKpis.setSede(this.value)" class="p-1.5 bg-slate-950 border border-slate-700 rounded-xl text-[11px] text-slate-200 focus:outline-none focus:border-cyan-500 max-w-[11rem]">
+                  <option value="ALL">Todas las sedes</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="p-3.5 sm:p-4 space-y-4">
+              <div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2.5">
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">% Asistencia</div>
+                  <div id="att-kpi-asistencia-pct" class="text-xl font-black text-emerald-400 font-mono">0%</div>
+                  <p id="att-kpi-asistencia-sub" class="text-[9px] text-slate-500 leading-snug">slots laborables</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Tardeos</div>
+                  <div id="att-kpi-tardeos" class="text-xl font-black text-amber-400 font-mono">0</div>
+                  <p class="text-[9px] text-slate-500">ingreso &gt; 09:15</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Fuera geocerca</div>
+                  <div id="att-kpi-fuera" class="text-xl font-black text-rose-400 font-mono">0</div>
+                  <p class="text-[9px] text-slate-500">diligencias / GPS externo</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Jornada promedio</div>
+                  <div id="att-kpi-horas" class="text-xl font-black text-cyan-400 font-mono">0 h</div>
+                  <p class="text-[9px] text-slate-500">neto (menos almuerzo)</p>
+                </div>
+                <div class="bg-slate-950/70 border border-slate-800 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-slate-500 font-bold">Marcajes</div>
+                  <div id="att-kpi-marcajes" class="text-xl font-black text-white font-mono">0</div>
+                  <p class="text-[9px] text-slate-500">registros del período</p>
+                </div>
+                <div class="bg-slate-950/70 border border-amber-500/30 rounded-xl p-3 space-y-0.5">
+                  <div class="text-[10px] uppercase tracking-wide text-amber-400/90 font-bold">Pendientes</div>
+                  <div id="att-kpi-pendientes-periodo" class="text-xl font-black text-amber-400 font-mono">0</div>
+                  <p class="text-[9px] text-amber-300/70">en el período filtrado</p>
+                </div>
+              </div>
+
+              <div class="grid grid-cols-1 xl:grid-cols-12 gap-3">
+                <div class="xl:col-span-8 bg-slate-950/50 border border-slate-800 rounded-xl p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Asistencia por día</h4>
+                    <span class="text-[9px] text-slate-500">Presentes · Tardeos · Fuera geocerca</span>
+                  </div>
+                  <div class="h-52 relative">
+                    <canvas id="chartAttKpiDaily" aria-label="Gráfico de asistencia diaria"></canvas>
+                  </div>
+                </div>
+                <div class="xl:col-span-4 bg-slate-950/50 border border-slate-800 rounded-xl p-3">
+                  <div class="flex items-center justify-between mb-2">
+                    <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Modalidad de marcaje</h4>
+                  </div>
+                  <div class="h-52 relative">
+                    <canvas id="chartAttKpiModality" aria-label="Donut modalidades de marcaje"></canvas>
+                  </div>
+                </div>
+              </div>
+
+              <div class="bg-slate-950/50 border border-slate-800 rounded-xl p-3 space-y-2">
+                <div class="flex flex-wrap items-center justify-between gap-2">
+                  <h4 class="text-[11px] font-bold text-slate-300 uppercase tracking-wide">Mapa colaborador × día</h4>
+                  <div class="flex flex-wrap items-center gap-2 text-[9px] text-slate-400">
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-emerald-500/80"></span> Presente</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-amber-500/90"></span> Tardeo</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-sky-500/80"></span> Externa</span>
+                    <span class="inline-flex items-center gap-1"><span class="w-3.5 h-3.5 rounded bg-slate-800"></span> Sin marcaje</span>
+                  </div>
+                </div>
+                <div id="att-kpi-heatmap" class="min-h-[4rem]"></div>
+              </div>
+            </div>
+          </div>
 
           <!-- Bandeja de Excepciones Pendientes de Aprobación -->
           <div id="asistencia-pending-queue-wrapper" class="hidden bg-slate-900 border border-amber-500/50 rounded-2xl p-4 shadow-xl space-y-3">

@@ -113,9 +113,15 @@ async function verifySecret(plain, stored) {
   return _safeEqual(await sha256Hex(plain), stored);
 }
 const isLegacySecret = (stored) => !!stored && !String(stored).startsWith("pbkdf2$");
+/** Prueba PBKDF2 (base64) para que el servidor solo compare, sin recalcular 210k iteraciones. */
+async function deriveSecretProof(plain, saltB64, iterations) {
+  const bits = await _pbkdf2(plain, _fromB64(saltB64), parseInt(iterations, 10));
+  return _toB64(bits);
+}
 window.hashSecret = hashSecret;
 window.verifySecret = verifySecret;
 window.isLegacySecret = isLegacySecret;
+window.deriveSecretProof = deriveSecretProof;
 
 // Parser numérico financiero universal (Previene truncamiento por comas o símbolos monetarios)
 function parseMoney(val) {
@@ -403,9 +409,11 @@ const SEDES_CONFIG = {
     badgeBg: "bg-pink-950/80",
     badgeBorder: "border-pink-500/40",
     badgeText: "text-pink-300",
+    // Pin aproximado histórico; calibrar en sede con "Anclar oficina aquí".
+    // Radio 300m: cubre desfase típico del pin + GPS de altura en Cotabambas.
     lat: -14.116667,
     lon: -72.245000,
-    radio: 100
+    radio: 300
   }
 };
 
@@ -450,9 +458,11 @@ const DEFAULT_SETTINGS = {
   firmPhone: "+51 943 410 215 / Central Challhuahuacho",
   currency: "S/",
   currencyName: "Soles (PEN)",
-  pushTopic: "aldea_aldea_challhuahuacho",
-  pushAutoSend: false,
+  pushTopic: "",
+  pushAutoSend: true,
   pushAnonymize: true,
+  webPushOptIn: false,
+  pushScope: "self",
   telegramToken: "",
   telegramChatId: "",
   adminUser: "",
@@ -464,8 +474,9 @@ const DEFAULT_SETTINGS = {
   // Parámetros de Geolocalización y Control de Asistencia (Geofencing)
   oficinaLat: -14.116667,
   oficinaLon: -72.245000,
-  oficinaRadioMetros: 100,
-  oficinaNombre: "Sede Central Challhuahuacho - Cotabambas",
+  oficinaRadioMetros: 300,
+  oficinaNombre: "Sede Challhuahuacho - Cotabambas",
+  geofenceBySede: {},
   geofenceEnabled: true,
   toleranciaMinutosTardanza: 15,
   diasLaborables: "Lunes a Viernes",
@@ -473,13 +484,14 @@ const DEFAULT_SETTINGS = {
   horaSalidaDefecto: "20:00",
   masterPasswordHash: "",
   masterPinHash: "",
-  cloudSyncEndpoint: "https://cznxzrwhogyobpqmfxnk.supabase.co",
+  // Vacío por defecto: configurar en Master Admin o vía public-config (Modo B).
+  cloudSyncEndpoint: "",
   cloudSyncApiKey: "",
   cloudSyncAuto: true,
   firebaseConfig: {
-    projectId: "paolo-aldea-juridico-3c5cb",
-    authDomain: "paolo-aldea-juridico-3c5cb.firebaseapp.com",
-    storageBucket: "paolo-aldea-juridico-3c5cb.appspot.com",
+    projectId: "",
+    authDomain: "",
+    storageBucket: "",
     apiKey: ""
   }
 };
@@ -685,9 +697,14 @@ class SafeStorageAdapter {
         req.onsuccess = () => {
           const results = req.result || [];
           if (results.length > 0) {
-            // IndexedDB es primario: siempre gana sobre el espejo localStorage
+            // IndexedDB es primario, pero no pisar escrituras más nuevas hechas durante la hidratación.
             results.forEach(rec => {
               if (rec && rec.key && rec.data !== undefined) {
+                const mem = this.memoryCache.get(rec.key);
+                if (Array.isArray(mem) && Array.isArray(rec.data) && mem.length > rec.data.length) {
+                  this.mirrorToIndexedDB(rec.key, mem);
+                  return;
+                }
                 this.memoryCache.set(rec.key, rec.data);
                 this._scheduleLocalStorageMirror(rec.key, rec.data, true);
               }
@@ -809,10 +826,21 @@ class SafeStorageAdapter {
           return parsed;
         }
         if (parsed && parsed._storedInIndexedDB) {
-          // Stub: no cachear [] — esperar hidratación / rehydrate async
+          // Stub: rehidratar desde IDB. Nunca envenenar con [] (provoca borrado al guardar).
           this._rehydrateKeyFromIdb(key);
           if (this.memoryCache.has(key)) return this.memoryCache.get(key);
-          return fallback;
+          try {
+            const rawBackup = localStorage.getItem(backupKey);
+            if (rawBackup) {
+              const recovered = JSON.parse(rawBackup);
+              if (recovered && !recovered._storedInIndexedDB) {
+                this.memoryCache.set(key, recovered);
+                return recovered;
+              }
+            }
+          } catch (_) {}
+          // Devolver fallback SIN cachearlo (evita save([]) destructivo).
+          return Array.isArray(fallback) ? fallback : fallback;
         }
       }
     } catch (e) {
@@ -1048,15 +1076,31 @@ class DataManager {
 
   migratePresupuestosIds(items) {
     if (!Array.isArray(items) || items.length === 0) return items;
+    // Prefijos válidos: legado CH- y códigos de sede (CHL, MIR, ABN, CUZ, HRZ, NAC, …)
+    const knownCodes = new Set(["CH"]);
+    try {
+      Object.values(typeof SEDES_CONFIG !== "undefined" ? SEDES_CONFIG : {}).forEach((s) => {
+        if (s && s.codigo) knownCodes.add(String(s.codigo).toUpperCase());
+      });
+    } catch (_) {}
+    const isCanonicalId = (id) => {
+      if (!id || typeof id !== "string") return false;
+      const m = /^([A-Za-z]{2,6})-/.exec(id);
+      return !!(m && knownCodes.has(m[1].toUpperCase()));
+    };
     let modified = false;
     items.forEach((item, idx) => {
-      if (!item.id || item.id.startsWith("PRE-") || !item.id.startsWith("CH-")) {
+      if (!item.id || item.id.startsWith("PRE-") || !isCanonicalId(item.id)) {
         const detected = typeof detectCentroCostoAndPcge === "function" ? detectCentroCostoAndPcge(item) : { centroCosto: "CC-LIT", clasePcge: "63" };
         const num = item.correlativo || (item.id && /^PRE-(\d+)$/.test(item.id) ? parseInt(item.id.replace("PRE-", ""), 10) : idx + 1);
         item.centroCosto = item.centroCosto || detected.centroCosto;
         item.clasePcge = item.clasePcge || detected.clasePcge;
         item.correlativo = num;
-        item.id = `CH-${item.centroCosto}-${item.clasePcge}-${String(num).padStart(3, "0")}`;
+        const sedeKey = this.normalizeSede(item.sede || item.sedeId || "challhuahuacho");
+        const prefix = (typeof SEDES_CONFIG !== "undefined" && SEDES_CONFIG[sedeKey] && SEDES_CONFIG[sedeKey].codigo)
+          ? SEDES_CONFIG[sedeKey].codigo
+          : "CHL";
+        item.id = `${prefix}-${item.centroCosto}-${item.clasePcge}-${String(num).padStart(3, "0")}`;
         modified = true;
       }
     });
@@ -1203,7 +1247,8 @@ class DataManager {
         personal: { read: true, create: true, update: true, delete: true, export: true },
         inventario: { read: true, create: true, update: true, delete: true, export: true },
         master_admin: { read: true, create: true, update: true, delete: true, export: true },
-        configuracion: { read: true, create: true, update: true, delete: true, export: true }
+        configuracion: { read: true, create: true, update: true, delete: true, export: true },
+        roles_permisos: { read: true, create: true, update: true, delete: true, export: true }
       };
     }
     if (cat === "socio") {
@@ -1327,11 +1372,16 @@ class DataManager {
           // Si el rol no está en la matriz permitida, se bloquea el acceso en tiempo real
           if (!modConfig.rolesAllowed.includes(role)) {
             if (role === "admin" || role === "socio") {
-              return modConfig.rolesAllowed.includes("admin") || modConfig.rolesAllowed.includes("socio");
+              if (!(modConfig.rolesAllowed.includes("admin") || modConfig.rolesAllowed.includes("socio"))) {
+                return false;
+              }
+            } else {
+              return false;
             }
-            return false;
           }
         }
+        // Apartados personalizados: la matriz de roles es autoridad suficiente
+        if (modConfig.isCustom) return true;
       }
     }
 
@@ -1370,9 +1420,8 @@ class DataManager {
     }
     const own = u.permisos && u.permisos[moduleName];
     const defaults = this.getDefaultPermissionsForRole(role)[moduleName];
-    // Los permisos propios nunca pueden superar a la matriz del rol en acciones destructivas
+    // Matriz RBAC del colaborador es autoridad: si el Super Admin otorgó delete explícito, se honra
     if (own && typeof own[action] === "boolean") {
-      if (own[action] && (action === "delete") && !(defaults && defaults[action])) return false;
       return own[action];
     }
     return !!(defaults && defaults[action]);
@@ -1508,7 +1557,9 @@ class DataManager {
         (w.email && w.email.toLowerCase().trim() === idLower)
       );
 
-      if (verified && verified.activo !== false && (verified.passwordHash || verified.pinHash)) {
+      // Sesión ya autenticada: no exigir hashes en workers[] (la nube a veces los omite en el directorio).
+      // NUNCA confiar en candidate.permisos (DevTools): solo nómina o matriz por rol.
+      if (verified && verified.activo !== false) {
         return {
           id: verified.id,
           dni: verified.dni,
@@ -1525,7 +1576,25 @@ class DataManager {
       }
     }
 
-    // 3. Sesión inválida o sin credencial registrada → revocar
+    // 3. Fallback de sesión firmada (workers sync incompleto / hashes vacíos)
+    // permisos: null → canDo() usa únicamente la matriz del rol firmado (anti-escalada).
+    if (candidate && candidate.id && storedSig === expectedSig) {
+      return {
+        id: candidate.id,
+        dni: candidate.dni || "",
+        nombre: candidate.nombre || candidate.username || "Usuario",
+        cargo: candidate.cargo || "",
+        rol: this.normalizeRole(candidate.rol),
+        sede: this.normalizeSede(candidate.sede),
+        email: candidate.email || "",
+        usuario: candidate.usuario || candidate.dni || candidate.id,
+        username: candidate.username || candidate.usuario || candidate.nombre,
+        foto: candidate.foto || "",
+        permisos: null
+      };
+    }
+
+    // 4. Sesión inválida → revocar
     return null;
   }
 
@@ -1585,11 +1654,18 @@ class DataManager {
     if (!raw) return "challhuahuacho";
     const s = String(raw).toLowerCase().trim();
     if (s === "todas" || s === "global" || s === "all" || s === "consolidado") return "todas";
+    // Clave exacta ya registrada (incluye sedes personalizadas en SEDES_CONFIG)
+    if (typeof SEDES_CONFIG !== "undefined" && SEDES_CONFIG[s] && s !== "todas") return s;
     if (s.includes("miraflor")) return "miraflores";
     if (s.includes("abancay")) return "abancay";
     if (s.includes("cusco") || s.includes("cuzco")) return "cusco";
     if (s.includes("huaraz")) return "huaraz";
     if (s.includes("challhua") || s.includes("cotabamba") || s.includes("chalhua")) return "challhuahuacho";
+    // Sede custom guardada en settings (aún no fusionada a SEDES_CONFIG en este tick)
+    try {
+      const custom = (this.getSettings && this.getSettings().customSedes) || [];
+      if (Array.isArray(custom) && custom.some((c) => c && String(c.id).toLowerCase() === s)) return s;
+    } catch (_) {}
     return "challhuahuacho";
   }
 
@@ -1673,8 +1749,11 @@ class DataManager {
         localStorage.setItem(this.STORAGE_KEY_PREFIX + collectionName, JSON.stringify(items));
       }
 
-      // Sincronizacion instantanea multi-sede al agregar, editar o eliminar (Supabase / Hub Local + Firebase Firestore Delta O(Δ))
+      // Solo PUSH de lo editado (sin pull inmediato). El pull-first borraba ediciones locales.
       if (!this._isMergingSync && collectionName !== 'auditoria' && typeof window !== 'undefined') {
+        if (window.PaoloCloudDataSync && typeof window.PaoloCloudDataSync.schedulePush === 'function') {
+          window.PaoloCloudDataSync.schedulePush(collectionName);
+        }
         if (!this._dirtyCollections) this._dirtyCollections = new Set();
         this._dirtyCollections.add(collectionName);
         clearTimeout(this._cloudSyncDebounce);
@@ -1682,9 +1761,7 @@ class DataManager {
           const colsToSync = Array.from(this._dirtyCollections || []);
           this._dirtyCollections.clear();
 
-          if (window.app && typeof window.app.sincronizarConNube === 'function') {
-            window.app.sincronizarConNube(true);
-          }
+          // Subir deltas a Firestore si está configurado; el pull periódico lo hace app.setupNetworkSyncListeners.
           if (window.firebaseService && typeof window.firebaseService.hasCredentials === 'function' && window.firebaseService.hasCredentials()) {
             if (typeof window.firebaseService.syncCollectionDelta === 'function' && colsToSync.length > 0) {
               for (const col of colsToSync) {
@@ -1715,7 +1792,7 @@ class DataManager {
     // Un colaborador solo puede registrar información en su propia sede asignada
     if (collectionName === "workers" && canManageWorkers && item.sede) {
       item.sede = this.normalizeSede(item.sede);
-    } else if (!isGlobal && !canManageWorkers) {
+    } else if (!isGlobal && !canManageWorkers && user) {
       item.sede = this.normalizeSede(user.sede);
     } else {
       if (!item.sede || item.sede === "todas") {
@@ -1729,10 +1806,24 @@ class DataManager {
     const nowIso = new Date().toISOString();
     if (!item.createdAt) item.createdAt = nowIso;
     item.updatedAt = nowIso;
+    // Evitar que un server_ts antiguo gane al LWW sobre esta edición local.
+    delete item.server_ts;
 
-    const list = this.getRaw(collectionName);
-    list.unshift(item);
-    this._persist(collectionName, list);
+    const rawList = this.getRaw(collectionName);
+    const list = Array.isArray(rawList) ? rawList.slice() : [];
+    // Evitar duplicar id si ya existe
+    const existingIdx = list.findIndex((r) => r && String(r.id) === String(item.id));
+    if (existingIdx >= 0) {
+      list[existingIdx] = { ...list[existingIdx], ...item, updatedAt: nowIso };
+      delete list[existingIdx].server_ts;
+    } else {
+      list.unshift(item);
+    }
+    const persisted = this._persist(collectionName, list);
+    if (!persisted) {
+      this._denyAccess(collectionName, "create", item.id, "No se pudo persistir el registro nuevo. Reintente.");
+      return null;
+    }
 
     if (collectionName !== "auditoria") {
       let desc = "";
@@ -1766,7 +1857,8 @@ class DataManager {
     const userRole = this.getUserRole(user);
     const canManageWorkers = collectionName === "workers" && (isGlobal || userRole === "admin" || userRole === "socio" || userRole === "super_admin" || this.hasPermission(user, "update", "personal") || (user && user.id === id));
     const list = this.getRaw(collectionName);
-    const index = list.findIndex(i => i.id === id);
+    const idKey = String(id);
+    const index = list.findIndex(i => String(i.id) === idKey);
     if (index === -1) return null;
 
     const currentItem = list[index];
@@ -1787,6 +1879,8 @@ class DataManager {
     updatedFields.updatedAt = new Date().toISOString();
     const changedKeys = Object.keys(updatedFields).filter(k => k !== "id" && k !== "updatedAt" && updatedFields[k] !== currentItem[k]);
     list[index] = { ...list[index], ...updatedFields };
+    // server_ts viejo haría que el próximo pull descartara esta edición.
+    delete list[index].server_ts;
     this._persist(collectionName, list);
 
     if (collectionName !== "auditoria") {
@@ -1811,7 +1905,8 @@ class DataManager {
     const userRole = this.getUserRole(user);
     const canManageWorkers = collectionName === "workers" && (isGlobal || userRole === "admin" || userRole === "socio" || userRole === "super_admin" || this.hasPermission(user, "delete", "personal"));
     let list = this.getRaw(collectionName);
-    const index = list.findIndex(i => i.id === id);
+    const idKey = String(id);
+    const index = list.findIndex(i => String(i.id) === idKey);
     if (index === -1) return false;
 
     const currentItem = list[index];
@@ -2049,16 +2144,16 @@ class DataManager {
   // =========================================================================
   getDefaultModulesConfig() {
     return [
-      { id: "kpis", label: "KPIs Power BI & Procesos", icon: "fa-chart-line", iconColor: "text-amber-400", category: "Control Ejecutivo", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin", "abogado"] },
-      { id: "casos", label: "Casos & Expedientes", icon: "fa-gavel", iconColor: "text-blue-400", category: "Litigios & Diligencias", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin", "abogado", "asistente_legal"] },
-      { id: "citas", label: "Agenda Citas & Audiencias", icon: "fa-calendar-check", iconColor: "text-emerald-400", category: "Litigios & Diligencias", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin", "abogado", "asistente_legal", "asistente_admin"] },
-      { id: "documentos", label: "Gestión Documental", icon: "fa-file-contract", iconColor: "text-cyan-400", category: "Litigios & Diligencias", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin", "abogado", "asistente_legal", "asistente_admin"] },
-      { id: "personal", label: "Gestión de Personal", icon: "fa-id-card-clip", iconColor: "text-indigo-400", category: "Personal & Asistencia", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin", "abogado", "asistente_legal", "asistente_admin"] },
-      { id: "asistencia", label: "Control de Asistencia", icon: "fa-user-clock", iconColor: "text-amber-400", category: "Personal & Asistencia", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin", "abogado", "asistente_legal", "asistente_admin"] },
-      { id: "caja_chica", label: "Caja Chica & Centros de Costo", icon: "fa-cash-register", iconColor: "text-green-400", category: "Costos & Almacén Sede", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin", "asistente_admin", "abogado"] },
-      { id: "presupuestos", label: "Presupuestos & Proyecciones", icon: "fa-file-invoice-dollar", iconColor: "text-amber-500", category: "Costos & Almacén Sede", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin"] },
-      { id: "inventario", label: "Inventario ABC & Archivo", icon: "fa-boxes-packing", iconColor: "text-orange-400", category: "Costos & Almacén Sede", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin", "asistente_admin"] },
-      { id: "configuracion", label: "Ajustes & Respaldo Local", icon: "fa-sliders", iconColor: "text-slate-400", category: "Administración", enabled: true, isCustom: false, rolesAllowed: ["socio", "admin"] }
+      { id: "kpis", label: "KPIs Power BI & Procesos", icon: "fa-chart-line", iconColor: "text-amber-400", category: "Control Ejecutivo", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin", "abogado"] },
+      { id: "casos", label: "Casos & Expedientes", icon: "fa-gavel", iconColor: "text-blue-400", category: "Litigios & Diligencias", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin", "abogado", "asistente_legal"] },
+      { id: "citas", label: "Agenda Citas & Audiencias", icon: "fa-calendar-check", iconColor: "text-emerald-400", category: "Litigios & Diligencias", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin", "abogado", "asistente_legal", "asistente_admin"] },
+      { id: "documentos", label: "Gestión Documental", icon: "fa-file-contract", iconColor: "text-cyan-400", category: "Litigios & Diligencias", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin", "abogado", "asistente_legal", "asistente_admin"] },
+      { id: "personal", label: "Gestión de Personal", icon: "fa-id-card-clip", iconColor: "text-indigo-400", category: "Personal & Asistencia", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin", "abogado", "asistente_legal", "asistente_admin"] },
+      { id: "asistencia", label: "Control de Asistencia", icon: "fa-user-clock", iconColor: "text-amber-400", category: "Personal & Asistencia", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin", "abogado", "asistente_legal", "asistente_admin"] },
+      { id: "caja_chica", label: "Caja Chica & Centros de Costo", icon: "fa-cash-register", iconColor: "text-green-400", category: "Costos & Almacén Sede", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin", "asistente_admin", "abogado"] },
+      { id: "presupuestos", label: "Presupuestos & Proyecciones", icon: "fa-file-invoice-dollar", iconColor: "text-amber-500", category: "Costos & Almacén Sede", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin"] },
+      { id: "inventario", label: "Inventario ABC & Archivo", icon: "fa-boxes-packing", iconColor: "text-orange-400", category: "Costos & Almacén Sede", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin", "asistente_admin"] },
+      { id: "configuracion", label: "Ajustes & Respaldo Local", icon: "fa-sliders", iconColor: "text-slate-400", category: "Administración", enabled: true, isCustom: false, rolesAllowed: ["super_admin", "socio", "admin"] }
     ];
   }
 
@@ -2404,12 +2499,25 @@ class PdfDatabase {
     return new Promise((resolve, reject) => {
       const tx = db.transaction(this.storeName, "readwrite");
       const store = tx.objectStore(this.storeName);
+      // Sin tipoDoc: borrar el registro completo (expediente + resolución + legacy)
+      if (!tipoDoc) {
+        const delReq = store.delete(casoId);
+        delReq.onsuccess = () => resolve(true);
+        delReq.onerror = (e) => reject(e);
+        return;
+      }
       const getReq = store.get(casoId);
       getReq.onsuccess = () => {
         if (getReq.result) {
           const record = getReq.result;
           delete record[tipoDoc];
-          store.put(record);
+          const stillHas =
+            record.expediente || record.resolucion || record.blob || record.data || record.pdf;
+          if (!stillHas) {
+            store.delete(casoId);
+          } else {
+            store.put(record);
+          }
         }
         resolve(true);
       };

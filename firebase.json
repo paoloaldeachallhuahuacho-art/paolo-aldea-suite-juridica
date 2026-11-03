@@ -8,7 +8,18 @@
     "ignore": [
       "firebase.json",
       "**/.*",
-      "**/node_modules/**"
+      "**/node_modules/**",
+      "**/tests/**",
+      "**/supabase/**",
+      "**/docs/**",
+      "**/netlify/**",
+      "**/herramientas/**",
+      "package-lock.json",
+      "*.ps1",
+      "*.bat",
+      "*.vbs",
+      "*.sql",
+      ".env*"
     ],
     "rewrites": [
       {

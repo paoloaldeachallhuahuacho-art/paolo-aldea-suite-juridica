@@ -36,8 +36,15 @@ const escapeHtml = (str) => {
 };
 window.escapeHtml = escapeHtml;
 
-/** Serializa un valor para usarlo como literal JS en onclick (evita breakout de comillas). */
-const jsStr = (val) => JSON.stringify(String(val ?? ""));
+/**
+ * Serializa un valor para usarlo como literal JS dentro de atributos HTML
+ * (onclick="..."). JSON.stringify usa comillas dobles; hay que escaparlas
+ * a &quot; o el navegador corta el atributo y dispara SyntaxError.
+ */
+const jsStr = (val) =>
+  JSON.stringify(String(val ?? ""))
+    .replace(/&/g, "&amp;")
+    .replace(/"/g, "&quot;");
 window.jsStr = jsStr;
 
 /** Solo data:image o https/http seguros para fotos de perfil. */
@@ -118,8 +125,27 @@ class LegalApp {
     const flujoCajaBadge = document.getElementById("flujoCajaSedeBadge");
     if (flujoCajaBadge) flujoCajaBadge.textContent = sedeLabel;
 
-    const radarSedeSub = document.getElementById("asistencia-radar-sede-sub");
-    if (radarSedeSub) radarSedeSub.textContent = sedeLabel;
+    if (window.AttendanceModule && typeof window.AttendanceModule.paintSedeHero === "function") {
+      window.AttendanceModule.paintSedeHero(activeSedeKey === "todas" ? {
+        id: "todas",
+        nombre: "PAOLO ALDEA & ABOGADOS",
+        nombreCorto: "Consolidado Nacional",
+        ciudad: "CONSOLIDADO NACIONAL"
+      } : (branchConfig ? {
+        id: branchConfig.id || activeSedeKey,
+        nombre: branchConfig.nombre,
+        nombreCorto: branchConfig.nombreCorto,
+        ciudad: branchConfig.region || ""
+      } : {
+        id: "challhuahuacho",
+        nombre: sedeLabel,
+        nombreCorto: sedeLabel,
+        ciudad: ""
+      }));
+    } else {
+      const radarSedeSub = document.getElementById("asistencia-radar-sede-sub");
+      if (radarSedeSub) radarSedeSub.textContent = sedeLabel;
+    }
   }
 
   setupAutoSaveSettings() {
@@ -140,7 +166,7 @@ class LegalApp {
       el.addEventListener("change", triggerAutoSave);
     });
 
-    ["cfgPushTopic", "cfgPushAutoSend", "cfgPushAnonymize", "cfgTelegramToken", "cfgTelegramChatId"].forEach(id => {
+    ["cfgWebPushOptIn", "cfgPushAutoSend", "cfgPushScope", "cfgTelegramToken", "cfgTelegramChatId"].forEach(id => {
       const el = document.getElementById(id);
       if (el) {
         el.addEventListener("input", triggerAutoSave);
@@ -164,9 +190,10 @@ class LegalApp {
       const firmPhone = getSafeVal("cfgFirmPhone", current.firmPhone || "+51 943 410 215");
       const currency = getSafeVal("cfgCurrency", current.currency || "S/");
 
-      const topic = getSafeVal("cfgPushTopic", current.pushTopic || "aldea_notificaciones_seguras").replace(/\s+/g, "_").toLowerCase();
-      const autoSend = document.getElementById("cfgPushAutoSend") ? document.getElementById("cfgPushAutoSend").checked : false;
-      const anonymize = document.getElementById("cfgPushAnonymize") ? document.getElementById("cfgPushAnonymize").checked : true;
+      const autoSend = document.getElementById("cfgPushAutoSend") ? document.getElementById("cfgPushAutoSend").checked : true;
+      const webPushOptIn = document.getElementById("cfgWebPushOptIn") ? document.getElementById("cfgWebPushOptIn").checked : !!current.webPushOptIn;
+      const pushScopeEl = document.getElementById("cfgPushScope");
+      const pushScope = pushScopeEl ? pushScopeEl.value : (current.pushScope || "self");
       const tgToken = getSafeVal("cfgTelegramToken", current.telegramToken || "");
       const tgChat = getSafeVal("cfgTelegramChatId", current.telegramChatId || "");
 
@@ -181,12 +208,14 @@ class LegalApp {
         firmAddress,
         firmPhone,
         currency,
-        pushTopic: topic,
         pushAutoSend: autoSend,
-        pushAnonymize: anonymize,
+        webPushOptIn,
+        pushScope,
+        pushAnonymize: true,
         telegramToken: tgToken,
         telegramChatId: tgChat
       };
+      if (window.PaoloPushService) window.PaoloPushService.setOptIn(!!webPushOptIn);
 
             if (window.SEDES_CONFIG && window.SEDES_CONFIG[activeSedeKey]) {
         window.SEDES_CONFIG[activeSedeKey].nombre = firmBranch;
@@ -248,6 +277,10 @@ class LegalApp {
       } else {
         document.documentElement.classList.remove("dark");
       }
+      const metaThemeColor = document.getElementById("metaThemeColor");
+      if (metaThemeColor) {
+        metaThemeColor.setAttribute("content", isDark ? "#141518" : "#F8FAFC");
+      }
       this.updateThemeIcon(isDark);
     } catch (e) {
       console.warn("Theme init error:", e);
@@ -270,7 +303,7 @@ class LegalApp {
 
       const metaThemeColor = document.getElementById("metaThemeColor");
       if (metaThemeColor) {
-        metaThemeColor.setAttribute("content", newTheme === "dark" ? "#020617" : "#0B132B");
+        metaThemeColor.setAttribute("content", newTheme === "dark" ? "#141518" : "#F8FAFC");
       }
 
       this.showToast(newTheme === "dark" ? "Modo oscuro activado" : "Modo claro activado", "info");
@@ -296,48 +329,89 @@ class LegalApp {
   // =========================================================================
   // PWA (PROGRESSIVE WEB APP) & SERVICE WORKER MÓVIL
   // =========================================================================
-  initPwa() {
-    // 1. Registro de Service Worker para caché offline y notificaciones push nativas
-    if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => {
-        navigator.serviceWorker
-          .register("./sw.js")
-          .then((registration) => {
-            console.log("Service Worker Paolo Aldea activo:", registration.scope);
-          })
-          .catch((error) => {
-            console.warn("Service Worker registro:", error);
-          });
-      });
-    }
+  isPwaInstalled() {
+    try {
+      if (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches) return true;
+      if (window.matchMedia && window.matchMedia("(display-mode: minimal-ui)").matches) return true;
+      if (typeof navigator !== "undefined" && navigator.standalone === true) return true; // iOS Safari
+      if (document.referrer && document.referrer.startsWith("android-app://")) return true;
+      if (localStorage.getItem("PA_PWA_INSTALLED") === "1") return true;
+    } catch (_) {}
+    return false;
+  }
 
-    // 2. Evento beforeinstallprompt para instalación directa PWA en Android y Chrome
+  setPwaInstallButtonVisible(visible) {
+    const btnInstall = document.getElementById("btnPwaInstall");
+    if (!btnInstall) return;
+    if (visible && !this.isPwaInstalled()) {
+      btnInstall.classList.remove("hidden");
+      btnInstall.classList.add("inline-flex");
+      btnInstall.setAttribute("aria-hidden", "false");
+    } else {
+      btnInstall.classList.add("hidden");
+      btnInstall.classList.remove("inline-flex");
+      btnInstall.setAttribute("aria-hidden", "true");
+    }
+  }
+
+  initPwa() {
+    // El service worker y el aviso de versión nueva viven en js/app-update.js.
+    // Si ya está instalada en este dispositivo, nunca mostrar "Instalar App".
+    this.setPwaInstallButtonVisible(false);
+
     window.addEventListener("beforeinstallprompt", (e) => {
       e.preventDefault();
-      this.deferredPwaPrompt = e;
-      const btnInstall = document.getElementById("btnPwaInstall");
-      if (btnInstall) {
-        btnInstall.classList.remove("hidden");
-        btnInstall.classList.add("inline-flex");
+      if (this.isPwaInstalled()) {
+        this.deferredPwaPrompt = null;
+        this.setPwaInstallButtonVisible(false);
+        return;
       }
+      this.deferredPwaPrompt = e;
+      this.setPwaInstallButtonVisible(true);
     });
 
-    // 3. Confirmación de app instalada en pantalla principal
     window.addEventListener("appinstalled", () => {
       this.deferredPwaPrompt = null;
-      const btnInstall = document.getElementById("btnPwaInstall");
-      if (btnInstall) {
-        btnInstall.classList.add("hidden");
-      }
+      try {
+        localStorage.setItem("PA_PWA_INSTALLED", "1");
+      } catch (_) {}
+      this.setPwaInstallButtonVisible(false);
       this.showToast("¡Aplicación Paolo Aldea instalada en su dispositivo!", "success");
     });
+
+    // Revalidar si el usuario abre la PWA ya instalada
+    try {
+      if (window.matchMedia) {
+        const mq = window.matchMedia("(display-mode: standalone)");
+        const sync = () => {
+          if (mq.matches) {
+            try {
+              localStorage.setItem("PA_PWA_INSTALLED", "1");
+            } catch (_) {}
+            this.setPwaInstallButtonVisible(false);
+          }
+        };
+        sync();
+        if (typeof mq.addEventListener === "function") mq.addEventListener("change", sync);
+        else if (typeof mq.addListener === "function") mq.addListener(sync);
+      }
+    } catch (_) {}
   }
 
   async installPwa() {
+    if (this.isPwaInstalled()) {
+      this.setPwaInstallButtonVisible(false);
+      this.showToast("Esta aplicación ya está instalada en este dispositivo.", "info");
+      return;
+    }
     if (this.deferredPwaPrompt) {
       this.deferredPwaPrompt.prompt();
       const choiceResult = await this.deferredPwaPrompt.userChoice;
       if (choiceResult.outcome === "accepted") {
+        try {
+          localStorage.setItem("PA_PWA_INSTALLED", "1");
+        } catch (_) {}
+        this.setPwaInstallButtonVisible(false);
         this.showToast("Instalando aplicaci\u00F3n Paolo Aldea...", "success");
       }
       this.deferredPwaPrompt = null;
@@ -422,6 +496,14 @@ class LegalApp {
       try { await window.db.ready(); } catch (_) {}
     }
 
+    // Modo B enterprise (no-op si no hay SUPABASE_* en Netlify)
+    if (window.PaoloEnterprise && typeof window.PaoloEnterprise.boot === "function") {
+      try { await window.PaoloEnterprise.boot(); } catch (_) {}
+    }
+
+    // Multi-dispositivo: sincronizar si ya existe Super Admin en la nube (Supabase)
+    try { await this.syncCloudAuthGate(); } catch (_) {}
+
     // Gestión de Sesiones Senior:
     // 1. Bloquea únicamente si el usuario recarga la página (F5 / Recargar) o si expiró por inactividad (2-3 min).
     // 2. Permite navegación fluida entre múltiples pestañas/ventanas sin bloquear al cambiar de pestaña.
@@ -435,7 +517,12 @@ class LegalApp {
     this.setupEventListeners();
     this.setupAutoSaveSettings();
     if (window.AttendanceModule) {
-      window.AttendanceModule.init();
+      if (typeof window.AttendanceModule.init === "function") {
+        window.AttendanceModule.init({ forceKiosk: true });
+      }
+      if (typeof window.AttendanceModule.enterKioskColaborador === "function") {
+        window.AttendanceModule.enterKioskColaborador();
+      }
     }
 
     setInterval(() => {
@@ -465,12 +552,25 @@ class LegalApp {
 
   applySettingsToUI() {
     const s = window.db.getSettings();
-    const activeSedeKey = window.db ? window.db.getActiveSede() : "challhuahuacho";
+    const activeSedeKey = this.resolveDisplaySedeKey
+      ? this.resolveDisplaySedeKey()
+      : (window.db ? window.db.getActiveSede() : "challhuahuacho");
     const branchConfig = (window.SEDES_CONFIG && window.SEDES_CONFIG[activeSedeKey]) ? window.SEDES_CONFIG[activeSedeKey] : null;
 
-    const branchNameDisplay = branchConfig ? branchConfig.nombre : (activeSedeKey === "todas" ? "Consolidado Nacional" : (s.firmBranch || "Sede Challhuahuacho"));
+    const branchNameDisplay = this.getActiveBranchDisplayLabel
+      ? this.getActiveBranchDisplayLabel({ uppercase: false })
+      : (branchConfig ? branchConfig.nombre : (activeSedeKey === "todas" ? "Consolidado Nacional" : (s.firmBranch || "Sede Challhuahuacho")));
     document.querySelectorAll(".firm-name-display").forEach(el => el.textContent = s.firmName || "PAOLO ALDEA & ABOGADOS");
-    document.querySelectorAll(".firm-branch-display").forEach(el => el.textContent = branchNameDisplay);
+    document.querySelectorAll(".firm-branch-display").forEach(el => {
+      if (el.classList.contains("firm-branch-login") || el.id === "loginSedeDisplay") {
+        el.textContent = this.getActiveBranchDisplayLabel
+          ? this.getActiveBranchDisplayLabel({ uppercase: true })
+          : String(branchNameDisplay).toUpperCase();
+      } else {
+        el.textContent = branchNameDisplay;
+      }
+    });
+    if (typeof this.applySedeToHeader === "function") this.applySedeToHeader();
     document.querySelectorAll(".firm-attorney-display").forEach(el => el.textContent = s.managingAttorney || "Dr. Paolo Aldea Quincho");
     document.querySelectorAll(".firm-license-display").forEach(el => el.textContent = s.firmLicense || "CAL / CAA - Registro Profesional");
     const currentUser = window.db ? window.db.getCurrentUser() : null;
@@ -512,20 +612,21 @@ class LegalApp {
     }
     if (inCurr) inCurr.value = s.currency || "S/";
 
-    const inPushTopic = document.getElementById("cfgPushTopic");
     const inPushAuto = document.getElementById("cfgPushAutoSend");
-    const inPushAnon = document.getElementById("cfgPushAnonymize");
+    const inWebPushOpt = document.getElementById("cfgWebPushOptIn");
+    const inPushScope = document.getElementById("cfgPushScope");
     const inTgToken = document.getElementById("cfgTelegramToken");
     const inTgChat = document.getElementById("cfgTelegramChatId");
-    const dispTopic = document.getElementById("displayPushTopic");
 
-    const activeTopic = s.pushTopic || `aldea_notificaciones_${activeSedeKey}`;
-    if (inPushTopic) inPushTopic.value = activeTopic;
-    if (dispTopic) dispTopic.textContent = activeTopic;
-    if (inPushAuto) inPushAuto.checked = s.pushAutoSend === true;
-    if (inPushAnon) inPushAnon.checked = s.pushAnonymize !== false;
+    if (inPushAuto) inPushAuto.checked = s.pushAutoSend !== false;
+    if (inWebPushOpt) {
+      inWebPushOpt.checked =
+        s.webPushOptIn === true || (window.PaoloPushService && window.PaoloPushService.isOptedIn());
+    }
+    if (inPushScope) inPushScope.value = s.pushScope || "self";
     if (inTgToken) inTgToken.value = s.telegramToken || "";
     if (inTgChat) inTgChat.value = s.telegramChatId || "";
+    if (typeof this.refreshWebPushStatus === "function") this.refreshWebPushStatus();
 
     // Sincronizaci\u00F3n Arquitectura Multi-Sede (RBAC)
     // currentUser already initialized above in applySettingsToUI
@@ -539,6 +640,7 @@ class LegalApp {
     if (isGlobal) {
       if (globalSedeContainer) globalSedeContainer.classList.remove("hidden");
       if (globalSedeSelect) globalSedeSelect.value = activeSedeKey;
+      if (typeof this.syncSedePickerUI === "function") this.syncSedePickerUI(activeSedeKey);
       if (workerSedeBadge) {
         workerSedeBadge.classList.add("hidden");
         workerSedeBadge.classList.remove("flex");
@@ -602,7 +704,195 @@ class LegalApp {
     }
 
     this.renderDirectorioBanner();
-    this.updateProfilePhotoUI(s.userPhoto);
+  }
+
+  /**
+   * Sede a mostrar en membretes: prioriza sede del usuario (si no es global),
+   * si no la sede activa de la app / última sede usada (también en pantalla de login).
+   */
+  resolveDisplaySedeKey() {
+    const norm = (raw) => (window.db && typeof window.db.normalizeSede === "function")
+      ? window.db.normalizeSede(raw)
+      : String(raw || "challhuahuacho").toLowerCase();
+    const user = window.db && typeof window.db.getCurrentUser === "function"
+      ? window.db.getCurrentUser()
+      : null;
+
+    // Colaborador de sede fija: siempre su sede asignada
+    if (user && window.db && typeof window.db.isGlobalAdmin === "function" && !window.db.isGlobalAdmin(user)) {
+      return norm(user.sede || "challhuahuacho");
+    }
+
+    // Admin global / socio / super: sede activa del selector
+    if (user && window.db && typeof window.db.getActiveSede === "function") {
+      return norm(window.db.getActiveSede());
+    }
+
+    // Sin sesión (login): última sede de uso de la app
+    try {
+      const stored = sessionStorage.getItem("PAOLO ALDEA_ACTIVE_SEDE")
+        || localStorage.getItem("PAOLO ALDEA_ACTIVE_SEDE");
+      if (stored) return norm(stored);
+    } catch (_) {}
+    return "challhuahuacho";
+  }
+
+  /** Etiqueta institucional: «SEDE MIRAFLORES • LIMA METROPOLITANA» */
+  getActiveBranchDisplayLabel(opts = {}) {
+    const uppercase = opts.uppercase !== false;
+    const sedeKey = this.resolveDisplaySedeKey();
+    const cfg = (window.SEDES_CONFIG && window.SEDES_CONFIG[sedeKey]) ? window.SEDES_CONFIG[sedeKey] : null;
+
+    let label;
+    if (sedeKey === "todas") {
+      label = "Consolidado Nacional";
+    } else if (cfg) {
+      const short = String(cfg.nombreCorto || cfg.nombre || sedeKey).replace(/^Sede\s+/i, "").trim();
+      const region = String(cfg.region || "").trim();
+      label = region ? `Sede ${short} • ${region}` : `Sede ${short}`;
+    } else {
+      label = "Sede Challhuahuacho • Cotabambas";
+    }
+
+    return uppercase ? label.toUpperCase() : label;
+  }
+
+  /** Actualiza login + topbar + sidebar con la sede del usuario / sede activa. */
+  applySedeToHeader() {
+    const labelUpper = this.getActiveBranchDisplayLabel({ uppercase: true });
+    const labelTitle = this.getActiveBranchDisplayLabel({ uppercase: false });
+    document.querySelectorAll(".firm-branch-login, #loginSedeDisplay").forEach((el) => {
+      el.textContent = labelUpper;
+    });
+    document.querySelectorAll(".firm-branch-display").forEach((el) => {
+      if (el.classList.contains("firm-branch-login") || el.id === "loginSedeDisplay") return;
+      el.textContent = labelTitle;
+    });
+    const locked = document.getElementById("workerSedeLockedText");
+    if (locked) locked.textContent = labelTitle;
+  }
+
+  /** Iconos institucionales por sede (selector custom / topbar). */
+  getSedePickerIcon(sedeId) {
+    const map = {
+      todas: "fa-globe-americas",
+      miraflores: "fa-city",
+      abancay: "fa-mountain-sun",
+      cusco: "fa-landmark",
+      huaraz: "fa-mountain",
+      challhuahuacho: "fa-building-flag"
+    };
+    return map[sedeId] || "fa-building-columns";
+  }
+
+  /** Sincroniza botón visible del selector con la sede activa (evita picker nativo Android). */
+  syncSedePickerUI(sedeId) {
+    const key = sedeId
+      || (window.db && typeof window.db.getActiveSede === "function" ? window.db.getActiveSede() : null)
+      || "challhuahuacho";
+    const select = document.getElementById("globalSedeSelect");
+    if (select && [...select.options].some((o) => o.value === key)) {
+      select.value = key;
+    }
+    const cfg = (window.SEDES_CONFIG && window.SEDES_CONFIG[key]) ? window.SEDES_CONFIG[key] : null;
+    const labelEl = document.getElementById("globalSedeSelectLabel");
+    if (labelEl) {
+      labelEl.textContent = key === "todas"
+        ? "Consolidado Nacional"
+        : (cfg ? (cfg.nombre || ("Sede " + (cfg.nombreCorto || key))) : ("Sede " + key));
+    }
+    const iconEl = document.getElementById("globalSedeSelectIcon");
+    if (iconEl) {
+      iconEl.className = "fa-solid " + this.getSedePickerIcon(key) + " text-[11px]";
+    }
+    const trigger = document.getElementById("btnOpenSedePicker");
+    if (trigger) {
+      trigger.setAttribute("aria-label", "Sede activa: " + (labelEl ? labelEl.textContent : key));
+      trigger.setAttribute("aria-expanded", "false");
+    }
+  }
+
+  async openSedePicker() {
+    const currentUser = window.db && typeof window.db.getCurrentUser === "function" ? window.db.getCurrentUser() : null;
+    const isGlobal = window.db ? window.db.isGlobalAdmin(currentUser) : true;
+    if (!isGlobal) {
+      this.showToast("Su perfil tiene sede fija. No puede cambiar de ubicación.", "info");
+      return;
+    }
+    this.renderSedePickerList();
+    const trigger = document.getElementById("btnOpenSedePicker");
+    if (trigger) trigger.setAttribute("aria-expanded", "true");
+    await this.openModal("modalSedePicker");
+    setTimeout(() => {
+      const selected = document.querySelector("#sedePickerList .sede-picker-option.is-selected");
+      if (selected && typeof selected.focus === "function") selected.focus();
+    }, 80);
+  }
+
+  closeSedePicker() {
+    this.closeModal("modalSedePicker");
+    const trigger = document.getElementById("btnOpenSedePicker");
+    if (trigger) {
+      trigger.setAttribute("aria-expanded", "false");
+      if (typeof trigger.focus === "function") trigger.focus();
+    }
+  }
+
+  renderSedePickerList() {
+    const list = document.getElementById("sedePickerList");
+    if (!list || !window.SEDES_CONFIG) return;
+    const active = (window.db && typeof window.db.getActiveSede === "function")
+      ? window.db.getActiveSede()
+      : "challhuahuacho";
+    const preferred = ["todas", "miraflores", "abancay", "cusco", "huaraz", "challhuahuacho"];
+    const keys = preferred
+      .filter((k) => window.SEDES_CONFIG[k])
+      .concat(Object.keys(window.SEDES_CONFIG).filter((k) => !preferred.includes(k)));
+
+    const esc = (typeof escapeHtml === "function")
+      ? escapeHtml
+      : (t) => String(t ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+
+    list.innerHTML = keys.map((k) => {
+      const s = window.SEDES_CONFIG[k];
+      const selected = k === active;
+      const title = k === "todas" ? "Consolidado Nacional" : (s.nombre || ("Sede " + (s.nombreCorto || k)));
+      const subtitle = s.region || s.direccion || "";
+      const code = s.codigo ? String(s.codigo) : "";
+      const icon = this.getSedePickerIcon(k);
+      const accent = String(s.color || "#D97706").replace(/[^#a-fA-F0-9(),.%\s]/g, "");
+      const safeKey = String(k).replace(/[^a-z0-9_]/gi, "");
+      return `
+        <button type="button" role="option" aria-selected="${selected ? "true" : "false"}"
+          class="sede-picker-option ${selected ? "is-selected" : ""}"
+          data-sede="${esc(safeKey)}"
+          onclick="window.app.pickSede('${safeKey}')">
+          <span class="sede-picker-option-icon" style="color:${accent};border-color:${accent}55;background:${accent}18">
+            <i class="fa-solid ${icon}"></i>
+          </span>
+          <span class="sede-picker-option-text">
+            <span class="sede-picker-option-title">${esc(title)}</span>
+            <span class="sede-picker-option-sub">${esc(subtitle)}</span>
+          </span>
+          ${code ? `<span class="sede-picker-option-code">${esc(code)}</span>` : ""}
+          <span class="sede-picker-option-radio" aria-hidden="true">
+            <i class="fa-solid ${selected ? "fa-circle-check" : "fa-circle"}"></i>
+          </span>
+        </button>`;
+    }).join("");
+  }
+
+  pickSede(sedeId) {
+    this.closeSedePicker();
+    if (!sedeId) return;
+    const current = (window.db && typeof window.db.getActiveSede === "function")
+      ? window.db.getActiveSede()
+      : null;
+    if (current === sedeId) {
+      this.syncSedePickerUI(sedeId);
+      return;
+    }
+    this.switchSede(sedeId);
   }
 
   // Alternar sede activa (Permiso exclusivo de Administrador Global)
@@ -618,8 +908,10 @@ class LegalApp {
     const cfg = window.SEDES_CONFIG ? window.SEDES_CONFIG[norm] : null;
     const label = cfg ? cfg.nombreCorto : "Consolidado Nacional";
 
+    this.syncSedePickerUI(norm);
     this.showToast(`Vista de despacho cambiada a: ${label}`, "info");
     this.applySettingsToUI();
+    this.applySedeToHeader();
     if (typeof this.renderDynamicSidebarModules === 'function') this.renderDynamicSidebarModules();
 
     // Refrescar inmediatamente el m\u00F3dulo actual con los datos de la sede seleccionada
@@ -644,7 +936,13 @@ class LegalApp {
     if (tabId === "kpis") {
       if (window.kpiDashboard) window.kpiDashboard.refresh();
     } else if (tabId === "asistencia") {
-      if (window.AttendanceModule) window.AttendanceModule.init();
+      if (window.AttendanceModule) {
+        if (typeof window.AttendanceModule.softRefresh === "function") {
+          window.AttendanceModule.softRefresh();
+        } else if (typeof window.AttendanceModule.init === "function") {
+          window.AttendanceModule.init();
+        }
+      }
     } else if (tabId === "caja_chica") {
       this.renderCajaChica();
     } else if (tabId === "presupuestos") {
@@ -694,8 +992,16 @@ class LegalApp {
     if (window.componentLoader && typeof window.componentLoader.ensureViewLoaded === "function") {
       const mounted = await window.componentLoader.ensureViewLoaded(tabId, "main");
       if (!mounted && !document.getElementById("view-" + tabId)) {
-        this.showToast(`No se pudo cargar el módulo «${tabId}». Verifique conexión o recargue.`, "error");
-        return;
+        // Fallback: apartado personalizado sin view-*.html
+        const modCfg = window.db && typeof window.db.getModulesConfig === "function"
+          ? (window.db.getModulesConfig() || []).find((m) => m.id === tabId)
+          : null;
+        if (modCfg && modCfg.isCustom && typeof this.ensureCustomModuleView === "function") {
+          this.ensureCustomModuleView(modCfg);
+        } else {
+          this.showToast(`No se pudo cargar el módulo «${tabId}». Verifique conexión o recargue.`, "error");
+          return;
+        }
       }
     }
     if (window.PaoloControllerLoader && typeof window.PaoloControllerLoader.ensure === "function") {
@@ -769,9 +1075,9 @@ class LegalApp {
       <div class="flex flex-wrap items-center justify-between gap-2 px-1 py-2 text-[11px] text-slate-600 border-t border-slate-200 mt-1">
         <span>Mostrando ${start + 1}–${end} de ${total}</span>
         <div class="flex items-center gap-1.5">
-          <button type="button" class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 ${prevDisabled}" onclick="window.app.setTablePage('${key}', ${page - 1})"><i class="fa-solid fa-chevron-left"></i></button>
+          <button type="button" class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 ${prevDisabled}" onclick="window.app.setTablePage(${jsStr(key)}, ${page - 1})"><i class="fa-solid fa-chevron-left"></i></button>
           <span class="font-semibold text-slate-800">Pág. ${page} / ${pages}</span>
-          <button type="button" class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 ${nextDisabled}" onclick="window.app.setTablePage('${key}', ${page + 1})"><i class="fa-solid fa-chevron-right"></i></button>
+          <button type="button" class="px-2 py-1 rounded border border-slate-300 bg-white hover:bg-slate-50 ${nextDisabled}" onclick="window.app.setTablePage(${jsStr(key)}, ${page + 1})"><i class="fa-solid fa-chevron-right"></i></button>
         </div>
       </div>`;
   }
@@ -826,7 +1132,13 @@ class LegalApp {
     const _rbacObs = new MutationObserver(() => { clearTimeout(_rbacTimer); _rbacTimer = setTimeout(() => this.applyRbacUI(), 60); });
     _rbacObs.observe(document.body, { childList: true, subtree: true });
     document.addEventListener("keydown", (ev) => {
-      if (ev.key === "Escape") this.toggleMobileSidebar(false);
+      if (ev.key !== "Escape") return;
+      const sedeModal = document.getElementById("modalSedePicker");
+      if (sedeModal && !sedeModal.classList.contains("hidden")) {
+        this.closeSedePicker();
+        return;
+      }
+      this.toggleMobileSidebar(false);
     });
     window.addEventListener("resize", () => {
       const sidebar = document.getElementById("mainAppSidebar");
@@ -886,8 +1198,8 @@ class LegalApp {
       return matchSearch && matchTipo && matchCat && matchEstado;
     });
 
-    const totalIng = items.filter(i => i.tipo === "Ingreso").reduce((s, i) => s + Number(i.monto || 0), 0);
-    const totalEg = items.filter(i => i.tipo === "Egreso").reduce((s, i) => s + Number(i.monto || 0), 0);
+    const totalIng = items.filter(i => /^ingreso$/i.test(String(i.tipo || ""))).reduce((s, i) => s + Number(i.monto || 0), 0);
+    const totalEg = items.filter(i => !/^ingreso$/i.test(String(i.tipo || ""))).reduce((s, i) => s + Number(i.monto || 0), 0);
     const saldo = totalIng - totalEg;
 
     const elSaldo = document.getElementById("cajaSummarySaldo");
@@ -917,7 +1229,7 @@ class LegalApp {
     const pageItems = filtered.slice(pageState.start, pageState.end);
 
     container.innerHTML = pageItems.map(item => {
-      const isIngreso = item.tipo === "Ingreso";
+      const isIngreso = /^ingreso$/i.test(String(item.tipo || ""));
       const tipoBadge = isIngreso
         ? `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-300"><i class="fa-solid fa-arrow-down-left mr-1"></i>Ingreso</span>`
         : `<span class="px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-300"><i class="fa-solid fa-arrow-up-right mr-1"></i>Egreso</span>`;
@@ -1060,8 +1372,16 @@ class LegalApp {
     }
   }
 
-  openCajaModal(id = null) {
+  async openCajaModal(id = null) {
     this.editingId = id;
+    if (window.componentLoader && typeof window.componentLoader.ensureModalsLoaded === "function") {
+      const ok = await window.componentLoader.ensureModalsLoaded();
+      if (!ok || !document.getElementById("modalCajaChica")) {
+        this.showToast("No se pudo cargar el formulario de Caja Chica. Recargue la página.", "error");
+        return;
+      }
+    }
+
     const form = document.getElementById("formCajaChica");
     if (form) form.reset();
 
@@ -1076,7 +1396,8 @@ class LegalApp {
       const item = window.db.get("caja_chica").find(i => i.id === id);
       if (item) { this._editingOriginalUpdatedAt = item.updatedAt || item.createdAt || null; }
       if (item) {
-        if (document.getElementById("cajaTipo")) document.getElementById("cajaTipo").value = item.tipo;
+        const tipoNorm = /^ingreso$/i.test(String(item.tipo || "")) ? "Ingreso" : "Egreso";
+        if (document.getElementById("cajaTipo")) document.getElementById("cajaTipo").value = tipoNorm;
         if (document.getElementById("cajaFecha")) document.getElementById("cajaFecha").value = item.fecha;
         if (document.getElementById("cajaCentroCosto")) document.getElementById("cajaCentroCosto").value = item.centroCosto || "Costo Procesal Recuperable";
         if (document.getElementById("cajaCategoria")) document.getElementById("cajaCategoria").value = item.categoria;
@@ -1109,7 +1430,7 @@ class LegalApp {
       document.getElementById("cajaSede").disabled = !(window.db && window.db.isGlobalAdmin());
     }
 
-    this.showModal("modalCajaChica");
+    await this.showModal("modalCajaChica");
   }
 
   saveCajaChica(e) {
@@ -1205,7 +1526,11 @@ class LegalApp {
             }
           ];
         }
-        window.db.update("caja_chica", this.editingId, data);
+        const updated = window.db.update("caja_chica", this.editingId, data);
+        if (!updated) {
+          this.showToast("No se pudo actualizar el movimiento de caja. Verifique permisos o reintente.", "error");
+          return;
+        }
         this.showToast("Movimiento de caja actualizado con éxito", "success");
       } else {
         data.id = window.generateUniqueId("CC");
@@ -1220,7 +1545,14 @@ class LegalApp {
             comentario: "Rendición de gasto ingresada al sistema. En espera de revisión por Asistente Administrativo."
           }
         ];
-        window.db.add("caja_chica", data);
+        const created = window.db.add("caja_chica", data);
+        if (!created) {
+          this.showToast("No se pudo guardar el movimiento de caja chica. Verifique permisos o reintente.", "error");
+          return;
+        }
+        if (window.PaoloCashManager && typeof window.PaoloCashManager.enqueueLocalEntry === "function") {
+          window.PaoloCashManager.enqueueLocalEntry(data).catch(() => {});
+        }
         this.showToast("Nuevo movimiento registrado en caja chica", "success");
 
         // Notificar automáticamente al Asistente Administrativo
@@ -1256,7 +1588,11 @@ class LegalApp {
   deleteCajaItem(id) {
     if (window.db && !window.db._rbacCheck("caja_chica", "delete", id)) return;
     if (confirm("¿Está seguro de eliminar este registro contable de Caja Chica?")) {
-      window.db.delete("caja_chica", id);
+      const ok = window.db.delete("caja_chica", id);
+      if (!ok) {
+        this.showToast("No se pudo eliminar el registro de caja chica.", "error");
+        return;
+      }
       this.renderCajaChica();
       window.kpiDashboard.refresh();
       this.showToast("Registro eliminado con éxito", "info");
@@ -1266,7 +1602,7 @@ class LegalApp {
   // =========================================================================
   // CONTROLADORES DEL FLUJO DE APROBACIÓN DE CAJA CHICA (3 NIVELES)
   // =========================================================================
-  openFlujoCajaModal(id) {
+  async openFlujoCajaModal(id) {
     this.currentFlujoCajaId = id;
     const item = (window.db.get("caja_chica") || []).find(i => i.id === id);
     if (!item) {
@@ -1274,9 +1610,20 @@ class LegalApp {
       return;
     }
 
+    if (window.componentLoader && typeof window.componentLoader.ensureModalsLoaded === "function") {
+      const ok = await window.componentLoader.ensureModalsLoaded();
+      if (!ok || !document.getElementById("modalFlujoCajaChica")) {
+        this.showToast("No se pudo cargar el flujo de caja. Recargue la página (Ctrl+F5).", "error");
+        return;
+      }
+    }
+
     const curr = window.db.getSettings().currency || "S/";
     const currentUser = (window.db && window.db.getCurrentUser) ? window.db.getCurrentUser() : null;
-    const userRole = currentUser?.rol || "socio";
+    const userRole = window.db.normalizeRole
+      ? window.db.normalizeRole(currentUser?.rol || "socio")
+      : (currentUser?.rol || "socio");
+    const isSuper = userRole === "super_admin" || (currentUser && currentUser.id === "WRK-000");
 
     // Encabezado e información de resumen
     const idBadge = document.getElementById("flujoCajaIdBadge");
@@ -1375,19 +1722,19 @@ class LegalApp {
       }).join("");
     }
 
-    // Visibilidad de Botones de Gestión según Rol RBAC
+    // Visibilidad de Botones de Gestión según Rol RBAC (super_admin puede todo)
     const secAsistente = document.getElementById("flujoAccionesAsistente");
     const secAdmin = document.getElementById("flujoAccionesAdmin");
     const secColaborador = document.getElementById("flujoMensajeColaborador");
 
-    const canAsistente = ["asistente_admin", "admin", "socio"].includes(userRole);
-    const canAdmin = ["admin", "socio"].includes(userRole);
+    const canAsistente = isSuper || ["asistente_admin", "admin", "socio"].includes(userRole);
+    const canAdmin = isSuper || ["admin", "socio"].includes(userRole);
 
     if (secAsistente) secAsistente.classList.toggle("hidden", !canAsistente);
     if (secAdmin) secAdmin.classList.toggle("hidden", !canAdmin);
     if (secColaborador) secColaborador.classList.toggle("hidden", canAsistente || canAdmin);
 
-    this.showModal("modalFlujoCajaChica");
+    await this.showModal("modalFlujoCajaChica");
   }
 
   elevarCajaChica() {
@@ -1399,7 +1746,7 @@ class LegalApp {
     const userRole = currentUser?.rol || "asistente_admin";
     const userName = currentUser?.nombre || currentUser?.nombres || "Asistente Administrativo";
 
-    if (!["asistente_admin", "admin", "socio"].includes(userRole)) {
+    if (!["super_admin", "asistente_admin", "admin", "socio"].includes(userRole) && !(currentUser && currentUser.id === "WRK-000")) {
       this.showToast("Solo el Asistente Administrativo o Dirección pueden elevar gastos.", "error");
       return;
     }
@@ -1418,6 +1765,14 @@ class LegalApp {
     });
 
     window.db.update("caja_chica", item.id, item);
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloCashManager && typeof window.PaoloCashManager.transition === "function") {
+      const cloudState = (window.PaoloSyncManager && window.PaoloSyncManager.mapLegacyWorkflow)
+        ? window.PaoloSyncManager.mapLegacyWorkflow("elevado_admin")
+        : "branch_approved";
+      window.PaoloCashManager.transition(item.id, cloudState, nota).catch((err) => {
+        console.warn("[CashManager] elevar cloud:", err && err.message);
+      });
+    }
     this.showToast("Gasto elevado con éxito a Administración / Socio", "success");
 
     // Notificar a Dirección / Socios
@@ -1451,6 +1806,11 @@ class LegalApp {
     const currentUser = window.db.getCurrentUser ? window.db.getCurrentUser() : null;
     const userRole = currentUser?.rol || "asistente_admin";
     const userName = currentUser?.nombre || currentUser?.nombres || "Asistente Administrativo";
+
+    if (!["super_admin", "asistente_admin", "admin", "socio"].includes(userRole) && !(currentUser && currentUser.id === "WRK-000")) {
+      this.showToast("Solo el Asistente Administrativo o Dirección pueden observar gastos.", "error");
+      return;
+    }
 
     const inputComentario = document.getElementById("flujoCajaComentarioInput");
     const nota = (inputComentario?.value || "").trim();
@@ -1495,7 +1855,7 @@ class LegalApp {
     const userRole = currentUser?.rol || "socio";
     const userName = currentUser?.nombre || currentUser?.nombres || "Socio Principal";
 
-    if (!["admin", "socio"].includes(userRole)) {
+    if (!["super_admin", "admin", "socio"].includes(userRole) && !(currentUser && currentUser.id === "WRK-000")) {
       this.showToast("Solo los Socios Principales o Administradores pueden aprobar desembolsos.", "error");
       return;
     }
@@ -1514,6 +1874,15 @@ class LegalApp {
     });
 
     window.db.update("caja_chica", item.id, item);
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloCashManager && typeof window.PaoloCashManager.transition === "function") {
+      // Flujo legal: branch_approved → disbursed (no saltar requested → disbursed)
+      window.PaoloCashManager.transition(item.id, "disbursed", nota).catch((err) => {
+        console.warn("[CashManager] aprobar cloud:", err && err.message);
+        this.showToast("Aprobado local; nube: " + ((err && err.message) || "error"), "warning");
+      });
+    } else if (window.PaoloCashManager && window.PaoloCashManager.enqueueLocalEntry) {
+      window.PaoloCashManager.enqueueLocalEntry(item).catch(() => {});
+    }
     this.showToast("Gasto aprobado y autorizado para desembolso", "success");
 
     // Notificar al colaborador solicitante
@@ -1547,7 +1916,7 @@ class LegalApp {
     const userRole = currentUser?.rol || "socio";
     const userName = currentUser?.nombre || currentUser?.nombres || "Socio Principal";
 
-    if (!["admin", "socio"].includes(userRole)) {
+    if (!["super_admin", "admin", "socio"].includes(userRole) && !(currentUser && currentUser.id === "WRK-000")) {
       this.showToast("Solo los Socios Principales o Administradores pueden rechazar gastos.", "error");
       return;
     }
@@ -1571,6 +1940,11 @@ class LegalApp {
     });
 
     window.db.update("caja_chica", item.id, item);
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloCashManager && typeof window.PaoloCashManager.transition === "function") {
+      window.PaoloCashManager.transition(item.id, "rejected", nota).catch((err) => {
+        console.warn("[CashManager] rechazar cloud:", err && err.message);
+      });
+    }
     this.showToast("Gasto rechazado por Dirección", "info");
 
     // Notificar al colaborador solicitante
@@ -1635,10 +2009,10 @@ class LegalApp {
 
     const filtered = items.filter(c => {
       const matchSearch =
-        c.expediente.toLowerCase().includes(searchVal) ||
-        c.caratula.toLowerCase().includes(searchVal) ||
-        c.cliente.toLowerCase().includes(searchVal) ||
-        c.juzgado.toLowerCase().includes(searchVal);
+        (c.expediente || "").toLowerCase().includes(searchVal) ||
+        (c.caratula || "").toLowerCase().includes(searchVal) ||
+        (c.cliente || "").toLowerCase().includes(searchVal) ||
+        (c.juzgado || "").toLowerCase().includes(searchVal);
 
       const matchMat = filterMateria === "ALL" || c.materia === filterMateria;
       const matchEst = filterEstado === "ALL" || c.estado === filterEstado;
@@ -1813,17 +2187,19 @@ class LegalApp {
         const etapa = (c.etapa || "").toLowerCase();
         const est = (c.estado || "").toLowerCase();
         const matchSearch =
-          c.expediente.toLowerCase().includes(searchVal) ||
-          c.caratula.toLowerCase().includes(searchVal) ||
-          c.cliente.toLowerCase().includes(searchVal);
+          (c.expediente || "").toLowerCase().includes(searchVal) ||
+          (c.caratula || "").toLowerCase().includes(searchVal) ||
+          (c.cliente || "").toLowerCase().includes(searchVal);
 
         if (!matchSearch) return false;
 
+        const isEjecucion = etapa.includes("ejecuci") || est.includes("concluido") || est.includes("ganado");
         if (stage.key === "Postulatoria") return etapa.includes("postulatoria") || etapa.includes("calificación");
         if (stage.key === "Probatoria") return etapa.includes("probatoria") || etapa.includes("conciliación");
         if (stage.key === "Juzgamiento") return etapa.includes("juzgamiento") || etapa.includes("intermedia") || etapa.includes("audiencia");
-        if (stage.key === "Sentencia") return etapa.includes("sentencia") || etapa.includes("apelación");
-        if (stage.key === "Ejecución") return est.includes("concluido") || est.includes("ganado") || etapa.includes("ejecución");
+        // Sentencia NO debe incluir "Ejecución de Sentencia" (contiene la subcadena "sentencia")
+        if (stage.key === "Sentencia") return !isEjecucion && (etapa.includes("sentencia") || etapa.includes("apelación"));
+        if (stage.key === "Ejecución") return isEjecucion;
         return false;
       });
 
@@ -1916,8 +2292,17 @@ class LegalApp {
     if (!caso) return;
 
     const stages = ["Postulatoria", "Probatoria", "Juzgamiento", "Sentencia", "Ejecución de Sentencia"];
-    const currentEtapa = caso.etapa || "Postulatoria";
-    let nextIdx = stages.findIndex(s => currentEtapa.includes(s));
+    const currentEtapa = String(caso.etapa || "Postulatoria").trim();
+    // Igualdad exacta (o match del tramo más largo primero): evita que "Ejecución de Sentencia" quede atrapada en "Sentencia"
+    let nextIdx = stages.findIndex(s => currentEtapa === s);
+    if (nextIdx === -1) {
+      const lower = currentEtapa.toLowerCase();
+      if (lower.includes("ejecuci")) nextIdx = 4;
+      else if (lower.includes("sentencia") || lower.includes("apelaci")) nextIdx = 3;
+      else if (lower.includes("juzgamiento") || lower.includes("audiencia") || lower.includes("intermedia")) nextIdx = 2;
+      else if (lower.includes("probatoria") || lower.includes("conciliaci")) nextIdx = 1;
+      else if (lower.includes("postulatoria") || lower.includes("calificaci")) nextIdx = 0;
+    }
 
     if (nextIdx === -1 || nextIdx >= stages.length - 1) {
       caso.estado = "Concluido / Ganado";
@@ -2163,13 +2548,24 @@ class LegalApp {
             return;
           }
         }
-        window.db.update("casos", this.editingId, data);
+        const updated = window.db.update("casos", this.editingId, data);
+        if (!updated) {
+          this.showToast("No se pudo actualizar el expediente. Verifique permisos o reintente.", "error");
+          return;
+        }
         this.showToast("Expediente judicial actualizado con éxito", "success");
       } else {
         data.id = casoId;
         data.fechaInicio = getRelativeDateOnlyStr(0);
-        window.db.add("casos", data);
+        const created = window.db.add("casos", data);
+        if (!created) {
+          this.showToast("No se pudo guardar el expediente. Verifique permisos o reintente.", "error");
+          return;
+        }
         this.showToast("Nuevo expediente judicial registrado en el despacho", "success");
+      }
+      if (window.PaoloCaseService && typeof window.PaoloCaseService.upsertCase === "function") {
+        window.PaoloCaseService.upsertCase(data).catch(() => {});
       }
 
       if (window.draftAutosave) window.draftAutosave.clearDraft("modalCaso");
@@ -2204,7 +2600,11 @@ class LegalApp {
       } catch (e) {
         console.warn("No se pudo eliminar PDF asociado a caso:", e);
       }
-      window.db.delete("casos", id);
+      const ok = window.db.delete("casos", id);
+      if (!ok) {
+        this.showToast("No se pudo eliminar el expediente.", "error");
+        return;
+      }
       this.renderCasos();
       window.alerts.evaluateAlerts();
       window.kpiDashboard.refresh();
@@ -2605,58 +3005,105 @@ class LegalApp {
   }
 
   // =========================================================================
-  // AJUSTES DE NOTIFICACIONES PUSH MÓVILES & PC
+  // AJUSTES WEB PUSH (VAPID) — segundo plano
   // =========================================================================
+  async refreshWebPushStatus() {
+    const label = document.getElementById("webPushStatusLabel");
+    if (!label) return;
+    if (!window.PaoloPushService) {
+      label.textContent = "Estado: servicio push no cargado.";
+      return;
+    }
+    try {
+      const st = await window.PaoloPushService.status();
+      if (!st.supported) {
+        label.textContent = "Estado: este navegador no soporta Web Push.";
+        return;
+      }
+      const parts = [
+        "permiso " + st.permission,
+        st.optedIn ? "opt-in activo" : "sin opt-in",
+        st.subscribed ? "dispositivo suscrito" : "sin suscripción",
+        st.hasToken ? "sesión cloud OK" : "falta sesión cloud",
+        st.vapidReady ? "VAPID listo" : "VAPID pendiente en servidor"
+      ];
+      label.textContent = "Estado: " + parts.join(" · ");
+    } catch (_) {
+      label.textContent = "Estado: no disponible.";
+    }
+  }
+
+  async enableWebPushOnDevice() {
+    if (!window.PaoloPushService) {
+      this.showToast("PushService no disponible.", "error");
+      return;
+    }
+    this.showToast("Solicitando permiso y registrando este dispositivo…", "info");
+    try {
+      const res = await window.PaoloPushService.subscribe({ forcePermission: true });
+      const opt = document.getElementById("cfgWebPushOptIn");
+      if (opt) opt.checked = !!res.ok;
+      if (res.ok) {
+        this.showToast("Dispositivo suscrito a Web Push.", "success");
+        this.autoSaveCurrentSettings();
+      } else {
+        const map = {
+          denied: "Permiso denegado en el navegador.",
+          vapid_missing: "Falta VAPID_PUBLIC_KEY en Cloudflare.",
+          no_session: "Inicie sesión online (syncToken) primero.",
+          unsupported: "Navegador sin soporte Push.",
+          permission_needed: "Se requiere permiso de notificaciones."
+        };
+        this.showToast(map[res.reason] || ("No se pudo suscribir (" + (res.reason || "?") + ")."), "error");
+      }
+    } catch (err) {
+      this.showToast((err && err.message) || "Error al suscribir Web Push", "error");
+    }
+    this.refreshWebPushStatus();
+  }
+
+  async disableWebPushOnDevice() {
+    if (!window.PaoloPushService) return;
+    try {
+      await window.PaoloPushService.unsubscribe();
+      const opt = document.getElementById("cfgWebPushOptIn");
+      if (opt) opt.checked = false;
+      this.autoSaveCurrentSettings();
+      this.showToast("Web Push desactivado en este dispositivo.", "info");
+    } catch (err) {
+      this.showToast((err && err.message) || "Error al desactivar", "error");
+    }
+    this.refreshWebPushStatus();
+  }
+
   savePushNotificationSettings() {
     try {
-      const current = window.db.getSettings();
-      const topic = getSafeVal("cfgPushTopic", "aldea_aldea_challhuahuacho").replace(/\s+/g, "_").toLowerCase();
-      const autoSend = document.getElementById("cfgPushAutoSend") ? document.getElementById("cfgPushAutoSend").checked : false;
-      const anonymize = document.getElementById("cfgPushAnonymize") ? document.getElementById("cfgPushAnonymize").checked : true;
-      const tgToken = getSafeVal("cfgTelegramToken", "");
-      const tgChat = getSafeVal("cfgTelegramChatId", "");
-
-      const newSettings = {
-        ...current,
-        pushTopic: topic,
-        pushAutoSend: autoSend,
-        pushAnonymize: anonymize,
-        telegramToken: tgToken,
-        telegramChatId: tgChat
-      };
-
-      window.db.saveSettings(newSettings);
+      this.autoSaveCurrentSettings();
       this.applySettingsToUI();
-    if (typeof this.renderDynamicSidebarModules === 'function') this.renderDynamicSidebarModules();
-      this.showToast("Canal y parámetros de notificaciones móviles guardados con éxito", "success");
+      if (typeof this.renderDynamicSidebarModules === "function") this.renderDynamicSidebarModules();
+      this.showToast("Ajustes de Web Push guardados", "success");
     } catch (err) {
       console.error("Error al guardar ajustes push:", err);
       alert("Error al guardar ajustes de notificaciones: " + err.message);
     }
   }
 
-  generateNewPushTopic() {
-    const rand = Math.random().toString(36).substring(2, 8);
-    const newTopic = `aldea_aldea_${rand}`;
-    const inTopic = document.getElementById("cfgPushTopic");
-    if (inTopic) inTopic.value = newTopic;
-    const disp = document.getElementById("displayPushTopic");
-    if (disp) disp.textContent = newTopic;
-  }
-
   async testPushNotification() {
-    this.showToast("Enviando alerta de prueba a su celular y PC...", "info");
+    this.showToast("Enviando prueba Web Push…", "info");
     const res = await window.alerts.testPushNotification();
     if (res.success) {
-      this.showToast(`¡Alerta enviada con éxito al canal «${res.topic}»! Verifique su celular.`, "success");
+      this.showToast("Prueba enviada. Revise la notificación del sistema.", "success");
     } else {
-      this.showToast(`¡Alerta despachada. Asegúrese de tener la app ntfy suscrita al canal «${res.topic}».`, "info");
+      this.showToast(
+        "No se completó la prueba. Suscriba el dispositivo e inicie sesión cloud (VAPID configurado).",
+        "info"
+      );
     }
+    this.refreshWebPushStatus();
   }
 
   openPhoneNotificationUrl() {
-    const topic = window.alerts ? window.alerts.getPushTopic() : "aldea_aldea_challhuahuacho";
-    window.open(`https://ntfy.sh/${encodeURIComponent(topic)}`, "_blank");
+    this.showToast("Web Push usa el navegador/PWA; ya no se usa un canal público.", "info");
   }
 
   showWindowsNotifierInstructions() {
@@ -2802,7 +3249,7 @@ class LegalApp {
                   <a href="${escapeHtml(c.meetUrl)}" target="_blank" rel="noopener noreferrer" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-2.5 py-1 rounded text-[11px] flex items-center gap-1 shadow-2xs transition">
                     Unirse
                   </a>
-                  <button type="button" onclick="window.app.copiarMeetUrl('${escapeHtml(c.meetUrl)}')" class="p-1 text-slate-400 hover:text-emerald-700 text-xs" title="Copiar enlace Meet">
+                  <button type="button" onclick="window.app.copiarMeetUrl(${jsStr(c.meetUrl)})" class="p-1 text-slate-400 hover:text-emerald-700 text-xs" title="Copiar enlace Meet">
                     <i class="fa-regular fa-copy"></i>
                   </button>
                 </div>
@@ -2960,11 +3407,19 @@ class LegalApp {
             return;
           }
         }
-        window.db.update("citas", this.editingId, data);
+        const updated = window.db.update("citas", this.editingId, data);
+        if (!updated) {
+          this.showToast("No se pudo actualizar la cita. Verifique permisos o reintente.", "error");
+          return;
+        }
         this.showToast("Cita actualizada exitosamente", "success");
       } else {
         data.id = window.generateUniqueId("CITA");
-        window.db.add("citas", data);
+        const created = window.db.add("citas", data);
+        if (!created) {
+          this.showToast("No se pudo guardar la cita. Verifique permisos o reintente.", "error");
+          return;
+        }
         this.showToast("Cita agendada en Sede Challhuahuacho", "success");
         window.alerts.playChime("alert");
       }
@@ -2988,7 +3443,11 @@ class LegalApp {
   deleteCita(id) {
     if (window.db && !window.db._rbacCheck("citas", "delete", id)) return;
     if (confirm("¿Desea cancelar y eliminar esta cita de la agenda?")) {
-      window.db.delete("citas", id);
+      const ok = window.db.delete("citas", id);
+      if (!ok) {
+        this.showToast("No se pudo eliminar la cita.", "error");
+        return;
+      }
       this.renderCitas();
       window.alerts.evaluateAlerts();
       window.kpiDashboard.refresh();
@@ -3141,11 +3600,19 @@ class LegalApp {
       this.showToast("No hay espacio para guardar la foto.", "error");
       return;
     }
+    if (window.db && typeof window.db.getSettings === "function" && typeof window.db.saveSettings === "function") {
+      const settings = window.db.getSettings() || {};
+      settings.userPhoto = dataUrl || "";
+      window.db.saveSettings(settings);
+    }
     if (currentUser && window.db.setCurrentUser) {
       window.db.setCurrentUser({ ...currentUser, foto: dataUrl });
     }
     if (currentUser && currentUser.id && window.db.update) {
-      window.db.update("workers", currentUser.id, { foto: dataUrl, updatedAt: new Date().toISOString() });
+      const saved = window.db.update("workers", currentUser.id, { foto: dataUrl, updatedAt: new Date().toISOString() });
+      if (!saved) {
+        this.showToast("La foto se ve ahora, pero no quedó en la ficha del colaborador.", "warning");
+      }
     }
     this.updateProfilePhotoUI(dataUrl);
     this.showToast(dataUrl ? "Foto de perfil actualizada." : "Foto de perfil eliminada.", "success");
@@ -3360,11 +3827,23 @@ class LegalApp {
         <a href="${safeUrl}" target="_blank" rel="noopener noreferrer" class="px-3.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold flex items-center gap-1.5 shadow transition cursor-pointer">
           <i class="fa-solid fa-video"></i> Unirse a Google Meet
         </a>
-        <button type="button" onclick="document.getElementById('topAlertBanner').classList.add('hidden')" class="text-white/70 hover:text-white p-1 cursor-pointer">
-          <i class="fa-solid fa-xmark"></i>
+        <button type="button" data-alert-action="dismiss-meet" class="text-white/70 hover:text-white min-w-[36px] min-h-[36px] rounded-lg flex items-center justify-center cursor-pointer" title="Cerrar" aria-label="Cerrar banner">
+          <i class="fa-solid fa-xmark pointer-events-none"></i>
         </button>
       </div>
     `;
+    const meetClose = content.querySelector('[data-alert-action="dismiss-meet"]');
+    if (meetClose) {
+      meetClose.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (window.alerts && typeof window.alerts.dismissTopBanner === "function") {
+          window.alerts.dismissTopBanner("meet-banner");
+        } else {
+          banner.classList.add("hidden");
+        }
+      });
+    }
   }
 
   pegarDirectorioMeetEnCita() {
@@ -3778,7 +4257,7 @@ ${callToAction}
       } else if (item.estado === "Aprobado") {
         ejecCellHtml = `
           <div class="py-1 text-center">
-            <button onclick="window.app.openEjecutarPresupuestoModal('${escapeHtml(item.id)}')" class="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 hover:border-amber-400 font-bold px-2 py-1 rounded-lg text-[10px] shadow-2xs transition group" title="Registrar gasto real efectuado de este presupuesto">
+            <button onclick="window.app.openEjecutarPresupuestoModal(${jsStr(item.id)})" class="inline-flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 hover:border-amber-400 font-bold px-2 py-1 rounded-lg text-[10px] shadow-2xs transition group" title="Registrar gasto real efectuado de este presupuesto">
               <i class="fa-solid fa-money-bill-transfer text-amber-600 group-hover:scale-110 transition"></i>
               <span>Registrar Ejecución (0% usado)</span>
             </button>
@@ -3794,7 +4273,7 @@ ${callToAction}
       }
 
       const btnEjecutarAction = (item.estado === "Aprobado" || isEjecutado) ? `
-        <button onclick="window.app.openEjecutarPresupuestoModal('${escapeHtml(item.id)}')" class="text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 p-1.5 rounded border border-amber-300 transition shadow-2xs" title="${isEjecutado ? 'Modificar Liquidación / Ver % Usado' : 'Registrar Gasto Ejecutado'}">
+        <button onclick="window.app.openEjecutarPresupuestoModal(${jsStr(item.id)})" class="text-amber-700 hover:text-amber-900 bg-amber-50 hover:bg-amber-100 p-1.5 rounded border border-amber-300 transition shadow-2xs" title="${isEjecutado ? 'Modificar Liquidación / Ver % Usado' : 'Registrar Gasto Ejecutado'}">
           <i class="fa-solid fa-chart-pie"></i>
         </button>
       ` : '';
@@ -3852,10 +4331,10 @@ ${callToAction}
           <td class="text-center">
             <div class="flex items-center justify-center gap-1">
               ${btnEjecutarAction}
-              <button onclick="window.pdfExporter.exportSinglePresupuestoPdf('${escapeHtml(item.id)}')" class="text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 p-1.5 rounded border border-rose-200 transition shadow-2xs" title="Exportar comprobante PDF"><i class="fa-solid fa-file-pdf"></i></button>
-              <button onclick="window.excelExporter.exportSinglePresupuesto('${escapeHtml(item.id)}')" class="text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 p-1.5 rounded border border-emerald-200 transition shadow-2xs" title="Exportar comprobante Excel"><i class="fa-solid fa-file-excel"></i></button>
-              <button onclick="window.app.editPresupuesto('${escapeHtml(item.id)}')" class="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 p-1.5 rounded border border-blue-200 transition shadow-2xs" title="Editar partida"><i class="fa-solid fa-pen-to-square"></i></button>
-              <button onclick="window.app.deletePresupuesto('${escapeHtml(item.id)}')" class="text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 p-1.5 rounded border border-slate-200 transition shadow-2xs" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
+              <button onclick="window.pdfExporter.exportSinglePresupuestoPdf(${jsStr(item.id)})" class="text-rose-600 hover:text-rose-800 bg-rose-50 hover:bg-rose-100 p-1.5 rounded border border-rose-200 transition shadow-2xs" title="Exportar comprobante PDF"><i class="fa-solid fa-file-pdf"></i></button>
+              <button onclick="window.excelExporter.exportSinglePresupuesto(${jsStr(item.id)})" class="text-emerald-700 hover:text-emerald-900 bg-emerald-50 hover:bg-emerald-100 p-1.5 rounded border border-emerald-200 transition shadow-2xs" title="Exportar comprobante Excel"><i class="fa-solid fa-file-excel"></i></button>
+              <button onclick="window.app.editPresupuesto(${jsStr(item.id)})" class="text-blue-600 hover:text-blue-800 bg-blue-50 hover:bg-blue-100 p-1.5 rounded border border-blue-200 transition shadow-2xs" title="Editar partida"><i class="fa-solid fa-pen-to-square"></i></button>
+              <button onclick="window.app.deletePresupuesto(${jsStr(item.id)})" class="text-slate-400 hover:text-red-600 bg-slate-50 hover:bg-red-50 p-1.5 rounded border border-slate-200 transition shadow-2xs" title="Eliminar"><i class="fa-solid fa-trash-can"></i></button>
             </div>
           </td>
         </tr>
@@ -4902,11 +5381,15 @@ ${callToAction}
         data.correlativo = existingNum;
         data.id = `${branchPrefix}-${cc}-${pcge}-${String(existingNum).padStart(3, "0")}`;
 
-        window.db.update("presupuestos", this.editingPresupuestoId, data);
+        const updated = window.db.update("presupuestos", this.editingPresupuestoId, data);
+        if (!updated) {
+          this.showToast("No se pudo actualizar la partida presupuestaria. Verifique permisos.", "error");
+          return;
+        }
         this.showToast(`Partida presupuestaria ${data.id} actualizada con éxito`, "success");
       } else {
-        // Correlativo secuencial estructurado: [PREFIJO_SEDE]-[CENTRO_COSTO]-[CLASE_PCGE]-[CORRELATIVO]
-        const maxNum = window.db.get("presupuestos").reduce((mx, p) => {
+        // Correlativo global por raw (todas las sedes) para evitar colisiones CHL/MIR → mismo 001
+        const maxNum = (window.db.getRaw("presupuestos") || []).reduce((mx, p) => {
           let num = p.correlativo;
           if (!num && p.id) {
             const m = /-(\d+)$/.exec(p.id);
@@ -4918,7 +5401,11 @@ ${callToAction}
         data.correlativo = nextNum;
         data.id = `${branchPrefix}-${cc}-${pcge}-${String(nextNum).padStart(3, "0")}`;
 
-        window.db.add("presupuestos", data);
+        const created = window.db.add("presupuestos", data);
+        if (!created) {
+          this.showToast("No se pudo guardar el presupuesto. Verifique permisos o reintente.", "error");
+          return;
+        }
         this.showToast(`Partida ${data.id} registrada con éxito`, "success");
         window.alerts.playChime("alert");
       }
@@ -4941,7 +5428,11 @@ ${callToAction}
   deletePresupuesto(id) {
     if (window.db && !window.db._rbacCheck("presupuestos", "delete", id)) return;
     if (confirm("¿Está seguro de que desea eliminar esta partida presupuestaria?")) {
-      window.db.delete("presupuestos", id);
+      const ok = window.db.delete("presupuestos", id);
+      if (!ok) {
+        this.showToast("No se pudo eliminar la partida presupuestaria.", "error");
+        return;
+      }
       this.renderPresupuestos();
       window.kpiDashboard.refresh();
       this.showToast("Partida presupuestaria eliminada", "info");
@@ -5346,11 +5837,19 @@ ${callToAction}
       };
 
       if (this.editingId) {
-        window.db.update("inventario", this.editingId, data);
+        const updated = window.db.update("inventario", this.editingId, data);
+        if (!updated) {
+          this.showToast("No se pudo actualizar el ítem de inventario. Verifique permisos.", "error");
+          return;
+        }
         this.showToast("Inventario actualizado correctamente", "success");
       } else {
         data.id = window.generateUniqueId("INV");
-        window.db.add("inventario", data);
+        const created = window.db.add("inventario", data);
+        if (!created) {
+          this.showToast("No se pudo registrar el ítem. Verifique permisos o reintente.", "error");
+          return;
+        }
         this.showToast("Ítem registrado en inventario", "success");
       }
 
@@ -5371,7 +5870,11 @@ ${callToAction}
   deleteInventario(id) {
     if (window.db && !window.db._rbacCheck("inventario", "delete", id)) return;
     if (confirm("¿Desea dar de baja este artículo del inventario?")) {
-      window.db.delete("inventario", id);
+      const ok = window.db.delete("inventario", id);
+      if (!ok) {
+        this.showToast("No se pudo eliminar el ítem de inventario.", "error");
+        return;
+      }
       this.renderInventario();
       window.kpiDashboard.refresh();
       this.showToast("Ítem eliminado", "info");
@@ -5521,11 +6024,19 @@ ${callToAction}
       };
 
       if (this.editingId) {
-        window.db.update("documentos", this.editingId, data);
+        const updated = window.db.update("documentos", this.editingId, data);
+        if (!updated) {
+          this.showToast("No se pudo actualizar el documento. Verifique permisos.", "error");
+          return;
+        }
         this.showToast("Documento actualizado correctamente", "success");
       } else {
         data.id = window.generateUniqueId("DOC");
-        window.db.add("documentos", data);
+        const created = window.db.add("documentos", data);
+        if (!created) {
+          this.showToast("No se pudo guardar el documento. Verifique permisos o reintente.", "error");
+          return;
+        }
         this.showToast("Nuevo documento legal guardado", "success");
       }
 
@@ -5546,7 +6057,11 @@ ${callToAction}
   deleteDocument(id) {
     if (window.db && !window.db._rbacCheck("documentos", "delete", id)) return;
     if (confirm("¿Desea eliminar este documento de la base de datos?")) {
-      window.db.delete("documentos", id);
+      const ok = window.db.delete("documentos", id);
+      if (!ok) {
+        this.showToast("No se pudo eliminar el documento.", "error");
+        return;
+      }
       this.renderDocumentos();
       window.kpiDashboard.refresh();
       this.showToast("Documento eliminado", "info");
@@ -5726,44 +6241,58 @@ ${callToAction}
   // MODALES & TOASTS
   // =========================================================================
   async showModal(modalId) {
-    if (window.componentLoader && typeof window.componentLoader.ensureModalsLoaded === "function") {
-      await window.componentLoader.ensureModalsLoaded();
-    }
-    const modal = document.getElementById(modalId);
-    if (!modal) return;
-    this._lastFocusedElementBeforeModal = document.activeElement;
-    this.activeModal = modalId;
-    modal.setAttribute("role", "dialog");
-    modal.setAttribute("aria-modal", "true");
-    if (!modal.getAttribute("aria-label")) {
-      const heading = modal.querySelector("h2, h3, h4");
-      if (heading && heading.textContent) {
-        modal.setAttribute("aria-label", heading.textContent.trim());
+    try {
+      if (window.componentLoader && typeof window.componentLoader.ensureModalsLoaded === "function") {
+        await window.componentLoader.ensureModalsLoaded();
       }
-    }
-    modal.classList.remove("hidden");
-    modal.classList.add("flex");
-
-    // Enfocar automáticamente el primer campo interactivo (Accesibilidad WCAG 2.1 AA)
-    setTimeout(() => {
-      const firstInput = modal.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
-      if (firstInput && typeof firstInput.focus === "function") {
-        firstInput.focus();
+      const modal = document.getElementById(modalId);
+      if (!modal) {
+        console.warn("[showModal] Modal no encontrado:", modalId);
+        return false;
       }
-    }, 60);
-
-    // Verificar si existe borrador autoguardado para restaurar
-    if (window.draftAutosave && typeof window.draftAutosave.checkAndPromptRestore === "function") {
-      window.draftAutosave.checkAndPromptRestore(modalId, !!this.editingId);
-    }
-
-    if (!modal.dataset.backdropConfigured) {
-      modal.dataset.backdropConfigured = "true";
-      modal.addEventListener("click", (e) => {
-        if (e.target === modal) {
-          this.closeModal(modalId);
+      this._lastFocusedElementBeforeModal = document.activeElement;
+      this.activeModal = modalId;
+      modal.setAttribute("role", "dialog");
+      modal.setAttribute("aria-modal", "true");
+      if (!modal.getAttribute("aria-label")) {
+        const heading = modal.querySelector("h2, h3, h4");
+        if (heading && heading.textContent) {
+          modal.setAttribute("aria-label", heading.textContent.trim());
         }
-      });
+      }
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+
+      // Enfocar automáticamente el primer campo interactivo (Accesibilidad WCAG 2.1 AA)
+      setTimeout(() => {
+        const firstInput = modal.querySelector('input:not([type="hidden"]):not([disabled]), select:not([disabled]), textarea:not([disabled]), button:not([disabled])');
+        if (firstInput && typeof firstInput.focus === "function") {
+          firstInput.focus();
+        }
+      }, 60);
+
+      // Verificar si existe borrador autoguardado para restaurar
+      if (window.draftAutosave && typeof window.draftAutosave.checkAndPromptRestore === "function") {
+        try {
+          window.draftAutosave.checkAndPromptRestore(modalId, !!this.editingId);
+        } catch (draftErr) {
+          console.warn("[showModal] draft restore:", draftErr);
+        }
+      }
+
+      if (!modal.dataset.backdropConfigured) {
+        modal.dataset.backdropConfigured = "true";
+        modal.addEventListener("click", (e) => {
+          if (e.target === modal) {
+            this.closeModal(modalId);
+          }
+        });
+      }
+      return true;
+    } catch (err) {
+      console.error("[showModal]", modalId, err);
+      this.showToast("No se pudo abrir el formulario. Intente de nuevo o recargue la página.", "error");
+      return false;
     }
   }
 
@@ -5818,7 +6347,136 @@ ${callToAction}
     this.editingId = null;
   }
 
-  showToast(message, type = "success") {
+  /**
+   * Confirmación institucional (reemplaza window.confirm nativo).
+   * options: { title, message, detail, confirmLabel, cancelLabel, danger }
+   */
+  ensureAppConfirmModal() {
+    let modal = document.getElementById("modalAppConfirm");
+    if (modal && document.getElementById("btnAppConfirmOk") && document.getElementById("btnAppConfirmCancel")) {
+      return modal;
+    }
+    if (modal) modal.remove();
+    modal = document.createElement("div");
+    modal.id = "modalAppConfirm";
+    modal.className = "modal-container hidden fixed inset-0 z-[10060] items-center justify-center p-4";
+    modal.setAttribute("role", "dialog");
+    modal.setAttribute("aria-modal", "true");
+    modal.style.background = "rgba(8, 12, 24, 0.82)";
+    modal.style.backdropFilter = "blur(10px)";
+    modal.innerHTML = `
+      <div class="app-confirm-sheet relative w-full max-w-md rounded-2xl border border-amber-500/40 bg-slate-950 shadow-2xl overflow-hidden text-slate-100">
+        <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-600 via-rose-500 to-amber-600"></div>
+        <div class="px-5 pt-5 pb-3.5 border-b border-slate-800/90 bg-gradient-to-r from-slate-950 via-slate-900 to-rose-950/30 flex items-start gap-3">
+          <span id="modalAppConfirmIcon" class="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0 shadow-inner text-lg"><i class="fa-solid fa-trash-can"></i></span>
+          <div class="min-w-0 flex-1 pt-0.5">
+            <p id="modalAppConfirmSubtitle" class="text-[10px] uppercase tracking-[0.16em] text-amber-400/90 font-bold">Paolo Aldea &amp; Abogados · Control seguro</p>
+            <h3 id="modalAppConfirmTitle" class="text-base font-extrabold tracking-wide text-white mt-0.5">Confirmar acción</h3>
+          </div>
+          <button type="button" id="btnAppConfirmClose" class="text-slate-400 hover:text-white p-2 rounded-xl hover:bg-slate-800 transition" aria-label="Cerrar"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="px-5 py-4 space-y-3">
+          <p id="modalAppConfirmMessage" class="text-xs sm:text-sm leading-relaxed text-slate-300"></p>
+          <div id="modalAppConfirmDetail" class="hidden rounded-xl border border-amber-500/35 bg-gradient-to-br from-slate-900 to-slate-950 px-3.5 py-3">
+            <p class="text-[10px] uppercase tracking-wider text-amber-400/90 font-bold mb-1">Registro afectado</p>
+            <p id="modalAppConfirmDetailText" class="text-xs font-semibold text-slate-100 break-words"></p>
+          </div>
+        </div>
+        <div class="px-5 py-3.5 border-t border-slate-800 bg-slate-950/95 flex flex-col-reverse sm:flex-row sm:justify-end gap-2">
+          <button type="button" id="btnAppConfirmCancel" class="min-h-[46px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition">Cancelar</button>
+          <button type="button" id="btnAppConfirmOk" class="min-h-[46px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition inline-flex items-center justify-center gap-2"><i class="fa-solid fa-trash-can text-[11px]"></i><span>Sí, eliminar</span></button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
+    return modal;
+  }
+
+  confirmAction(options = {}) {
+    const opts = typeof options === "string" ? { message: options } : (options || {});
+    return new Promise((resolve) => {
+      const modal = this.ensureAppConfirmModal();
+      const titleEl = document.getElementById("modalAppConfirmTitle");
+      const msgEl = document.getElementById("modalAppConfirmMessage");
+      const detailBox = document.getElementById("modalAppConfirmDetail");
+      const detailText = document.getElementById("modalAppConfirmDetailText");
+      const iconWrap = document.getElementById("modalAppConfirmIcon");
+      const okBtn = document.getElementById("btnAppConfirmOk");
+      const cancelBtn = document.getElementById("btnAppConfirmCancel");
+      const closeBtn = document.getElementById("btnAppConfirmClose");
+
+      if (!modal || !okBtn || !cancelBtn) {
+        resolve(false);
+        return;
+      }
+
+      if (titleEl) titleEl.textContent = opts.title || "Confirmar acción";
+      if (msgEl) msgEl.textContent = opts.message || "¿Desea continuar?";
+      if (detailBox && detailText) {
+        if (opts.detail) {
+          detailText.textContent = opts.detail;
+          detailBox.classList.remove("hidden");
+        } else {
+          detailBox.classList.add("hidden");
+          detailText.textContent = "";
+        }
+      }
+      cancelBtn.textContent = opts.cancelLabel || "Cancelar";
+      const danger = opts.danger !== false;
+      const iconName = String(opts.icon || (danger ? "fa-trash-can" : "fa-triangle-exclamation")).replace(/[^a-z0-9-]/gi, "");
+      if (iconWrap) {
+        iconWrap.className = danger
+          ? "w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-400/40 text-rose-400 flex items-center justify-center shrink-0 shadow-inner text-lg"
+          : "w-12 h-12 rounded-2xl bg-amber-500/15 border border-amber-400/40 text-amber-400 flex items-center justify-center shrink-0 shadow-inner text-lg";
+        iconWrap.innerHTML = '<i class="fa-solid ' + iconName + '"></i>';
+      }
+      const subtitleEl = document.getElementById("modalAppConfirmSubtitle");
+      if (subtitleEl) {
+        subtitleEl.textContent = opts.subtitle || "Paolo Aldea & Abogados · Control seguro";
+      }
+      const confirmLabel = opts.confirmLabel || (danger ? "Sí, eliminar" : "Confirmar");
+      okBtn.innerHTML = danger
+        ? '<i class="fa-solid fa-trash-can text-[11px]"></i><span>' + confirmLabel + "</span>"
+        : "<span>" + confirmLabel + "</span>";
+      okBtn.className = danger
+        ? "min-h-[46px] px-4 py-2 rounded-xl text-xs font-extrabold bg-rose-600 hover:bg-rose-500 text-white border border-rose-400 shadow-md transition inline-flex items-center justify-center gap-2"
+        : "min-h-[46px] px-4 py-2 rounded-xl text-xs font-extrabold bg-amber-500 hover:bg-amber-400 text-slate-950 border border-amber-300 shadow-md transition inline-flex items-center justify-center gap-2";
+      cancelBtn.className = "min-h-[46px] px-4 py-2 rounded-xl text-xs font-bold border border-slate-600 text-slate-200 hover:bg-slate-900 transition";
+
+      const finish = (value) => {
+        modal.classList.add("hidden");
+        modal.classList.remove("flex");
+        modal.style.display = "none";
+        okBtn.onclick = null;
+        cancelBtn.onclick = null;
+        if (closeBtn) closeBtn.onclick = null;
+        modal.onclick = null;
+        document.removeEventListener("keydown", onKey);
+        resolve(!!value);
+      };
+
+      const onKey = (ev) => {
+        if (ev.key === "Escape") finish(false);
+      };
+
+      okBtn.onclick = () => finish(true);
+      cancelBtn.onclick = () => finish(false);
+      if (closeBtn) closeBtn.onclick = () => finish(false);
+      modal.onclick = (ev) => {
+        if (ev.target === modal) finish(false);
+      };
+      document.addEventListener("keydown", onKey);
+
+      modal.classList.remove("hidden");
+      modal.classList.add("flex");
+      modal.style.display = "flex";
+      modal.style.zIndex = "10060";
+      try {
+        okBtn.focus();
+      } catch (_) {}
+    });
+  }
+
+  showToast(message, type = "success", durationMs = null) {
     if (typeof message === "string") {
       message = message
         .replace(/\u00C3\u00A1/g, "\u00E1")
@@ -5846,26 +6504,59 @@ ${callToAction}
     const icons = {
       success: "fa-circle-check text-emerald-400",
       info: "fa-circle-info text-blue-400",
-      warning: "fa-triangle-exclamation text-amber-400"
+      warning: "fa-triangle-exclamation text-amber-400",
+      error: "fa-circle-xmark text-rose-400"
     };
+    const durations = { success: 3500, info: 4000, warning: 5500, error: 7000 };
+    const ttl = typeof durationMs === "number" && durationMs >= 0
+      ? durationMs
+      : (durations[type] != null ? durations[type] : 4000);
 
-    toast.className = "toast-enter bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-3 border border-slate-700 text-sm max-w-sm pointer-events-auto";
+    toast.className = "toast-enter bg-slate-900 text-white px-4 py-3 rounded-xl shadow-xl flex items-start gap-3 border border-slate-700 text-sm max-w-sm pointer-events-auto";
+    toast.setAttribute("role", "status");
     const iconEl = document.createElement("i");
-    iconEl.className = `fa-solid ${icons[type] || icons.success} text-lg`;
+    iconEl.className = `fa-solid ${icons[type] || icons.info} text-lg mt-0.5 shrink-0`;
     const textEl = document.createElement("div");
-    textEl.className = "flex-1 font-medium";
+    textEl.className = "flex-1 font-medium leading-snug";
     textEl.textContent = String(message == null ? "" : message);
+    const closeBtn = document.createElement("button");
+    closeBtn.type = "button";
+    closeBtn.className = "shrink-0 w-8 h-8 -mr-1 -mt-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center touch-manipulation";
+    closeBtn.setAttribute("aria-label", "Cerrar notificación");
+    closeBtn.innerHTML = '<i class="fa-solid fa-xmark text-sm"></i>';
+
+    let closed = false;
+    let hideTimer = null;
+    const dismiss = () => {
+      if (closed) return;
+      closed = true;
+      if (hideTimer) clearTimeout(hideTimer);
+      toast.style.opacity = "0";
+      toast.style.transform = "translateX(100%)";
+      toast.style.transition = "all 0.3s ease-in";
+      setTimeout(() => toast.remove(), 300);
+    };
+    closeBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      dismiss();
+    });
+
     toast.appendChild(iconEl);
     toast.appendChild(textEl);
-
+    toast.appendChild(closeBtn);
     container.appendChild(toast);
 
-    setTimeout(() => {
-      toast.style.opacity = '0';
-      toast.style.transform = 'translateX(100%)';
-      toast.style.transition = 'all 0.3s ease-in';
-      setTimeout(() => toast.remove(), 300);
-    }, 3200);
+    // Pausar auto-cierre al pasar el mouse / tocar (móvil).
+    const armTimer = () => {
+      if (closed || ttl <= 0) return;
+      if (hideTimer) clearTimeout(hideTimer);
+      hideTimer = setTimeout(dismiss, ttl);
+    };
+    toast.addEventListener("mouseenter", () => { if (hideTimer) clearTimeout(hideTimer); });
+    toast.addEventListener("mouseleave", armTimer);
+    toast.addEventListener("touchstart", () => { if (hideTimer) clearTimeout(hideTimer); }, { passive: true });
+    armTimer();
   }
 
   // =========================================================================
@@ -5995,10 +6686,13 @@ ${callToAction}
           if (!msg || !msg.type) return;
 
           if (msg.type === "SESSION_LOCK") {
+            // No tumbar un login en curso (p. ej. otra pestaña hizo F5 a la vez).
+            if (this._establishingSession) return;
             if (this.isSessionActive() || !document.getElementById("loginOverlay")?.classList.contains("flex")) {
               this.lockScreen(true, msg.reason || "remote_lock", true);
             }
           } else if (msg.type === "SESSION_LOGIN") {
+            if (this._establishingSession) return;
             const userObjStr = localStorage.getItem("PAOLO ALDEA_AUTH_USER_OBJ");
             const userStr = localStorage.getItem("PAOLO ALDEA_AUTH_USER");
             const sig = localStorage.getItem("PAOLO ALDEA_AUTH_SIG");
@@ -6007,7 +6701,13 @@ ${callToAction}
             if (userStr) sessionStorage.setItem("PAOLO ALDEA_AUTH_USER", userStr);
             if (sig) sessionStorage.setItem("PAOLO ALDEA_AUTH_SIG", sig);
             if (!this.isSessionActive() || !window.db.getCurrentUser()) {
-              this.clearSessionStorageState();
+              // Solo limpiar sessionStorage de ESTA pestaña. Nunca borrar localStorage
+              // compartido: eso dispara storage→remote_lock y tumba el login origen.
+              sessionStorage.removeItem("PAOLO ALDEA_AUTH_LOGGED_IN");
+              sessionStorage.removeItem("PAOLO ALDEA_AUTH_USER_OBJ");
+              sessionStorage.removeItem("PAOLO ALDEA_AUTH_USER");
+              sessionStorage.removeItem("PAOLO ALDEA_AUTH_SIG");
+              sessionStorage.removeItem("PAOLO ALDEA_ACTIVE_SEDE");
               return;
             }
             this.hideLoginOverlay();
@@ -6025,18 +6725,23 @@ ${callToAction}
     window.addEventListener("storage", (e) => {
       if (e.key === "PAOLO ALDEA_AUTH_LOGGED_IN") {
         if (e.newValue === "true") {
+          if (this._establishingSession) return;
           sessionStorage.setItem("PAOLO ALDEA_AUTH_LOGGED_IN", "true");
           const userObjStr = localStorage.getItem("PAOLO ALDEA_AUTH_USER_OBJ");
           const sig = localStorage.getItem("PAOLO ALDEA_AUTH_SIG");
           if (userObjStr) sessionStorage.setItem("PAOLO ALDEA_AUTH_USER_OBJ", userObjStr);
           if (sig) sessionStorage.setItem("PAOLO ALDEA_AUTH_SIG", sig);
           if (!this.isSessionActive() || !window.db.getCurrentUser()) {
-            this.clearSessionStorageState();
+            sessionStorage.removeItem("PAOLO ALDEA_AUTH_LOGGED_IN");
+            sessionStorage.removeItem("PAOLO ALDEA_AUTH_USER_OBJ");
+            sessionStorage.removeItem("PAOLO ALDEA_AUTH_USER");
+            sessionStorage.removeItem("PAOLO ALDEA_AUTH_SIG");
             return;
           }
           this.hideLoginOverlay();
           this.applySettingsToUI();
         } else if (!e.newValue) {
+          if (this._establishingSession) return;
           this.lockScreen(true, "remote_lock", true);
         }
       }
@@ -6102,9 +6807,84 @@ ${callToAction}
     }
   }
 
+  /**
+   * Consulta/registra el estado de autenticación en la nube (Modo B).
+   * Evita que un celular vacío pida "crear Super Admin" si ya existe en Supabase.
+   */
+  async syncCloudAuthGate() {
+    if (!window.__ENTERPRISE_CLOUD__ || !window.PaoloAuthService) {
+      window.__CLOUD_AUTH_BOOTSTRAPPED__ = false;
+      return false;
+    }
+    let status = null;
+    try {
+      const res = await fetch("/api/auth-firm-status", { credentials: "same-origin" });
+      status = await res.json();
+    } catch (_) {
+      status = null;
+    }
+    const cloudBoot = status && status.bootstrapped === true;
+    window.__CLOUD_AUTH_STATUS__ = status || null;
+    if (cloudBoot) {
+      window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+      return true;
+    }
+
+    // Si este navegador ya tiene admin local y la nube aún no, publicar registro (una vez)
+    const localReady = window.db && typeof window.db.needsAuthBootstrap === "function" && !window.db.needsAuthBootstrap();
+    if (localReady) {
+      try {
+        const workers = window.db.getRaw("workers") || [];
+        const admin = workers.find((w) => w && w.activo !== false && (w.rol === "super_admin" || w.id === "WRK-000") && w.passwordHash);
+        if (admin) {
+          await window.PaoloAuthService.pushCloudBootstrap({
+            id: admin.id,
+            usuario: admin.usuario || admin.username,
+            email: admin.email || "",
+            dni: admin.dni || "",
+            nombre: admin.nombre,
+            cargo: admin.cargo,
+            rol: admin.rol || "super_admin",
+            sede: admin.sede || "todas",
+            passwordHash: admin.passwordHash,
+            pinHash: admin.pinHash || "",
+            permisos: admin.permisos || null
+          });
+          window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+          this.showToast("Super Admin publicado en la nube. Ya puede ingresar desde otros dispositivos.", "success");
+          return true;
+        }
+      } catch (e) {
+        console.warn("[Auth] No se pudo publicar admin local a la nube:", e && e.message);
+        const detail = (status && status.detail) || "";
+        if (detail === "missing_tables") {
+          this.showToast("Falta ejecutar el SQL de autenticación en Supabase (firm_auth_registry).", "warning");
+        } else if (detail === "missing_service_role") {
+          this.showToast("Falta SUPABASE_SERVICE_ROLE_KEY en Netlify.", "warning");
+        } else {
+          this.showToast("No se pudo sincronizar el admin a la nube: " + (e.message || "error"), "warning");
+        }
+      }
+    } else if (status && (status.detail === "missing_tables" || status.detail === "missing_service_role")) {
+      console.warn("[Auth] Nube no lista:", status.detail, status.hint || "");
+    }
+
+    window.__CLOUD_AUTH_BOOTSTRAPPED__ = false;
+    return false;
+  }
+
+  /** true si hay que mostrar el formulario de registro inicial. */
+  needsAuthBootstrapUI() {
+    const localNeeds = window.db && typeof window.db.needsAuthBootstrap === "function" && window.db.needsAuthBootstrap();
+    if (!localNeeds) return false;
+    // Si la nube ya tiene admin, nunca pedir bootstrap en un dispositivo vacío
+    if (window.__CLOUD_AUTH_BOOTSTRAPPED__) return false;
+    return true;
+  }
+
   /** Alterna login vs registro inicial (borrón y cuenta nueva). */
   updateAuthGateUI() {
-    const needsBootstrap = window.db && typeof window.db.needsAuthBootstrap === "function" && window.db.needsAuthBootstrap();
+    const needsBootstrap = this.needsAuthBootstrapUI();
     const loginForm = document.getElementById("formLogin");
     const bootForm = document.getElementById("formBootstrapAdmin");
     const bootBanner = document.getElementById("authBootstrapBanner");
@@ -6120,6 +6900,11 @@ ${callToAction}
       el.classList.remove("hidden");
       el.classList.add("flex");
     }
+    if (typeof window.updateLoginModeBadge === "function") {
+      window.updateLoginModeBadge();
+    }
+    // Mostrar última sede de uso / consolidado aunque aún no haya sesión
+    if (typeof this.applySedeToHeader === "function") this.applySedeToHeader();
     const needsBootstrap = this.updateAuthGateUI();
     const userInput = document.getElementById("loginUsername");
     const passInput = document.getElementById("loginPassword");
@@ -6147,6 +6932,11 @@ ${callToAction}
       el.classList.add("hidden");
       el.classList.remove("flex");
     }
+    try {
+      if (window.AttendanceModule && typeof window.AttendanceModule.updateAnchorOfficeVisibility === "function") {
+        window.AttendanceModule.updateAnchorOfficeVisibility();
+      }
+    } catch (_) {}
   }
 
   /** Politica de claves: minimo 10 caracteres, no solo digitos, no triviales. */
@@ -6194,7 +6984,7 @@ ${callToAction}
       }
     };
 
-    if (!window.db || typeof window.db.needsAuthBootstrap !== "function" || !window.db.needsAuthBootstrap()) {
+    if (!this.needsAuthBootstrapUI()) {
       showErr("El sistema ya tiene un administrador registrado. Use el formulario de acceso.");
       this.updateAuthGateUI();
       return;
@@ -6213,6 +7003,18 @@ ${callToAction}
     const pwErr = this._validatePasswordPolicy(pass);
     if (pwErr) return showErr(pwErr);
     if (pass !== conf) return showErr("Las contraseñas no coinciden.");
+
+    // En Modo B, revalidar nube antes de crear (evita dos Super Admin)
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService) {
+      try {
+        const remote = await window.PaoloAuthService.fetchFirmBootstrapped();
+        if (remote === true) {
+          window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+          this.updateAuthGateUI();
+          return showErr("Ya existe un Super Administrador en la nube. Inicie sesión con esas credenciales.");
+        }
+      } catch (_) {}
+    }
 
     const passHash = await window.hashSecret(pass);
     const worker = {
@@ -6257,6 +7059,33 @@ ${callToAction}
       window.db._trusted = false;
     }
 
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService) {
+      try {
+        await window.PaoloAuthService.pushCloudBootstrap({
+          id: worker.id,
+          usuario: worker.usuario,
+          email: worker.email,
+          dni: worker.dni,
+          nombre: worker.nombre,
+          cargo: worker.cargo,
+          rol: worker.rol,
+          sede: worker.sede,
+          passwordHash: worker.passwordHash,
+          pinHash: worker.pinHash,
+          permisos: worker.permisos
+        });
+        window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+      } catch (cloudErr) {
+        if (cloudErr && cloudErr.status === 409) {
+          window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+          this.updateAuthGateUI();
+          return showErr("Ya existe un Super Administrador en la nube. Use el formulario de acceso con esas credenciales.");
+        }
+        console.warn("[Auth] Bootstrap local OK; nube pendiente:", cloudErr && cloudErr.message);
+        this.showToast("Admin local creado. La publicación en nube falló; reintente al tener conexión.", "warning");
+      }
+    }
+
     try { window.db.logAudit("BOOTSTRAP_ADMIN", "seguridad", "WRK-000", "Registro inicial del Super Administrador '" + usuario + "'", null, null); } catch (_) {}
     if (errAlert) errAlert.classList.add("hidden");
     await this._establishAuthenticatedSession(worker, pass);
@@ -6264,56 +7093,137 @@ ${callToAction}
   }
 
   async _establishAuthenticatedSession(matchedWorker, pass) {
-    const userObj = {
-      id: matchedWorker.id,
-      dni: matchedWorker.dni,
-      nombre: matchedWorker.nombre,
-      cargo: matchedWorker.cargo,
-      rol: window.db.normalizeRole(matchedWorker.rol),
-      sede: window.db.normalizeSede(matchedWorker.sede),
-      email: matchedWorker.email,
-      usuario: matchedWorker.usuario || matchedWorker.dni,
-      username: matchedWorker.usuario || matchedWorker.nombre,
-      permisos: matchedWorker.permisos || null
+    this._establishingSession = true;
+    try {
+      const userObj = {
+        id: matchedWorker.id,
+        dni: matchedWorker.dni,
+        nombre: matchedWorker.nombre,
+        cargo: matchedWorker.cargo,
+        rol: window.db.normalizeRole(matchedWorker.rol),
+        sede: window.db.normalizeSede(matchedWorker.sede),
+        email: matchedWorker.email,
+        usuario: matchedWorker.usuario || matchedWorker.dni,
+        username: matchedWorker.usuario || matchedWorker.nombre,
+        permisos: matchedWorker.permisos || null
+      };
+
+      sessionStorage.setItem("PAOLO ALDEA_AUTH_LOGGED_IN", "true");
+      sessionStorage.setItem("PAOLO ALDEA_AUTH_USER", userObj.nombre);
+      localStorage.setItem("PAOLO ALDEA_AUTH_LOGGED_IN", "true");
+      localStorage.setItem("PAOLO ALDEA_AUTH_USER", userObj.nombre);
+      window.db.setCurrentUser(userObj);
+      this.broadcastSessionEvent("SESSION_LOGIN", { user: userObj.nombre });
+
+      if (window.legalCrypto) {
+        try { await window.legalCrypto.deriveSessionKey(pass); } catch (_) {}
+      }
+      this.updateStorageQuotaDisplay();
+      this.hideLoginOverlay();
+      this.updateAuthGateUI();
+
+      const sedeCfg = (userObj.sede !== "todas" && window.SEDES_CONFIG && window.SEDES_CONFIG[userObj.sede])
+        ? window.SEDES_CONFIG[userObj.sede].nombreCorto
+        : "Consolidado Nacional";
+      this.showToast(`Bienvenido al Despacho: ${userObj.nombre} (${sedeCfg})`, "success");
+      // Alinear sede activa a la del usuario (salvo consolidado/global)
+      if (userObj.sede && userObj.sede !== "todas" && window.db && typeof window.db.setActiveSede === "function") {
+        try { window.db.setActiveSede(userObj.sede); } catch (_) {}
+      }
+      this.applySettingsToUI();
+      if (typeof this.applySedeToHeader === "function") this.applySedeToHeader();
+      if (typeof this.renderDynamicSidebarModules === "function") this.renderDynamicSidebarModules();
+
+      this.switchTab("asistencia");
+      if (window.AttendanceModule) {
+        // Siempre abrir en Kiosco Colaborador (Supervisión solo bajo demanda).
+        if (typeof window.AttendanceModule.enterKioskColaborador === "function") {
+          window.AttendanceModule.enterKioskColaborador();
+        } else if (typeof window.AttendanceModule.setRoleView === "function") {
+          window.AttendanceModule.setRoleView("colaborador");
+        }
+        if (userObj.dni && typeof window.AttendanceModule.selectWorker === "function") {
+          window.AttendanceModule.selectWorker(userObj.dni);
+        }
+        if (typeof window.AttendanceModule.startAutoGeofenceTracking === "function") {
+          window.AttendanceModule.startAutoGeofenceTracking();
+        }
+        if (typeof window.AttendanceModule.updateAnchorOfficeVisibility === "function") {
+          window.AttendanceModule.updateAnchorOfficeVisibility();
+        }
+        // Roles privilegiados: dejan supervisión lista, sin abrir el panel admin.
+        if (typeof window.AttendanceModule.ensurePrivilegedSupervision === "function") {
+          window.AttendanceModule.ensurePrivilegedSupervision(false);
+        }
+      }
+      if (window.alerts) window.alerts.evaluateAlerts();
+      if (window.kpiDashboard) window.kpiDashboard.refresh();
+      // Refresco post-login. La sync nube la dispara handleLogin en background
+      // (evita doble pull/push que retrasaba el arranque del panel).
+      this.refreshCurrentModuleView();
+      if (window.AttendanceModule && typeof window.AttendanceModule.enterKioskColaborador === "function") {
+        window.AttendanceModule.enterKioskColaborador();
+      }
+    } finally {
+      // Ventana breve: evita que un F5 en otra pestaña tumbe el login recién hecho.
+      setTimeout(() => { this._establishingSession = false; }, 1500);
+      const btnLogin = document.getElementById("btnLoginSubmit");
+      if (btnLogin) {
+        btnLogin.disabled = false;
+        btnLogin.classList.remove("opacity-80", "cursor-wait");
+      }
+    }
+  }
+
+  async resetSuperAdminAccess(e) {
+    if (e) e.preventDefault();
+    const errAlert = document.getElementById("loginErrorAlert");
+    const errMsg = document.getElementById("loginErrorMessage");
+    const showErr = (msg) => {
+      if (errAlert && errMsg) {
+        errMsg.textContent = msg;
+        errAlert.classList.remove("hidden");
+      } else {
+        this.showToast(msg, "error");
+      }
     };
-
-    sessionStorage.setItem("PAOLO ALDEA_AUTH_LOGGED_IN", "true");
-    sessionStorage.setItem("PAOLO ALDEA_AUTH_USER", userObj.nombre);
-    localStorage.setItem("PAOLO ALDEA_AUTH_LOGGED_IN", "true");
-    localStorage.setItem("PAOLO ALDEA_AUTH_USER", userObj.nombre);
-    window.db.setCurrentUser(userObj);
-    this.broadcastSessionEvent("SESSION_LOGIN", { user: userObj.nombre });
-
-    if (window.legalCrypto) {
-      try { await window.legalCrypto.deriveSessionKey(pass); } catch (_) {}
+    const code = (document.getElementById("resetAdminCode")?.value || "").trim();
+    const pass = (document.getElementById("resetAdminPassword")?.value || "").trim();
+    const conf = (document.getElementById("resetAdminPasswordConfirm")?.value || "").trim();
+    if (!code) return showErr("Ingrese el código de restablecimiento.");
+    const pwErr = this._validatePasswordPolicy(pass);
+    if (pwErr) return showErr(pwErr);
+    if (pass !== conf) return showErr("Las contraseñas no coinciden.");
+    let passwordHash = "";
+    try {
+      passwordHash = await window.hashSecret(pass);
+    } catch (err) {
+      return showErr(err && err.message ? err.message : "No se pudo proteger la contraseña.");
     }
-    this.updateStorageQuotaDisplay();
-    this.hideLoginOverlay();
-    this.updateAuthGateUI();
-
-    const sedeCfg = (userObj.sede !== "todas" && window.SEDES_CONFIG && window.SEDES_CONFIG[userObj.sede])
-      ? window.SEDES_CONFIG[userObj.sede].nombreCorto
-      : "Consolidado Nacional";
-    this.showToast(`Bienvenido al Despacho: ${userObj.nombre} (${sedeCfg})`, "success");
-    this.applySettingsToUI();
-    if (typeof this.renderDynamicSidebarModules === "function") this.renderDynamicSidebarModules();
-
-    this.switchTab("asistencia");
-    if (window.AttendanceModule) {
-      if (userObj.dni && typeof window.AttendanceModule.selectWorker === "function") {
-        window.AttendanceModule.selectWorker(userObj.dni);
-      }
-      if (typeof window.AttendanceModule.startAutoGeofenceTracking === "function") {
-        window.AttendanceModule.startAutoGeofenceTracking();
-      }
+    try {
+      const res = await fetch("/api/auth-login", {
+        method: "POST",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ phase: "reset-admin", code, passwordHash })
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) return showErr((data && data.error) || "No se pudo restablecer la contraseña.");
+      const usuario = data.usuario || "";
+      const userInput = document.getElementById("loginUsername");
+      if (userInput && usuario) userInput.value = usuario;
+      const form = document.getElementById("formResetAdmin");
+      if (form) form.classList.add("hidden");
+      if (errAlert) errAlert.classList.add("hidden");
+      this.showToast("Contraseña actualizada. Entre con el usuario " + usuario + ".", "success");
+    } catch (err) {
+      showErr(err && err.message ? err.message : "No se pudo restablecer la contraseña.");
     }
-    if (window.alerts) window.alerts.evaluateAlerts();
-    if (window.kpiDashboard) window.kpiDashboard.refresh();
   }
 
   async handleLogin(e) {
     if (e) e.preventDefault();
-    if (window.db && typeof window.db.needsAuthBootstrap === "function" && window.db.needsAuthBootstrap()) {
+    if (this.needsAuthBootstrapUI()) {
       return this.completeAuthBootstrap(e);
     }
 
@@ -6321,6 +7231,19 @@ ${callToAction}
     const pass = (document.getElementById("loginPassword")?.value || "").trim();
     const errAlert = document.getElementById("loginErrorAlert");
     const errMsg = document.getElementById("loginErrorMessage");
+    const btnLogin = document.getElementById("btnLoginSubmit");
+    const btnLoginHtml = btnLogin ? btnLogin.innerHTML : "";
+    const setLoginBusy = (busy) => {
+      if (!btnLogin) return;
+      btnLogin.disabled = !!busy;
+      if (busy) {
+        btnLogin.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Verificando acceso…';
+        btnLogin.classList.add("opacity-80", "cursor-wait");
+      } else {
+        btnLogin.innerHTML = btnLoginHtml || '<i class="fa-solid fa-lock-open text-slate-950"></i> Ingresar al Despacho Jurídico';
+        btnLogin.classList.remove("opacity-80", "cursor-wait");
+      }
+    };
 
     const _remain = this._loginGuardRemaining();
     if (_remain > 0) {
@@ -6347,9 +7270,11 @@ ${callToAction}
       return;
     }
 
-    const workers = window.db ? window.db.getRaw("workers") : [];
+    setLoginBusy(true);
+
+    let workers = window.db ? window.db.getRaw("workers") : [];
     const uLower = user.toLowerCase().trim();
-    const matchedWorker = workers.find(w =>
+    let matchedWorker = workers.find(w =>
       (w.dni && String(w.dni).toLowerCase() === uLower) ||
       (w.usuario && String(w.usuario).toLowerCase() === uLower) ||
       (w.email && String(w.email).toLowerCase() === uLower)
@@ -6376,6 +7301,26 @@ ${callToAction}
     }
 
     let isValid = !!(matchedWorker && isWorkerValid);
+    let cloudSyncToken = null;
+    let cloudFailMessage = "";
+
+    // Dispositivo vacío / sin nómina local: autenticar contra Supabase (staff_directory)
+    if (!isValid && window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && navigator.onLine) {
+      try {
+        const cloud = await window.PaoloAuthService.cloudLogin(user, pass);
+        if (cloud && cloud.ok && cloud.worker) {
+          window.PaoloAuthService.hydrateLocalWorkers(cloud.directory || [cloud.worker]);
+          workers = window.db.getRaw("workers") || [];
+          matchedWorker = workers.find(w => String(w.id) === String(cloud.worker.id)) || cloud.worker;
+          isValid = true;
+          cloudSyncToken = cloud.syncToken || null;
+          window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+        }
+      } catch (cloudErr) {
+        cloudFailMessage = (cloudErr && cloudErr.message) || "";
+        console.warn("[Login] Nube:", cloudFailMessage);
+      }
+    }
 
     if (!isValid && matchedWorker && matchedWorker.activo !== false && user.includes("@") && window.firebaseService && window.firebaseService.hasCredentials() && navigator.onLine) {
       try {
@@ -6387,6 +7332,7 @@ ${callToAction}
     }
 
     if (!isValid) {
+      setLoginBusy(false);
       const _g = this._loginGuardFail();
       window._loginAttempts = _g.fails;
       try { window.db.logAudit("LOGIN_FALLIDO", "sesion", "-", "Intento de acceso fallido para el usuario '" + user.slice(0, 40) + "'", null, null); } catch (_) {}
@@ -6397,7 +7343,10 @@ ${callToAction}
         }
       } else if (errAlert && errMsg) {
         const restantes = 5 - window._loginAttempts;
-        errMsg.textContent = `Credenciales incorrectas. Verifique usuario y contraseña (${restantes} intento${restantes === 1 ? "" : "s"} restante${restantes === 1 ? "" : "s"}).`;
+        const cloudDetail = cloudFailMessage && cloudFailMessage !== "Credenciales incorrectas."
+          ? " " + cloudFailMessage
+          : "";
+        errMsg.textContent = `Credenciales incorrectas. Verifique usuario y contraseña (${restantes} intento${restantes === 1 ? "" : "s"} restante${restantes === 1 ? "" : "s"}).${cloudDetail}`;
         errAlert.classList.remove("hidden");
       }
       const passInput = document.getElementById("loginPassword");
@@ -6440,13 +7389,57 @@ ${callToAction}
       }
     }
 
+    // Credenciales de re-auth solo en sessionStorage (sync en segundo plano).
+    try {
+      sessionStorage.setItem("PA_SYNC_REAUTH", JSON.stringify({ u: user, p: pass }));
+    } catch (_) {}
+
     if (errAlert) errAlert.classList.add("hidden");
+
+    // Abrir el panel YA: no bloquear la UI esperando push/pull de 8 colecciones.
     await this._establishAuthenticatedSession(matchedWorker, pass);
+
+    // Sync nube en background (token + merge). El indicador refleja el progreso.
+    if (window.__ENTERPRISE_CLOUD__ && navigator.onLine && window.PaoloAuthService) {
+      const bgUser = user;
+      const bgPass = pass;
+      const bgToken = cloudSyncToken;
+      this.actualizarIndicadorNube("syncing", "Sincronizando…");
+      Promise.resolve()
+        .then(async () => {
+          let token = bgToken;
+          if (!token) {
+            const cloudRefresh = await window.PaoloAuthService.cloudLogin(bgUser, bgPass);
+            if (cloudRefresh && cloudRefresh.ok) {
+              token = cloudRefresh.syncToken || null;
+              if (cloudRefresh.directory) {
+                window.PaoloAuthService.hydrateLocalWorkers(cloudRefresh.directory);
+              }
+            }
+          }
+          if (token && window.PaoloCloudDataSync) {
+            window.__CLOUD_AUTH_BOOTSTRAPPED__ = true;
+            // quick: pull primero; push completo diferido (evita 8 POSTs en el login)
+            await window.PaoloCloudDataSync.afterLogin(token, { quick: true });
+            this.actualizarIndicadorNube("online", "Nube sincronizada");
+          } else {
+            this.actualizarIndicadorNube("offline", "Sync pendiente");
+          }
+        })
+        .catch((syncErr) => {
+          console.warn("[Login] Sync background:", syncErr && syncErr.message);
+          this.actualizarIndicadorNube("offline", "Sync pendiente");
+        });
+    }
   }
 
   lockScreen(silent = false, reason = "manual", fromRemote = false) {
     this.clearSessionStorageState();
     this._inactivityWarningShown = false;
+    try { sessionStorage.removeItem("PA_SYNC_REAUTH"); } catch (_) {}
+    if (window.PaoloCloudDataSync && typeof window.PaoloCloudDataSync.clearToken === "function") {
+      window.PaoloCloudDataSync.clearToken();
+    }
 
     if (!fromRemote) {
       this.broadcastSessionEvent("SESSION_LOCK", { reason });
@@ -6670,7 +7663,7 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
               <div class="mt-1">
                 <span class="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold bg-amber-50 text-amber-900 border border-amber-300">
                   <i class="fa-solid fa-door-open text-amber-600 text-[9px]"></i>
-                  ${escapeHtml(w.despacho)}
+                  ${escapeHtml(this.normalizeMirafloresDespacho(w.despacho))}
                 </span>
               </div>
             ` : ''}
@@ -6711,14 +7704,14 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
           <td class="py-3 px-3 text-center whitespace-nowrap">
             ${canMutate ? `
               <div class="flex items-center justify-center gap-1">
-                <button onclick="window.app.openPersonalModal('${escapeHtml(w.id)}')" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Editar datos del colaborador">
+                <button onclick="window.app.openPersonalModal(${jsStr(w.id)})" class="p-1.5 text-blue-600 hover:bg-blue-50 rounded-lg transition" title="Editar datos del colaborador">
                   <i class="fa-solid fa-pen-to-square text-xs"></i>
                 </button>
-                <button onclick="window.app.toggleWorkerStatus('${escapeHtml(w.id)}')" class="p-1.5 ${isActivo ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'} rounded-lg transition" title="${isActivo ? 'Dar de baja temporal' : 'Reactivar colaborador'}">
+                <button onclick="window.app.toggleWorkerStatus(${jsStr(w.id)})" class="p-1.5 ${isActivo ? 'text-amber-600 hover:bg-amber-50' : 'text-emerald-600 hover:bg-emerald-50'} rounded-lg transition" title="${isActivo ? 'Dar de baja temporal' : 'Reactivar colaborador'}">
                   <i class="fa-solid ${isActivo ? 'fa-user-slash' : 'fa-user-check'} text-xs"></i>
                 </button>
                 ${((window.db && window.db.isSuperAdmin()) || (w.id !== 'WRK-000' && w.rol !== 'super_admin')) ? `
-                  <button onclick="window.app.deleteWorkerRecord('${escapeHtml(w.id)}')" class="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Eliminar registro">
+                  <button onclick="window.app.deleteWorkerRecord(${jsStr(w.id)})" class="p-1.5 text-rose-600 hover:bg-rose-50 rounded-lg transition" title="Eliminar registro">
                     <i class="fa-solid fa-trash-can text-xs"></i>
                   </button>
                 ` : ''}
@@ -6854,7 +7847,7 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
     const currentSedeNorm = window.db ? window.db.normalizeSede(targetWorker ? targetWorker.sede : (sedeInput?.value || "challhuahuacho")) : "challhuahuacho";
     if (currentSedeNorm === "miraflores") {
       if (contDespacho) contDespacho.classList.remove("hidden");
-      if (selDespacho) selDespacho.value = targetWorker?.despacho || "Despacho 1";
+      if (selDespacho) selDespacho.value = this.normalizeMirafloresDespacho(targetWorker?.despacho);
     } else {
       if (contDespacho) contDespacho.classList.add("hidden");
       if (selDespacho) selDespacho.value = "";
@@ -7001,6 +7994,17 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
     } else {
       prompt("Copie las credenciales del colaborador:", memo);
     }
+  }
+
+  normalizeMirafloresDespacho(value) {
+    const raw = String(value || "").trim();
+    const legacy = {
+      "Despacho General 1": "Despacho 1",
+      "Despacho General 2": "Despacho 2",
+      "Despacho General 3": "Despacho 3",
+      "Admin General": "Administrador General"
+    };
+    return legacy[raw] || raw || "Despacho 1";
   }
 
   onPersonalSedeChange(sedeVal) {
@@ -7246,7 +8250,11 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
       const nextNum = maxNum + 1;
       workerData.id = `WRK-${String(nextNum).padStart(3, "0")}`;
       workerData.createdAt = new Date().toISOString();
-      window.db.add("workers", workerData);
+      const created = window.db.add("workers", workerData);
+      if (!created) {
+        this.showToast("No se pudo registrar el colaborador. Verifique permisos o reintente.", "error");
+        return;
+      }
       this.showToast(`Colaborador ${nombre} registrado exitosamente con ID ${workerData.id} y usuario '${finalUsuario}'.`, "success");
       if (this._tempPasswordOnce) {
         alert(`Credenciales iniciales de ${finalUsuario}\nContrasena temporal: ${this._tempPasswordOnce}\nPIN: ${finalPin}\n\nEntreguelas en privado; no se volveran a mostrar.`);
@@ -7255,6 +8263,33 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
     }
 
     this.editingPersonalId = null;
+
+    // Publicar colaborador en directorio nube (multi-dispositivo)
+    const canUpsertCloud = window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && (
+      window.__CLOUD_AUTH_BOOTSTRAPPED__ ||
+      (window.PaoloCloudDataSync && typeof window.PaoloCloudDataSync.getToken === "function" && window.PaoloCloudDataSync.getToken())
+    );
+    if (canUpsertCloud) {
+      try {
+        await window.PaoloAuthService.upsertStaffCloud({
+          id: workerData.id,
+          usuario: workerData.usuario,
+          email: workerData.email,
+          dni: workerData.dni,
+          nombre: workerData.nombre,
+          cargo: workerData.cargo,
+          rol: workerData.rol,
+          sede: workerData.sede,
+          passwordHash: workerData.passwordHash,
+          pinHash: workerData.pinHash,
+          activo: workerData.activo,
+          permisos: workerData.permisos
+        });
+      } catch (cloudStaffErr) {
+        console.warn("[Personal] Sync nube:", cloudStaffErr && cloudStaffErr.message);
+        this.showToast("Guardado local OK. Sync nube pendiente: " + (cloudStaffErr.message || "error"), "warning");
+      }
+    }
 
     // Garantizar que los filtros de la vista Gestión de Personal no oculten al colaborador recién editado o creado
     const sInput = document.getElementById("searchPersonal");
@@ -7314,7 +8349,7 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
     this.renderPersonal();
   }
 
-  deleteWorkerRecord(workerId) {
+  async deleteWorkerRecord(workerId) {
     const allWorkers = window.db ? window.db.getRaw("workers") : [];
     const worker = allWorkers.find(w => w.id === workerId);
     if (!worker) return;
@@ -7330,18 +8365,61 @@ ${safeImageSrc(w.foto) ? `<img src="${escapeHtml(safeImageSrc(w.foto))}" class="
       return;
     }
 
-    if (!confirm(`¿Está seguro de eliminar del padrón a: ${worker.nombre} (${worker.cargo})? Esta acción es irreversible.`)) {
-      return;
+    const confirmed = await this.confirmAction({
+      title: "Eliminar del padrón",
+      message: "Esta acción es irreversible. El colaborador dejará de aparecer en la nómina tras sincronizar.",
+      detail: `${worker.nombre || "Colaborador"}${worker.cargo ? " · " + worker.cargo : ""}`,
+      confirmLabel: "Sí, eliminar",
+      cancelLabel: "Cancelar",
+      danger: true
+    });
+    if (!confirmed) return;
+
+    // Baja en nube primero para que el sync periódico no lo resuscite
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloAuthService && typeof window.PaoloAuthService.upsertStaffCloud === "function") {
+      try {
+        await window.PaoloAuthService.upsertStaffCloud({
+          id: worker.id,
+          usuario: worker.usuario || worker.username || ("user_" + (worker.dni || worker.id)),
+          email: worker.email || "",
+          dni: worker.dni || "",
+          nombre: worker.nombre || "",
+          cargo: worker.cargo || "",
+          rol: worker.rol || "asistente_admin",
+          sede: worker.sede || "challhuahuacho",
+          passwordHash: worker.passwordHash || "",
+          pinHash: worker.pinHash || "",
+          activo: false,
+          permisos: worker.permisos || null
+        });
+      } catch (cloudErr) {
+        this.showToast("No se pudo eliminar en la nube: " + ((cloudErr && cloudErr.message) || "error"), "error");
+        return;
+      }
     }
 
-    window.db.delete("workers", workerId);
+    const deleted = window.db.delete("workers", workerId);
+    if (!deleted) {
+      this.showToast("No se pudo eliminar al colaborador (permisos o restricción de sede).", "error");
+      return;
+    }
+    if (window.PaoloCloudDataSync && typeof window.PaoloCloudDataSync.pushCollection === "function") {
+      try {
+        await window.PaoloCloudDataSync.pushCollection("workers");
+      } catch (_) {}
+    }
     this.showToast(`Colaborador ${worker.nombre} eliminado del sistema.`, "warning");
     this.renderPersonal();
     if (typeof this.renderRolesYPermisos === "function") {
       this.renderRolesYPermisos();
     }
-    if (window.AttendanceModule && typeof window.AttendanceModule.initWorkerSelector === "function") {
-      window.AttendanceModule.initWorkerSelector();
+    if (window.AttendanceModule) {
+      if (typeof window.AttendanceModule.renderWorkersList === "function") {
+        window.AttendanceModule.renderWorkersList();
+      }
+      if (typeof window.AttendanceModule.initWorkerSelector === "function") {
+        window.AttendanceModule.initWorkerSelector();
+      }
     }
   }
 
@@ -7760,6 +8838,24 @@ _________________________________                _______________________________
     return false;
   }
   async exportModule(module) {
+    // KPIs → reporte maestro completo (todas las pestañas)
+    if (module === "kpis") {
+      const canMaster = !window.db || ["kpis", "caja_chica", "casos", "presupuestos"].some((m) => window.db.canDo(null, "export", m));
+      if (!canMaster) {
+        this.showToast("Acceso denegado: su rol no puede exportar el reporte maestro.", "error");
+        return;
+      }
+      if (window.excelExporter && typeof window.excelExporter.exportMasterWorkbook === "function") {
+        this.showExportLoading("Generando Libro Excel Maestro...", "Consolidando caja, casos, citas, presupuestos, inventario, documentos, asistencia y personal.");
+        try {
+          await new Promise(r => setTimeout(r, 80));
+          return await window.excelExporter.exportMasterWorkbook();
+        } finally {
+          this.hideExportLoading();
+        }
+      }
+      return;
+    }
     if (!this._canExport(module)) return;
     if (window.excelExporter && typeof window.excelExporter.exportModule === "function") {
       this.showExportLoading("Generando Libro Excel de Alta Definición...", `Procesando registros de ${module} con formato contable oficial.`);
@@ -7773,7 +8869,7 @@ _________________________________                _______________________________
   }
 
   async exportPdf(module) {
-    if (!this._canExport(module)) return;
+    if (!this._canExport(module === "kpis" ? "casos" : module)) return;
     if (window.pdfExporter && typeof window.pdfExporter.exportModulePdf === "function") {
       this.showExportLoading("Renderizando Informe Oficial en PDF...", `Generando vista vectorial y foliado institucional de ${module}.`);
       try {
@@ -7883,7 +8979,7 @@ _________________________________                _______________________________
     const inApiKey = document.getElementById("masterCloudApiKey");
     const chkAuto = document.getElementById("masterCloudAutoSync");
 
-    if (inEndpoint) inEndpoint.value = s.cloudSyncEndpoint || "https://cznxzrwhogyobpqmfxnk.supabase.co";
+    if (inEndpoint) inEndpoint.value = s.cloudSyncEndpoint || "";
     if (inApiKey) inApiKey.value = s.cloudSyncApiKey || "";
     if (chkAuto) chkAuto.checked = !!s.cloudSyncAuto;
   }
@@ -7920,17 +9016,17 @@ _________________________________                _______________________________
           </div>
 
           <div class="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
-            <button type="button" onclick="window.app.toggleModuloStatus('${escapeHtml(m.id)}')" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 ${isEnabled ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}">
+            <button type="button" onclick="window.app.toggleModuloStatus(${jsStr(m.id)})" class="px-2.5 py-1.5 rounded-lg text-[11px] font-bold transition flex items-center gap-1.5 ${isEnabled ? 'bg-slate-100 hover:bg-slate-200 text-slate-700' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}">
               <i class="fa-solid ${isEnabled ? 'fa-eye-slash' : 'fa-eye'}"></i>
               <span>${isEnabled ? 'Ocultar' : 'Activar'}</span>
             </button>
 
             <div class="flex items-center gap-1">
-              <button type="button" onclick="window.app.openEditarModuloModal('${escapeHtml(m.id)}')" class="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg transition" title="Renombrar o cambiar ícono">
+              <button type="button" onclick="window.app.openEditarModuloModal(${jsStr(m.id)})" class="p-1.5 text-slate-400 hover:text-blue-600 rounded-lg transition" title="Renombrar o cambiar ícono">
                 <i class="fa-solid fa-pen-to-square"></i>
               </button>
               ${m.isCustom ? `
-                <button type="button" onclick="window.app.eliminarModuloPersonalizado('${escapeHtml(m.id)}')" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition" title="Eliminar apartado">
+                <button type="button" onclick="window.app.eliminarModuloPersonalizado(${jsStr(m.id)})" class="p-1.5 text-slate-400 hover:text-rose-600 rounded-lg transition" title="Eliminar apartado">
                   <i class="fa-solid fa-trash-can"></i>
                 </button>
               ` : ''}
@@ -8044,18 +9140,46 @@ _________________________________                _______________________________
     const currentUser = window.db.getCurrentUser ? window.db.getCurrentUser() : null;
     const userRole = window.db.getUserRole(currentUser);
     const isSuper = (window.db && typeof window.db.isSuperAdmin === "function") ? window.db.isSuperAdmin(currentUser) : (userRole === "super_admin" || userRole === "socio");
+    const navHost = document.querySelector("#sidebar nav") || document.querySelector("aside nav") || document.getElementById("sidebar");
+    let customHost = document.getElementById("nav-custom-modules");
+    if (!customHost && navHost) {
+      customHost = document.createElement("div");
+      customHost.id = "nav-custom-modules";
+      customHost.className = "mt-2 space-y-1 px-0";
+      const masterWrap = document.getElementById("container-nav-master-admin");
+      if (masterWrap && masterWrap.parentNode) {
+        masterWrap.parentNode.insertBefore(customHost, masterWrap);
+      } else {
+        navHost.appendChild(customHost);
+      }
+    }
 
     modules.forEach(m => {
-      const btn = document.querySelector(`.nav-tab-btn[data-tab="${m.id}"]`);
-      if (btn) {
-        const canAccess = window.db.canAccessModule(currentUser, m.id);
-        const shouldShow = (m.enabled !== false || isSuper) && canAccess;
-        btn.style.display = shouldShow ? "" : "none";
+      let btn = document.querySelector(`.nav-tab-btn[data-tab="${m.id}"]`);
+      const canAccess = window.db.canAccessModule(currentUser, m.id);
+      const shouldShow = (m.enabled !== false || isSuper) && canAccess;
 
-        // Actualizar título e icono si fueron renombrados
+      // Apartados personalizados: crear botón de navegación si no existe
+      if (!btn && m.isCustom && customHost) {
+        btn = document.createElement("button");
+        btn.type = "button";
+        btn.dataset.tab = m.id;
+        btn.className = "nav-tab-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-xs font-semibold hover:bg-slate-800 hover:text-white transition text-left text-slate-300";
+        btn.onclick = () => window.app.switchTab(m.id);
+        btn.innerHTML = `<i class="fa-solid ${escapeHtml(m.icon || "fa-folder")} ${escapeHtml(m.iconColor || "text-amber-400")} w-5 text-center"></i><span>${escapeHtml(m.label || m.id)}</span>`;
+        customHost.appendChild(btn);
+        this.ensureCustomModuleView(m);
+      }
+
+      if (btn) {
+        btn.style.display = shouldShow ? "" : "none";
         const span = btn.querySelector("span:not(.badge-asistencia-pendientes)");
         if (span && m.label) {
           span.textContent = m.label;
+        }
+        const icon = btn.querySelector("i.fa-solid");
+        if (icon && m.icon) {
+          icon.className = `fa-solid ${m.icon} ${m.iconColor || "text-amber-400"} w-5 text-center`;
         }
       }
     });
@@ -8065,6 +9189,129 @@ _________________________________                _______________________________
     const containerMasterNav = document.getElementById("container-nav-master-admin");
     if (navMasterBtn) navMasterBtn.style.display = isSuper ? "" : "none";
     if (containerMasterNav) containerMasterNav.style.display = isSuper ? "" : "none";
+  }
+
+  /** Vista genérica para apartados personalizados (tabla / notas). */
+  ensureCustomModuleView(mod) {
+    if (!mod || !mod.id) return null;
+    const fullId = "view-" + mod.id;
+    let el = document.getElementById(fullId);
+    if (el) return el;
+    const main = document.querySelector("main") || document.body;
+    el = document.createElement("section");
+    el.id = fullId;
+    el.className = "tab-view hidden p-4 sm:p-6 space-y-4";
+    el.innerHTML = `
+      <div class="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <h2 class="text-lg font-black text-slate-900 dark:text-white flex items-center gap-2">
+            <i class="fa-solid ${escapeHtml(mod.icon || "fa-folder")} text-amber-500"></i>
+            <span class="custom-mod-title">${escapeHtml(mod.label || mod.id)}</span>
+          </h2>
+          <p class="text-xs text-slate-500 mt-1">${escapeHtml(mod.descripcion || "Apartado personalizado de la firma")}</p>
+        </div>
+        <button type="button" class="px-3 py-2 rounded-xl text-xs font-bold bg-amber-500 text-slate-950 hover:bg-amber-400"
+          onclick="window.app.addCustomModuleNote(${JSON.stringify(String(mod.id))})">
+          <i class="fa-solid fa-plus mr-1"></i> Nueva nota
+        </button>
+      </div>
+      <div id="custom-mod-list-${escapeHtml(mod.id)}" class="space-y-2"></div>
+    `;
+    main.appendChild(el);
+    this.renderCustomModuleNotes(mod.id);
+    return el;
+  }
+
+  renderCustomModuleNotes(modId) {
+    const listEl = document.getElementById("custom-mod-list-" + modId);
+    if (!listEl || !window.db) return;
+    const items = window.db.get(modId) || window.db.getRaw(modId) || [];
+    if (!items.length) {
+      listEl.innerHTML = `<p class="text-sm text-slate-500 border border-dashed border-slate-300 rounded-xl p-6 text-center">Sin registros. Use «Nueva nota» para comenzar.</p>`;
+      return;
+    }
+    listEl.innerHTML = items.map((n) => `
+      <div class="flex items-start justify-between gap-3 p-3 rounded-xl border border-slate-200 bg-white dark:bg-slate-900 dark:border-slate-700">
+        <div class="min-w-0">
+          <p class="text-sm font-semibold text-slate-900 dark:text-white break-words">${escapeHtml(n.titulo || n.texto || "Nota")}</p>
+          <p class="text-[11px] text-slate-500 mt-1">${escapeHtml(n.updatedAt || n.createdAt || "")}</p>
+        </div>
+        <button type="button" class="text-rose-500 hover:text-rose-700 p-1.5" title="Eliminar"
+          onclick="window.app.deleteCustomModuleNote(${JSON.stringify(String(modId))}, ${JSON.stringify(String(n.id))})">
+          <i class="fa-solid fa-trash-can"></i>
+        </button>
+      </div>
+    `).join("");
+  }
+
+  addCustomModuleNote(modId) {
+    const texto = prompt("Contenido de la nota / registro:");
+    if (!texto || !texto.trim()) return;
+    const note = {
+      id: window.generateUniqueId ? window.generateUniqueId("NOTE") : ("NOTE-" + Date.now()),
+      titulo: texto.trim().slice(0, 200),
+      texto: texto.trim(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      sede: window.db.getActiveSede ? window.db.getActiveSede() : "challhuahuacho"
+    };
+    if (!window.db.add(modId, note)) {
+      // Colección custom puede no estar en RBAC: forzar persistencia local
+      const raw = window.db.getRaw(modId) || [];
+      raw.push(note);
+      window.db.save(modId, raw);
+    }
+    this.renderCustomModuleNotes(modId);
+    this.showToast("Registro agregado al apartado.", "success");
+  }
+
+  deleteCustomModuleNote(modId, noteId) {
+    if (!confirm("¿Eliminar este registro?")) return;
+    const ok = window.db.delete(modId, noteId);
+    if (!ok) {
+      const raw = (window.db.getRaw(modId) || []).filter((n) => String(n.id) !== String(noteId));
+      window.db.save(modId, raw);
+    }
+    this.renderCustomModuleNotes(modId);
+    this.showToast("Registro eliminado.", "info");
+  }
+
+  /** Regenera selectores de sede (header + modales) desde SEDES_CONFIG. */
+  renderSedeSelector() {
+    if (!window.SEDES_CONFIG) return;
+    const active = window.db && typeof window.db.getActiveSede === "function"
+      ? window.db.getActiveSede()
+      : "challhuahuacho";
+    const buildOptions = (includeTodas) => {
+      const keys = Object.keys(window.SEDES_CONFIG);
+      return keys
+        .filter((k) => includeTodas || k !== "todas")
+        .map((k) => {
+          const s = window.SEDES_CONFIG[k];
+          const label = escapeHtml(s.nombreCorto || s.nombre || k);
+          return `<option value="${escapeHtml(k)}">${k === "todas" ? "Consolidado Nacional" : ("Sede " + label)}</option>`;
+        })
+        .join("");
+    };
+
+    const globalSel = document.getElementById("globalSedeSelect");
+    if (globalSel) {
+      const prev = globalSel.value || active;
+      globalSel.innerHTML = buildOptions(true);
+      if ([...globalSel.options].some((o) => o.value === prev)) globalSel.value = prev;
+      else if ([...globalSel.options].some((o) => o.value === active)) globalSel.value = active;
+      if (typeof this.syncSedePickerUI === "function") this.syncSedePickerUI(globalSel.value || active);
+    }
+
+    const modalIds = ["casoSede", "cajaSede", "citaSede", "presSede", "invSede", "docSede", "personalSede", "permModalWorkerSede"];
+    modalIds.forEach((id) => {
+      const sel = document.getElementById(id);
+      if (!sel) return;
+      const prev = sel.value;
+      const keepTodas = [...sel.options].some((o) => o.value === "todas");
+      sel.innerHTML = buildOptions(keepTodas || id === "personalSede" || id === "permModalWorkerSede");
+      if (prev && [...sel.options].some((o) => o.value === prev)) sel.value = prev;
+    });
   }
 
   // Renderiza el Gestor de Sedes
@@ -8110,7 +9357,7 @@ _________________________________                _______________________________
             <span>Radio: ${radVal}m</span>
           </div>
           <div class="flex items-center justify-end pt-1">
-            <button type="button" onclick="window.app.openEditarSedeModal('${k}')" class="px-3 py-1 bg-amber-500/10 hover:bg-amber-500 text-amber-700 dark:text-amber-400 hover:text-slate-950 font-bold rounded-lg border border-amber-500/30 transition flex items-center gap-1.5 text-[11px] cursor-pointer">
+            <button type="button" onclick="window.app.openEditarSedeModal(${jsStr(k)})" class="px-3 py-1 bg-amber-500/10 hover:bg-amber-500 text-amber-700 dark:text-amber-400 hover:text-slate-950 font-bold rounded-lg border border-amber-500/30 transition flex items-center gap-1.5 text-[11px] cursor-pointer">
               <i class="fa-solid fa-pen-to-square text-[10px]"></i> Editar Sede
             </button>
           </div>
@@ -8261,7 +9508,7 @@ _________________________________                _______________________________
           </td>
           ${roles.map(r => `
             <td class="p-2.5 text-center">
-              <input type="checkbox" onchange="window.app.onRbacCheckChange(${jsStr(m.id)}, '${r}', this.checked)" ${allowed.includes(r) ? 'checked' : ''} class="w-4 h-4 text-amber-500 rounded border-slate-300 focus:ring-amber-400 cursor-pointer">
+              <input type="checkbox" onchange="window.app.onRbacCheckChange(${jsStr(m.id)}, ${jsStr(r)}, this.checked)" ${allowed.includes(r) ? 'checked' : ''} class="w-4 h-4 text-amber-500 rounded border-slate-300 focus:ring-amber-400 cursor-pointer">
             </td>
           `).join("")}
           <td class="p-2.5 text-center text-xs">
@@ -8578,7 +9825,107 @@ _________________________________                _______________________________
     }
   }
 
+  async _ensureCloudSyncToken() {
+    if (!window.__ENTERPRISE_CLOUD__ || !window.PaoloCloudDataSync) return "";
+    let token =
+      typeof window.PaoloCloudDataSync.getToken === "function"
+        ? window.PaoloCloudDataSync.getToken()
+        : "";
+    if (token) return token;
+    if (!navigator.onLine || !window.PaoloAuthService) return "";
+    try {
+      const raw = sessionStorage.getItem("PA_SYNC_REAUTH");
+      if (!raw) return "";
+      const creds = JSON.parse(raw);
+      if (!creds || !creds.u || !creds.p) return "";
+      const cloud = await window.PaoloAuthService.cloudLogin(creds.u, creds.p);
+      if (cloud && cloud.ok && cloud.syncToken) {
+        window.PaoloCloudDataSync.setToken(cloud.syncToken);
+        if (cloud.directory && typeof window.PaoloAuthService.hydrateLocalWorkers === "function") {
+          window.PaoloAuthService.hydrateLocalWorkers(cloud.directory);
+        }
+        return cloud.syncToken;
+      }
+    } catch (e) {
+      console.warn("[Sync] Reauth token:", e && e.message);
+    }
+    return "";
+  }
+
   async sincronizarConNube(silent = false) {
+    // Preferir syncToken + app_records (CloudDataSync) — canónico multi-dispositivo.
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloCloudDataSync) {
+      let token = await this._ensureCloudSyncToken();
+      if (token) {
+        this.cargarAjustesFirebaseUI();
+        this.actualizarIndicadorNube("syncing", "Sincronizando...");
+        try {
+          // Push primero: evita que un pull borre ediciones locales aún no subidas.
+          if (typeof window.PaoloCloudDataSync.flushDirty === "function") {
+            await window.PaoloCloudDataSync.flushDirty();
+          }
+          await window.PaoloCloudDataSync.pushAllLocal();
+          await window.PaoloCloudDataSync.pullAndMerge();
+          this.actualizarIndicadorNube("online", "Nube sincronizada");
+          if (!silent) this.showToast("Sincronización automática completada en este equipo.", "success");
+          if (window.kpiDashboard && typeof window.kpiDashboard.refresh === "function") {
+            window.kpiDashboard.refresh();
+          }
+          if (window.alerts && typeof window.alerts.evaluateAlerts === "function") {
+            window.alerts.evaluateAlerts();
+          }
+          this.refreshCurrentModuleView();
+          if (window.AttendanceModule) {
+            if (typeof window.AttendanceModule.renderWorkerSelectorDropdown === "function") {
+              window.AttendanceModule.renderWorkerSelectorDropdown();
+            }
+            if (typeof window.AttendanceModule.renderWorkersList === "function") {
+              window.AttendanceModule.renderWorkersList();
+            }
+            if (typeof window.AttendanceModule.renderAdminAttendanceTable === "function") {
+              window.AttendanceModule.renderAdminAttendanceTable();
+            }
+            if (typeof window.AttendanceModule.renderAdminKpis === "function") {
+              window.AttendanceModule.renderAdminKpis();
+            }
+            if (typeof window.AttendanceModule.updateAnchorOfficeVisibility === "function") {
+              window.AttendanceModule.updateAnchorOfficeVisibility();
+            }
+            if (typeof window.AttendanceModule.ensurePrivilegedSupervision === "function") {
+              window.AttendanceModule.ensurePrivilegedSupervision(false);
+            }
+          }
+        } catch (e) {
+          this.actualizarIndicadorNube("offline", "Sync pendiente");
+          if (!silent) {
+            this.showToast("No se pudo sincronizar: " + (e.message || "error"), "warning");
+          }
+        }
+        return;
+      }
+    }
+
+    // Modo B Zero-Trust: outbox/Realtime — no usar tabla legada sync_multi_sede_hub
+    if (window.__ENTERPRISE_CLOUD__ && window.PaoloSyncManager && typeof window.PaoloSyncManager.flush === "function") {
+      this.cargarAjustesFirebaseUI();
+      this.actualizarIndicadorNube("syncing", "Sincronizando...");
+      try {
+        await window.PaoloSyncManager.flush();
+        this.actualizarIndicadorNube("online", "Enterprise Sync");
+        if (!silent) this.showToast("Sincronización enterprise (outbox) completada.", "success");
+        if (window.kpiDashboard && typeof window.kpiDashboard.refresh === "function") {
+          window.kpiDashboard.refresh();
+        }
+        this.refreshCurrentModuleView();
+      } catch (e) {
+        this.actualizarIndicadorNube("offline", "Sync pendiente");
+        if (!silent) {
+          this.showToast("Sync enterprise no disponible: " + (e.message || "error"), "warning");
+        }
+      }
+      return;
+    }
+
     const sSettings = window.db ? window.db.getSettings() : {};
     let endpoint = (document.getElementById("masterCloudEndpoint")?.value || sSettings.cloudSyncEndpoint || "").trim();
     const apiKey = (document.getElementById("masterCloudApiKey")?.value || sSettings.cloudSyncApiKey || "").trim();
@@ -8599,6 +9946,19 @@ _________________________________                _______________________________
       return;
     }
 
+    // Supabase directo vía sync_multi_sede_hub fue retirado (schema inseguro eliminado).
+    if (/supabase\.co/i.test(endpoint)) {
+      this.cargarAjustesFirebaseUI();
+      this.actualizarIndicadorNube("offline", "Hub legado retirado");
+      if (!silent) {
+        this.showToast(
+          "El sync por sync_multi_sede_hub fue retirado. Use Modo B (Netlify + migración Zero-Trust) o el hub local /api/cloud_sync.",
+          "warning"
+        );
+      }
+      return;
+    }
+
     this.cargarAjustesFirebaseUI();
     this.actualizarIndicadorNube("syncing", "Sincronizando...");
     if (!silent) this.showToast("Iniciando sincronización bidireccional Multi-Sede...", "info");
@@ -8614,126 +9974,7 @@ _________________________________                _______________________________
         headers["apikey"] = apiKey;
       }
 
-      if (endpoint.includes("supabase.co")) {
-        const baseUrl = endpoint.replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
-        const restUrl = baseUrl + "/rest/v1";
-
-        let totalNewRecords = 0;
-        let totalUpdatedRecords = 0;
-
-        // 1. DESCARGAR Y FUSIONAR PRIMERO (GET -> Merge) todas las sedes (incluida la propia sede)
-        // Esto garantiza que dos usuarios en la misma sede jamás sobrescriban los cambios del otro
-        const fetchRes = await fetch(restUrl + "/sync_multi_sede_hub?select=*", {
-          method: "GET",
-          headers: headers
-        });
-
-        if (fetchRes.status === 401 || fetchRes.status === 403) {
-          throw new Error("HTTP " + fetchRes.status + " - API Key de Supabase no autorizada o RLS restringido.");
-        }
-
-        if (fetchRes.ok) {
-          const allSedes = await fetchRes.json();
-          if (Array.isArray(allSedes)) {
-            allSedes.forEach(sedeRow => {
-              if (sedeRow && sedeRow.data_bundle) {
-                const bundleData = (sedeRow.data_bundle && sedeRow.data_bundle.data)
-                  ? sedeRow.data_bundle
-                  : { data: sedeRow.data_bundle };
-                const mergeStats = window.db.mergeSyncPackage(bundleData);
-                totalNewRecords += mergeStats.totalAdded;
-                totalUpdatedRecords += mergeStats.totalUpdated;
-              }
-            });
-          }
-        }
-
-        // 2. EXPORTAR PAQUETE CONSOLIDADO Y SUBIR (POST UPSERT) a sync_multi_sede_hub
-        const mergedPayload = window.db.exportSyncPackage();
-        let totalRecordsInBundle = 0;
-        if (mergedPayload.data) {
-          Object.values(mergedPayload.data).forEach(arr => {
-            if (Array.isArray(arr)) totalRecordsInBundle += arr.length;
-          });
-        }
-
-        const rawSede = mergedPayload.sedeOrigen || "challhuahuacho";
-        const sedeCodigo = (rawSede === "todas") ? "nacional" : rawSede;
-        const nombreSede = (rawSede === "todas")
-          ? "Consolidado Nacional"
-          : ("Sede " + rawSede.charAt(0).toUpperCase() + rawSede.slice(1));
-
-        const hubPayload = {
-          sede_codigo: sedeCodigo,
-          nombre_sede: nombreSede,
-          emisor: mergedPayload.emisor || "Usuario",
-          data_bundle: {
-            data: mergedPayload.data,
-            deletedIds: mergedPayload.deletedIds || {}
-          },
-          records_count: totalRecordsInBundle,
-          updated_at: new Date().toISOString()
-        };
-
-        const hubRes = await fetch(restUrl + "/sync_multi_sede_hub", {
-          method: "POST",
-          headers: {
-            ...headers,
-            "Prefer": "resolution=merge-duplicates"
-          },
-          body: JSON.stringify(hubPayload)
-        });
-
-        if (!hubRes.ok) {
-          throw new Error("HTTP " + hubRes.status + " al sincronizar con sync_multi_sede_hub en Supabase.");
-        }
-
-        // 3. Registrar trazabilidad en auditoria_trazabilidad
-        try {
-          const auditRecord = [{
-            accion: "SYNC_SUPABASE_BIDIRECCIONAL",
-            tabla_afectada: "sync_multi_sede_hub",
-            detalles: {
-              sedeOrigen: mergedPayload.sedeOrigen,
-              emisor: mergedPayload.emisor,
-              timestamp: mergedPayload.timestamp,
-              totalEnviados: totalRecordsInBundle,
-              recibidosNuevos: totalNewRecords,
-              recibidosActualizados: totalUpdatedRecords
-            }
-          }];
-
-          await fetch(restUrl + "/auditoria_trazabilidad", {
-            method: "POST",
-            headers: {
-              ...headers,
-              "Prefer": "return=minimal"
-            },
-            body: JSON.stringify(auditRecord)
-          });
-        } catch (auditErr) {}
-
-        // 4. Si Firebase también tiene credenciales configuradas, sincronizar en paralelo
-        if (window.firebaseService && window.firebaseService.hasCredentials() && !window.firebaseService.isSyncing) {
-          window.firebaseService.fullSync(null, true).catch(() => {});
-        }
-
-        this.cargarAjustesFirebaseUI();
-        this.actualizarIndicadorNube("online", "Supabase Conectado");
-        if (!silent) {
-          const statsMsg = (totalNewRecords > 0 || totalUpdatedRecords > 0)
-            ? ` (+${totalNewRecords} nuevos, ${totalUpdatedRecords} actualizados)`
-            : " (Todas las sedes sincronizadas)";
-          this.showToast(`¡Sincronización en la nube (Supabase) completada!${statsMsg}`, "success");
-        }
-        if (window.kpiDashboard && typeof window.kpiDashboard.refresh === "function") {
-          window.kpiDashboard.refresh();
-        }
-        this.refreshCurrentModuleView();
-        return;
-      }
-
-      // Si es el hub local de despacho o servidor intermedio
+      // Hub local de despacho (/api/cloud_sync) o servidor intermedio LAN
       const localTok = window.__LOCAL_SERVER_API_KEY__ || sessionStorage.getItem("PA_LOCAL_API_TOKEN") || "";
       if (localTok && !headers.Authorization) {
         headers.Authorization = "Bearer " + localTok;
@@ -9378,7 +10619,7 @@ _________________________________                _______________________________
           </div>
 
           <div class="pt-1.5">
-            <button onclick="window.app.openPermissionsModal('${escapeHtml(w.id)}')" class="w-full py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer">
+            <button onclick="window.app.openPermissionsModal(${jsStr(w.id)})" class="w-full py-1.5 px-2 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-bold text-[11px] transition flex items-center justify-center gap-1.5 shadow-2xs cursor-pointer">
               <i class="fa-solid fa-sliders text-emerald-400 text-[10px]"></i> Gestionar Permisos
             </button>
           </div>
@@ -9444,6 +10685,8 @@ _________________________________                _______________________________
       { id: "asistencia", name: "Control de Asistencia", icon: "fa-user-clock" },
       { id: "documentos", name: "Documentos & Archivo Digital", icon: "fa-folder-open" },
       { id: "inventario", name: "Inventario Patrimonial ABC", icon: "fa-boxes-packing" },
+      { id: "personal", name: "Gestión de Personal", icon: "fa-users" },
+      { id: "kpis", name: "KPIs y Tablero Ejecutivo", icon: "fa-chart-pie" },
       { id: "configuracion", name: "Configuración y Ajustes", icon: "fa-sliders" }
     ];
 
@@ -9514,16 +10757,16 @@ _________________________________                _______________________________
     const newRol = rolSelect ? rolSelect.value : worker.rol;
     const newSede = sedeSelect ? sedeSelect.value : worker.sede;
 
-    // Recolectar matriz de permisos
-    const newPermisos = {};
-    const modules = ["casos", "caja_chica", "presupuestos", "citas", "asistencia", "documentos", "inventario", "configuracion"];
+    // Recolectar matriz de permisos (merge: no borrar personal/kpis ni otras claves previas)
+    const newPermisos = { ...(worker.permisos || {}) };
+    const modules = ["casos", "caja_chica", "presupuestos", "citas", "asistencia", "documentos", "inventario", "configuracion", "personal", "kpis"];
     const actions = ["read", "create", "update", "delete", "export"];
 
     modules.forEach(m => {
-      newPermisos[m] = {};
+      newPermisos[m] = { ...(newPermisos[m] || {}) };
       actions.forEach(a => {
         const chk = document.getElementById(`perm_${m}_${a}`);
-        newPermisos[m][a] = chk ? chk.checked : false;
+        if (chk) newPermisos[m][a] = chk.checked;
       });
     });
 
@@ -9661,15 +10904,38 @@ _________________________________                _______________________________
   }
 }
 
+function openAlertsFromDeepLink() {
+  try {
+    const params = new URLSearchParams(window.location.search || "");
+    const open = params.get("open");
+    if (open === "alerts" && window.alerts && typeof window.alerts.openDrawer === "function") {
+      window.alerts.openDrawer();
+      params.delete("open");
+      const next = params.toString();
+      const url = window.location.pathname + (next ? "?" + next : "") + (window.location.hash || "");
+      window.history.replaceState({}, "", url);
+    }
+  } catch (_) {}
+}
+
 async function bootLegalApp() {
   if (!window.app && typeof LegalApp === "function") {
     try {
       window.app = new LegalApp();
       await window.app.init();
+      openAlertsFromDeepLink();
     } catch (e) {
       console.error("Error al inicializar LegalApp:", e);
     }
   }
+}
+
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "PA_OPEN_ALERTS" && window.alerts && typeof window.alerts.openDrawer === "function") {
+      window.alerts.openDrawer();
+    }
+  });
 }
 
 if (document.readyState === 'loading') {
